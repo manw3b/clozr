@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Clozr Staging",
+  "identifier": "com.clozr.staging",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Clozr Staging"
+      }
+    ]
+  }
+}

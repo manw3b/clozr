@@ -1,0 +1,4 @@
+ALTER TABLE users ADD COLUMN phone TEXT;
+ALTER TABLE users ADD COLUMN role_description TEXT;
+ALTER TABLE users ADD COLUMN avatar_color TEXT DEFAULT '#E8001D';
+ALTER TABLE users ADD COLUMN notes TEXT;

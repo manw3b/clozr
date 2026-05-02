@@ -1,0 +1,21 @@
+{
+  "identifier": "default",
+  "description": "Capacidades por defecto de la ventana principal",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "sql:allow-execute",
+    "sql:allow-select",
+    "sql:allow-load",
+    "sql:allow-close",
+    "opener:allow-open-url",
+    "fs:allow-exists",
+    "fs:allow-mkdir",
+    "fs:allow-copy-file",
+    "fs:allow-remove",
+    "fs:allow-stat",
+    "fs:scope-home-recursive",
+    "fs:scope-appdata-recursive",
+    "dialog:allow-open"
+  ]
+}

@@ -1,0 +1,1 @@
+ALTER TABLE catalog_items ADD COLUMN stock_min INTEGER DEFAULT 0;

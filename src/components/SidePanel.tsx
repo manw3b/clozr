@@ -32,6 +32,8 @@ export default function SidePanel({
           position: "fixed",
           inset: 0,
           background: "rgba(0,0,0,0.4)",
+          backdropFilter: "blur(4px)",
+          WebkitBackdropFilter: "blur(4px)",
           zIndex: 40,
           opacity: isOpen ? 1 : 0,
           pointerEvents: isOpen ? "auto" : "none",
@@ -45,13 +47,14 @@ export default function SidePanel({
           right: 0,
           bottom: 0,
           width,
-          background: "var(--surface)",
+          background: "var(--surface-elevated)",
           borderLeft: "1px solid var(--border)",
+          boxShadow: "var(--shadow-lg)",
           zIndex: 50,
           display: "flex",
           flexDirection: "column",
           transform: isOpen ? "translateX(0)" : `translateX(${width}px)`,
-          transition: "transform 0.25s cubic-bezier(0.32,0.72,0,1)",
+          transition: "transform 0.28s cubic-bezier(0.32,0.72,0,1)",
         }}
       >
         <div
@@ -59,13 +62,13 @@ export default function SidePanel({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "18px 20px",
+            padding: "18px 24px",
             borderBottom: "1px solid var(--border)",
             flexShrink: 0,
           }}
         >
           {title ? (
-            <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>
+            <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.2px" }}>
               {title}
             </span>
           ) : (
@@ -74,15 +77,18 @@ export default function SidePanel({
           <button
             onClick={onClose}
             style={{
-              width: 28,
-              height: 28,
-              borderRadius: 6,
+              width: 30,
+              height: 30,
+              borderRadius: 8,
               background: "var(--surface-2)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               color: "var(--text-tertiary)",
+              transition: "background 0.12s ease, color 0.12s ease",
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-3)"; e.currentTarget.style.color = "var(--text-primary)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "var(--surface-2)"; e.currentTarget.style.color = "var(--text-tertiary)"; }}
           >
             <X size={15} />
           </button>

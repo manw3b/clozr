@@ -62,13 +62,13 @@ function DroppableColumn({
         flex: 1,
         display: "flex",
         flexDirection: "column",
-        gap: 6,
+        gap: 8,
         overflowY: "auto",
         paddingRight: 2,
         border: `1px solid ${isOver ? "var(--brand)" : "transparent"}`,
-        borderRadius: 8,
-        transition: "border-color 0.15s",
-        background: isOver ? "rgba(232,0,29,0.04)" : "transparent",
+        borderRadius: 10,
+        transition: "border-color 0.15s, background 0.12s ease",
+        background: isOver ? "var(--surface-2)" : "transparent",
         padding: isOver ? 4 : 0,
       }}
     >
@@ -211,7 +211,7 @@ export default function PipelineScreen() {
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Header */}
       <div style={{
-        padding: "20px 24px 16px",
+        padding: "32px 36px 24px",
         borderBottom: "1px solid var(--border)",
         flexShrink: 0,
         display: "flex",
@@ -219,13 +219,13 @@ export default function PipelineScreen() {
         justifyContent: "space-between",
       }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>
+          <h1 style={{ fontSize: 25, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>
             Pipeline
           </h1>
-          <div style={{ display: "flex", gap: 12, marginTop: 3 }}>
-            <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{openCount} activos</span>
+          <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+            <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{openCount} activos</span>
             {overdueCount > 0 && (
-              <span style={{ fontSize: 12, color: "var(--brand-light)" }}>{overdueCount} vencidos</span>
+              <span style={{ fontSize: 12.5, color: "var(--brand-light)" }}>{overdueCount} vencidos</span>
             )}
           </div>
         </div>
@@ -233,8 +233,9 @@ export default function PipelineScreen() {
           onClick={() => setShowAdd(true)}
           style={{
             display: "flex", alignItems: "center", gap: 6,
-            padding: "8px 14px", background: "var(--brand)",
-            borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#fff",
+            height: 34, padding: "7px 14px", background: "var(--brand)",
+            borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff",
+            transition: "background 0.12s ease",
           }}
         >
           <Plus size={14} />
@@ -245,11 +246,11 @@ export default function PipelineScreen() {
       {/* Kanban board */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div style={{
-          flex: 1, display: "flex", gap: 12,
-          padding: "16px 24px 24px", overflowX: "auto", alignItems: "flex-start",
+          flex: 1, display: "flex", gap: 16,
+          padding: "24px 36px 28px", overflowX: "auto", alignItems: "flex-start",
         }}>
           {isLoading ? (
-            <div style={{ color: "var(--text-tertiary)", fontSize: 13, paddingTop: 8 }}>Cargando...</div>
+            <div style={{ color: "var(--text-tertiary)", fontSize: 13.5, paddingTop: 8 }}>Cargando...</div>
           ) : (
             stages.map((stage) => {
               const stageItems = byStage[stage.id] ?? [];
@@ -257,22 +258,23 @@ export default function PipelineScreen() {
                 <div
                   key={stage.id}
                   style={{
-                    width: 240, flexShrink: 0, display: "flex",
-                    flexDirection: "column", gap: 8, maxHeight: "calc(100vh - 160px)",
+                    width: 260, flexShrink: 0, display: "flex",
+                    flexDirection: "column", gap: 10, maxHeight: "calc(100vh - 160px)",
                   }}
                 >
                   <div style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "8px 10px", background: "var(--surface)",
-                    border: "1px solid var(--border)", borderRadius: 8, flexShrink: 0,
+                    padding: "10px 12px", background: "var(--surface)",
+                    border: "1px solid var(--border)", borderRadius: 12, flexShrink: 0,
+                    transition: "background 0.12s ease",
                   }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>
                       {stage.name}
                     </span>
                     {stageItems.length > 0 && (
                       <span style={{
-                        fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)",
-                        background: "var(--surface-2)", padding: "1px 6px",
+                        fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)",
+                        background: "var(--surface-2)", padding: "1px 7px",
                         borderRadius: 10, minWidth: 20, textAlign: "center",
                       }}>
                         {stageItems.length}
@@ -282,8 +284,8 @@ export default function PipelineScreen() {
                   <DroppableColumn stageId={stage.id}>
                     {stageItems.length === 0 ? (
                       <div style={{
-                        padding: "16px 10px", textAlign: "center", fontSize: 12,
-                        color: "var(--text-tertiary)", border: "1px dashed var(--border)", borderRadius: 8,
+                        padding: "16px 12px", textAlign: "center", fontSize: 12.5,
+                        color: "var(--text-tertiary)", border: "1px dashed var(--border)", borderRadius: 10,
                       }}>
                         Sin leads
                       </div>

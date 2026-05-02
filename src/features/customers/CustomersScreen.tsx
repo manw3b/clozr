@@ -100,11 +100,11 @@ export default function CustomersScreen() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Header */}
-      <div style={{ padding: "20px 24px 0", background: "var(--bg)", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+      <div style={{ padding: "32px 36px 0", background: "var(--bg)", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>Clientes</h1>
-            <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>
+            <h1 style={{ fontSize: 25, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>Clientes</h1>
+            <p style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 4 }}>
               {customers.length} resultado{customers.length !== 1 ? "s" : ""}
             </p>
           </div>
@@ -112,18 +112,19 @@ export default function CustomersScreen() {
             <div style={{
               display: "flex", alignItems: "center", gap: 8, padding: "0 12px",
               background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, width: 240,
+              transition: "background 0.12s ease",
             }}>
               <Search size={14} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Buscar..."
-                style={{ flex: 1, padding: "8px 0", background: "transparent", border: "none", color: "var(--text-primary)", fontSize: 13, outline: "none" }}
+                style={{ flex: 1, padding: "8px 0", background: "transparent", border: "none", color: "var(--text-primary)", fontSize: 13.5, outline: "none" }}
               />
             </div>
             <button
               onClick={() => setShowCreate(true)}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "var(--brand)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#fff" }}
+              style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "7px 14px", background: "var(--brand)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff", transition: "background 0.12s ease" }}
             >
               <UserPlus size={14} />
               Nuevo cliente
@@ -138,7 +139,7 @@ export default function CustomersScreen() {
               key={f.value}
               onClick={() => setActiveFilter(f.value)}
               style={{
-                padding: "8px 14px", fontSize: 13,
+                padding: "8px 14px", fontSize: 13.5,
                 fontWeight: activeFilter === f.value ? 600 : 400,
                 color: activeFilter === f.value ? "var(--brand)" : "var(--text-secondary)",
                 borderBottom: activeFilter === f.value ? "2px solid var(--brand)" : "2px solid transparent",
@@ -154,9 +155,9 @@ export default function CustomersScreen() {
       {/* Table */}
       <div style={{ flex: 1, overflow: "auto" }}>
         {isLoading ? (
-          <div style={{ padding: 24, color: "var(--text-tertiary)", fontSize: 13 }}>Cargando...</div>
+          <div style={{ padding: 28, color: "var(--text-tertiary)", fontSize: 13.5 }}>Cargando...</div>
         ) : customers.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-tertiary)", fontSize: 14 }}>
+          <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-tertiary)", fontSize: 13.5 }}>
             {searchQuery ? "Sin resultados para tu búsqueda" : "Sin clientes aún"}
           </div>
         ) : (
@@ -165,8 +166,8 @@ export default function CustomersScreen() {
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
                 {["Nombre", "Tipo", "Estado", "Barrio", "Teléfono", ""].map((h) => (
                   <th key={h} style={{
-                    padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 600,
-                    color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px",
+                    padding: "12px 16px", textAlign: "left", fontSize: 13, fontWeight: 600,
+                    color: "var(--text-secondary)",
                     whiteSpace: "nowrap", position: "sticky", top: 0, background: "var(--bg)", zIndex: 1,
                   }}>
                     {h}

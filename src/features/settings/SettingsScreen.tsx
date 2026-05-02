@@ -8,6 +8,7 @@ import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import Select from "../../components/ui/Select";
 import ImageUpload from "../../components/ui/ImageUpload";
+import { useThemeStore, type Theme } from "../../store/themeStore";
 import type {
   PipelineStage, CustomerTypeRow, CatalogCategoryRow,
   CatalogFieldTemplate, CatalogFieldType,
@@ -234,10 +235,51 @@ function GeneralSection({ wid }: { wid: string }) {
           </p>
         </div>
 
+        {/* Theme */}
+        <div>
+          <label style={labelStyle}>Apariencia</label>
+          <ThemeToggle />
+          <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 5 }}>
+            Sigue el sistema operativo o forzá un modo
+          </p>
+        </div>
+
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <SaveBtn onSave={handleSave} saving={saving} />
         </div>
       </div>
+    </div>
+  );
+}
+
+function ThemeToggle() {
+  const { theme, setTheme } = useThemeStore();
+  const opts: Array<{ value: Theme; label: string }> = [
+    { value: "light", label: "Claro" },
+    { value: "dark", label: "Oscuro" },
+    { value: "system", label: "Sistema" },
+  ];
+  return (
+    <div style={{
+      display: "inline-flex", padding: 3, gap: 2,
+      background: "var(--surface-2)", borderRadius: 9,
+      border: "1px solid var(--border)",
+    }}>
+      {opts.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => setTheme(o.value)}
+          style={{
+            padding: "6px 14px", borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+            background: theme === o.value ? "var(--surface)" : "transparent",
+            color: theme === o.value ? "var(--text-primary)" : "var(--text-secondary)",
+            boxShadow: theme === o.value ? "var(--shadow-sm)" : undefined,
+            transition: "background 0.15s ease, color 0.15s ease",
+          }}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }

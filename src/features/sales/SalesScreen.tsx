@@ -26,11 +26,9 @@ const PERIODS: Array<{ value: Period; label: string }> = [
 const TH_STYLE: React.CSSProperties = {
   padding: "10px 14px",
   textAlign: "left",
-  fontSize: 11,
+  fontSize: 13,
   fontWeight: 600,
-  color: "var(--text-tertiary)",
-  textTransform: "uppercase",
-  letterSpacing: "0.5px",
+  color: "var(--text-secondary)",
   whiteSpace: "nowrap",
   position: "sticky",
   top: 0,
@@ -59,37 +57,37 @@ function SaleRow({
         background: selected
           ? "rgba(232,0,29,0.06)"
           : hovered
-          ? "rgba(255,255,255,0.02)"
+          ? "var(--surface-2)"
           : "transparent",
         cursor: "pointer",
-        transition: "background 0.1s",
+        transition: "background 0.12s ease",
       }}
     >
-      <td style={{ padding: "12px 14px", fontSize: 13, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+      <td style={{ padding: "12px 14px", fontSize: 13.5, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
         {formatDate(sale.sale_date)}
       </td>
       <td style={{
-        padding: "12px 14px", fontSize: 13,
+        padding: "12px 14px", fontSize: 13.5,
         color: sale.customer_name ? "var(--text-primary)" : "var(--text-tertiary)",
         maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
       }}>
         {sale.customer_name ?? "Sin cliente"}
       </td>
-      <td style={{ padding: "12px 14px", fontSize: 13, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+      <td style={{ padding: "12px 14px", fontSize: 13.5, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
         {sale.seller_name ?? "—"}
       </td>
       <td style={{
-        padding: "12px 14px", fontSize: 12, color: "var(--text-secondary)",
+        padding: "12px 14px", fontSize: 12.5, color: "var(--text-secondary)",
         maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
       }}>
         {sale.items_count > 0
           ? `${sale.items_count} ítem${sale.items_count !== 1 ? "s" : ""}${sale.items_preview ? ` · ${sale.items_preview}` : ""}`
           : "—"}
       </td>
-      <td style={{ padding: "12px 14px", fontSize: 13, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
+      <td style={{ padding: "12px 14px", fontSize: 13.5, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
         {formatCurrency(sale.total)}
       </td>
-      <td style={{ padding: "12px 14px", fontSize: 13, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+      <td style={{ padding: "12px 14px", fontSize: 13.5, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
         {formatCurrency(sale.total_paid)}
       </td>
       <td style={{ padding: "12px 14px" }}>
@@ -201,20 +199,21 @@ export default function SalesScreen() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Header */}
-      <div style={{ padding: "20px 24px 0", background: "var(--bg)", flexShrink: 0 }}>
+      <div style={{ padding: "24px 28px 0", background: "var(--bg)", flexShrink: 0 }}>
         <div style={{
           display: "flex", alignItems: "center",
-          justifyContent: "space-between", marginBottom: 16,
+          justifyContent: "space-between", marginBottom: 24,
         }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>
+          <h1 style={{ fontSize: 25, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>
             Ventas
           </h1>
           <button
             onClick={() => setShowNew(true)}
             style={{
               display: "flex", alignItems: "center", gap: 6,
-              padding: "8px 14px", background: "var(--brand)",
-              borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#fff",
+              height: 34, padding: "7px 14px", background: "var(--brand)",
+              borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff",
+              transition: "background 0.12s ease",
             }}
           >
             <Plus size={14} />
@@ -232,14 +231,14 @@ export default function SalesScreen() {
               key={tab.value}
               onClick={() => setActiveTab(tab.value)}
               style={{
-                padding: "8px 14px", fontSize: 13,
+                padding: "8px 14px", fontSize: 13.5,
                 fontWeight: activeTab === tab.value ? 600 : 400,
                 color: activeTab === tab.value ? "var(--brand)" : "var(--text-secondary)",
                 borderBottom: activeTab === tab.value
                   ? "2px solid var(--brand)"
                   : "2px solid transparent",
                 marginBottom: -1,
-                transition: "color 0.12s",
+                transition: "background 0.12s ease",
               }}
             >
               {tab.label}
@@ -253,13 +252,13 @@ export default function SalesScreen() {
         {activeTab === "metricas" ? (
           <MetricsTab workspaceId={wid} />
         ) : (
-          <div style={{ padding: "20px 24px" }}>
+          <div style={{ padding: "24px 28px" }}>
             {/* Summary cards */}
             <div style={{
               display: "grid",
               gridTemplateColumns: "repeat(4, 1fr)",
               gap: 12,
-              marginBottom: 20,
+              marginBottom: 24,
             }}>
               {summaryCards.map((card) => (
                 <div
@@ -267,24 +266,23 @@ export default function SalesScreen() {
                   style={{
                     background: "var(--surface)",
                     border: "1px solid var(--border)",
-                    borderRadius: 10,
-                    padding: "14px 16px",
+                    borderRadius: 12,
+                    padding: 16,
                   }}
                 >
                   <p style={{
-                    fontSize: 11, color: "var(--text-tertiary)", fontWeight: 500,
-                    textTransform: "uppercase" as const,
-                    letterSpacing: "0.5px", marginBottom: 6,
+                    fontSize: 12.5, color: "var(--text-secondary)", fontWeight: 500,
+                    marginBottom: 6,
                   }}>
                     {card.label}
                   </p>
                   <p style={{
-                    fontSize: 20, fontWeight: 700, letterSpacing: -0.5,
+                    fontSize: 22, fontWeight: 700, letterSpacing: -0.5,
                     color: card.warn ? "var(--amber)" : "var(--text-primary)",
                   }}>
                     {card.value}
                     {card.suffix && (
-                      <span style={{ fontSize: 13, fontWeight: 400, color: "var(--text-tertiary)", marginLeft: 4 }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 400, color: "var(--text-tertiary)", marginLeft: 4 }}>
                         {card.suffix}
                       </span>
                     )}
@@ -294,18 +292,18 @@ export default function SalesScreen() {
             </div>
 
             {/* Period filter */}
-            <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+            <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
               {PERIODS.map((p) => (
                 <button
                   key={p.value}
                   onClick={() => setPeriod(p.value)}
                   style={{
-                    padding: "5px 12px", borderRadius: 6,
-                    fontSize: 12, fontWeight: period === p.value ? 600 : 400,
+                    height: 32, padding: "7px 14px", borderRadius: 8,
+                    fontSize: 12.5, fontWeight: period === p.value ? 600 : 500,
                     background: period === p.value ? "var(--brand)" : "var(--surface)",
                     color: period === p.value ? "#fff" : "var(--text-secondary)",
                     border: `1px solid ${period === p.value ? "var(--brand)" : "var(--border)"}`,
-                    transition: "all 0.12s",
+                    transition: "background 0.12s ease",
                   }}
                 >
                   {p.label}
@@ -329,7 +327,7 @@ export default function SalesScreen() {
               <div style={{
                 background: "var(--surface)",
                 border: "1px solid var(--border)",
-                borderRadius: 10,
+                borderRadius: 12,
                 overflow: "hidden",
               }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>

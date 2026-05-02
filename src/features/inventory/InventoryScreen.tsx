@@ -47,10 +47,10 @@ function ProductImg({ item, size = 40 }: { item: CatalogItemWithImeis; size?: nu
 
 function SummaryCard({ label, value, color, sub }: { label: string; value: number | string; color?: string; sub?: string }) {
   return (
-    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px", flex: 1 }}>
-      <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{label}</p>
-      <p style={{ fontSize: 22, fontWeight: 800, color: color ?? "var(--text-primary)" }}>{value}</p>
-      {sub && <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>{sub}</p>}
+    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, flex: 1 }}>
+      <p style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>{label}</p>
+      <p style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5, color: color ?? "var(--text-primary)" }}>{value}</p>
+      {sub && <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{sub}</p>}
     </div>
   );
 }
@@ -180,7 +180,7 @@ function ProductPanel({
         {/* Units */}
         <div style={{ padding: "14px 0", borderBottom: "1px solid var(--border)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Unidades disponibles</p>
+            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Unidades disponibles</p>
             <span style={{ fontSize: 13, fontWeight: 700, color: unitCount > 0 ? "var(--green, #22c55e)" : "var(--text-secondary)" }}>{unitCount}</span>
           </div>
           <button
@@ -198,7 +198,7 @@ function ProductPanel({
         {/* Sale history */}
         {sales.length > 0 && (
           <div style={{ paddingTop: 14 }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>
               Ventas recientes
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -311,11 +311,11 @@ export default function InventoryScreen() {
       key={val}
       onClick={() => setProductFilter(val)}
       style={{
-        padding: "6px 12px", borderRadius: 20, fontSize: 12, fontWeight: 500,
+        height: 32, padding: "7px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 600,
         background: productFilter === val ? "var(--brand)" : "transparent",
         color: productFilter === val ? "#fff" : "var(--text-secondary)",
-        border: productFilter === val ? "none" : "1px solid var(--border)",
-        cursor: "pointer", transition: "background 0.15s, color 0.15s",
+        border: productFilter === val ? "1px solid var(--brand)" : "1px solid var(--border)",
+        cursor: "pointer", transition: "background 0.12s ease",
       }}
     >
       {label}
@@ -324,13 +324,13 @@ export default function InventoryScreen() {
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
     padding: "8px 20px",
-    fontSize: 13,
-    fontWeight: active ? 700 : 400,
+    fontSize: 13.5,
+    fontWeight: active ? 600 : 400,
     color: active ? "var(--text-primary)" : "var(--text-secondary)",
     background: "none",
     borderBottom: active ? "2px solid var(--brand)" : "2px solid transparent",
     cursor: "pointer",
-    transition: "color 0.15s, border-color 0.15s",
+    transition: "background 0.12s ease",
     whiteSpace: "nowrap",
   });
 
@@ -340,19 +340,20 @@ export default function InventoryScreen() {
     <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
 
       {/* Header */}
-      <div style={{ padding: "18px 28px 0", borderBottom: "1px solid var(--border)", background: "var(--surface)", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+      <div style={{ padding: "24px 28px 0", borderBottom: "1px solid var(--border)", background: "var(--surface)", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Archive size={18} color="var(--brand)" />
-            <h1 style={{ fontSize: 17, fontWeight: 700, color: "var(--text-primary)" }}>Inventario</h1>
+            <Archive size={20} color="var(--brand)" />
+            <h1 style={{ fontSize: 25, fontWeight: 700, letterSpacing: -0.5, color: "var(--text-primary)" }}>Inventario</h1>
           </div>
           {tab === "products" && (
             <button
               onClick={() => setShowAddModal(true)}
               style={{
                 display: "flex", alignItems: "center", gap: 6,
-                padding: "8px 14px", background: "var(--brand)", borderRadius: 8,
-                fontSize: 13, fontWeight: 600, color: "#fff", cursor: "pointer",
+                height: 34, padding: "7px 14px", background: "var(--brand)", borderRadius: 8,
+                fontSize: 12.5, fontWeight: 600, color: "#fff", cursor: "pointer",
+                transition: "background 0.12s ease",
               }}
             >
               <Plus size={14} /> Agregar producto
@@ -362,13 +363,13 @@ export default function InventoryScreen() {
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={() => { setUnitsPreSelection(undefined); setUnitsModelFilter(undefined); setUnitsMode("load"); }}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "var(--brand)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#fff", cursor: "pointer" }}
+                style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "7px 14px", background: "var(--brand)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff", cursor: "pointer", transition: "background 0.12s ease" }}
               >
                 <Plus size={14} /> Cargar mercadería
               </button>
               <button
                 onClick={() => { setSalePreUnit(undefined); setUnitsMode("sale"); }}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.4)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "var(--green, #22c55e)", cursor: "pointer" }}
+                style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "7px 14px", background: "rgba(34,197,94,0.12)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "var(--green, #22c55e)", cursor: "pointer", transition: "background 0.12s ease" }}
               >
                 ⚡ Venta rápida
               </button>
@@ -392,7 +393,7 @@ export default function InventoryScreen() {
             {/* Main content */}
             <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
               {/* Summary cards */}
-              <div style={{ display: "flex", gap: 10, padding: "16px 28px 0" }}>
+              <div style={{ display: "flex", gap: 12, padding: "24px 28px 0" }}>
                 <SummaryCard label="Total productos" value={summary.total_items} />
                 <SummaryCard label="Con unidades" value={summary.in_stock} color="var(--green, #22c55e)" />
                 <SummaryCard label="Sin unidades" value={summary.out_of_stock} color="var(--amber, #f59e0b)" />
@@ -403,14 +404,14 @@ export default function InventoryScreen() {
               </div>
 
               {/* Filters */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 28px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "20px 28px" }}>
                 <div style={{ position: "relative", flex: 1 }}>
                   <Search size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
                   <input
                     value={productSearch}
                     onChange={(e) => setProductSearch(e.target.value)}
                     placeholder="Buscar producto..."
-                    style={{ width: "100%", padding: "7px 12px 7px 30px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-primary)", fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                    style={{ width: "100%", height: 34, padding: "7px 12px 7px 30px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-primary)", fontSize: 13.5, outline: "none", boxSizing: "border-box" }}
                   />
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
@@ -436,11 +437,11 @@ export default function InventoryScreen() {
                 </div>
               ) : (
                 <div style={{ flex: 1, overflow: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
                     <thead>
                       <tr style={{ borderBottom: "1px solid var(--border)" }}>
                         {["", "Nombre", "Variante", "Precio", "Unidades", ""].map((h, i) => (
-                          <th key={i} style={{ padding: "9px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.04em", background: "var(--surface)", position: "sticky", top: 0, zIndex: 1 }}>{h}</th>
+                          <th key={i} style={{ padding: "10px 16px", textAlign: "left", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", background: "var(--surface)", position: "sticky", top: 0, zIndex: 1 }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -452,7 +453,7 @@ export default function InventoryScreen() {
                           <tr
                             key={item.id}
                             onClick={() => setSelectedProduct(isSelected ? null : item)}
-                            style={{ borderBottom: "1px solid var(--border)", cursor: "pointer", background: isSelected ? "var(--surface)" : "transparent", transition: "background 0.1s" }}
+                            style={{ borderBottom: "1px solid var(--border)", cursor: "pointer", background: isSelected ? "var(--surface)" : "transparent", transition: "background 0.12s ease" }}
                             onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "var(--surface)"; }}
                             onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
                           >

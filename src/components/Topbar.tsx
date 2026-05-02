@@ -140,37 +140,39 @@ export default function Topbar() {
   };
 
   const btn = (variant: "primary" | "ghost"): React.CSSProperties => ({
-    display: "flex", alignItems: "center", gap: 6, padding: "6px 12px",
-    borderRadius: 7, fontSize: 12, fontWeight: 600,
+    display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", height: 32,
+    borderRadius: 8, fontSize: 12.5, fontWeight: 600,
     background: variant === "primary" ? "var(--brand)" : "var(--surface-2)",
     color: variant === "primary" ? "#fff" : "var(--text-secondary)",
+    border: variant === "primary" ? "none" : "1px solid var(--border)",
     whiteSpace: "nowrap",
+    transition: "background 0.12s ease",
   });
 
   return (
     <div style={{
-      height: 48, display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "0 14px", background: "var(--surface)", borderBottom: "1px solid var(--border)",
-      flexShrink: 0, gap: 10, zIndex: 10,
+      height: 56, display: "flex", alignItems: "center", justifyContent: "space-between",
+      padding: "0 18px", background: "var(--surface)", borderBottom: "1px solid var(--border)",
+      flexShrink: 0, gap: 12, zIndex: 10,
     }}>
       {/* Business selector */}
       <div ref={dropRef} style={{ position: "relative" }}>
         <button
           onClick={() => setOpen((v) => !v)}
-          style={{ display: "flex", alignItems: "center", gap: 7, padding: "5px 9px", borderRadius: 8, background: open ? "var(--surface-2)" : "transparent" }}
+          style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: open ? "var(--surface-2)" : "transparent", transition: "background 0.12s ease" }}
         >
-          <span style={{ fontSize: 15 }}>{activeBusiness?.emoji ?? "🏪"}</span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 16 }}>{activeBusiness?.emoji ?? "🏪"}</span>
+          <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-primary)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {activeBusiness?.name ?? "Sin negocio"}
           </span>
-          <ChevronDown size={12} color="var(--text-tertiary)" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+          <ChevronDown size={13} color="var(--text-tertiary)" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
         </button>
 
         {open && (
           <div style={{
-            position: "absolute", top: "calc(100% + 5px)", left: 0,
-            background: "var(--surface)", border: "1px solid var(--border-strong)",
-            borderRadius: 10, minWidth: 210, boxShadow: "0 12px 32px rgba(0,0,0,0.4)", zIndex: 100, overflow: "hidden",
+            position: "absolute", top: "calc(100% + 6px)", left: 0,
+            background: "var(--surface-elevated)", border: "1px solid var(--border-strong)",
+            borderRadius: 12, minWidth: 240, boxShadow: "var(--shadow-lg)", zIndex: 100, overflow: "hidden",
           }}>
             {businesses.map((b) => (
               <BizOption key={b.id} b={b} active={activeBusiness?.id === b.id} onSelect={() => { setActiveBusiness(b); setOpen(false); }} />
@@ -211,27 +213,27 @@ export default function Topbar() {
           {saleChoice && (
             <div style={{
               position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200,
-              background: "var(--surface)", border: "1px solid var(--border-strong)",
-              borderRadius: 12, overflow: "hidden", boxShadow: "0 16px 40px rgba(0,0,0,0.45)",
-              minWidth: 240,
+              background: "var(--surface-elevated)", border: "1px solid var(--border-strong)",
+              borderRadius: 12, overflow: "hidden", boxShadow: "var(--shadow-lg)",
+              minWidth: 260,
             }}>
               <button
                 onClick={() => { setSaleChoice(false); setActiveScreen("inventory"); setInventoryOpenSale(true); }}
-                style={{ width: "100%", textAlign: "left", padding: "12px 16px", borderBottom: "1px solid var(--border)", cursor: "pointer" }}
+                style={{ width: "100%", textAlign: "left", padding: "14px 16px", borderBottom: "1px solid var(--border)", cursor: "pointer", transition: "background 0.12s ease" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
               >
-                <p style={{ fontSize: 13, fontWeight: 700, color: "var(--green, #22c55e)", marginBottom: 2 }}>⚡ Desde inventario</p>
-                <p style={{ fontSize: 11, color: "var(--text-secondary)" }}>Seleccioná una unidad en stock</p>
+                <p style={{ fontSize: 13.5, fontWeight: 600, color: "var(--green)", marginBottom: 3 }}>⚡ Desde inventario</p>
+                <p style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>Seleccioná una unidad en stock</p>
               </button>
               <button
                 onClick={() => { setSaleChoice(false); setQuickModal("sale"); }}
-                style={{ width: "100%", textAlign: "left", padding: "12px 16px", cursor: "pointer" }}
+                style={{ width: "100%", textAlign: "left", padding: "14px 16px", cursor: "pointer", transition: "background 0.12s ease" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
               >
-                <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 2 }}>✏️ Venta libre</p>
-                <p style={{ fontSize: 11, color: "var(--text-secondary)" }}>Ingresá los datos manualmente</p>
+                <p style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-primary)", marginBottom: 3 }}>✏️ Venta libre</p>
+                <p style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>Ingresá los datos manualmente</p>
               </button>
             </div>
           )}
@@ -241,13 +243,13 @@ export default function Topbar() {
         </button>
 
         {/* Score bar */}
-        <button onClick={() => setActiveScreen("home")} title={`Score del día: ${score}/100`} style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 9px", borderRadius: 7, background: "var(--surface-2)", border: `1px solid ${sc.color}28` }}>
-          <div style={{ display: "flex", gap: 1.5 }}>
+        <button onClick={() => setActiveScreen("home")} title={`Score del día: ${score}/100`} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", height: 32, borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", gap: 2 }}>
             {Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} style={{ width: 4, height: 14, borderRadius: 2, background: i < Math.round(score / 10) ? sc.color : "var(--surface-3)", transition: "background 0.3s" }} />
+              <div key={i} style={{ width: 4, height: 14, borderRadius: 2, background: i < Math.round(score / 10) ? sc.color : "var(--surface-3)", transition: "background 0.3s ease" }} />
             ))}
           </div>
-          <span style={{ fontSize: 12, fontWeight: 700, color: sc.color, minWidth: 22, textAlign: "right" }}>{score}</span>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: sc.color, minWidth: 22, textAlign: "right" }}>{score}</span>
           {sc.icon && <span style={{ fontSize: 11 }}>{sc.icon}</span>}
         </button>
       </div>
@@ -259,9 +261,9 @@ function BizOption({ b, active, onSelect }: { b: Business; active: boolean; onSe
   const [hov, setHov] = useState(false);
   return (
     <button onClick={onSelect} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "8px 12px", background: hov ? "var(--surface-2)" : "transparent" }}>
-      <span style={{ fontSize: 15 }}>{b.emoji}</span>
-      <span style={{ flex: 1, fontSize: 13, color: active ? "var(--brand)" : "var(--text-primary)", fontWeight: active ? 600 : 400 }}>{b.name}</span>
+      style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: hov ? "var(--surface-2)" : "transparent", transition: "background 0.12s ease" }}>
+      <span style={{ fontSize: 16 }}>{b.emoji}</span>
+      <span style={{ flex: 1, fontSize: 13.5, color: active ? "var(--text-primary)" : "var(--text-primary)", fontWeight: active ? 600 : 500, textAlign: "left" }}>{b.name}</span>
       {active && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--brand)" }} />}
     </button>
   );

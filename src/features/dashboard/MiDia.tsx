@@ -27,7 +27,11 @@ function greeting(): string {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h2 style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 10 }}>
+    <h2 style={{
+      fontSize: 13, fontWeight: 600, color: "var(--text-secondary)",
+      letterSpacing: "-0.1px", marginBottom: 12,
+      display: "flex", alignItems: "center", gap: 8,
+    }}>
       {children}
     </h2>
   );
@@ -35,7 +39,13 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden", ...style }}>
+    <div style={{
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
+      borderRadius: 12,
+      overflow: "hidden",
+      ...style,
+    }}>
       {children}
     </div>
   );
@@ -81,19 +91,19 @@ function FollowupItem({ followup, onToggle, onDelete }: { followup: Followup; on
 
   return (
     <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border)", background: hov ? "var(--surface-2)" : "transparent", transition: "background 0.1s" }}>
+      style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: "1px solid var(--border)", background: hov ? "var(--surface-2)" : "transparent", transition: "background 0.12s ease" }}>
       <button onClick={() => onToggle(followup.id, !done)}
-        style={{ width: 18, height: 18, borderRadius: 5, flexShrink: 0, border: `2px solid ${done ? "var(--green)" : overdue ? "var(--brand)" : "var(--border-strong)"}`, background: done ? "var(--green)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
-        {done && <Check size={10} color="#fff" strokeWidth={3} />}
+        style={{ width: 18, height: 18, borderRadius: 5, flexShrink: 0, border: `1.5px solid ${done ? "var(--green)" : overdue ? "var(--brand)" : "var(--border-strong)"}`, background: done ? "var(--green)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s ease" }}>
+        {done && <Check size={11} color="#fff" strokeWidth={3} />}
       </button>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 13, color: done ? "var(--text-tertiary)" : "var(--text-primary)", textDecoration: done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <p style={{ fontSize: 13.5, color: done ? "var(--text-tertiary)" : "var(--text-primary)", textDecoration: done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {followup.text}
         </p>
-        {followup.customer_name && <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>{followup.customer_name}</p>}
+        {followup.customer_name && <p style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 2 }}>{followup.customer_name}</p>}
       </div>
-      {overdue && <span style={{ fontSize: 10, fontWeight: 600, color: "var(--brand)", background: "var(--red-bg)", padding: "2px 6px", borderRadius: 4, flexShrink: 0 }}>Vencido</span>}
-      {hov && <button onClick={() => onDelete(followup.id)} style={{ color: "var(--text-tertiary)", display: "flex", flexShrink: 0 }}><X size={13} /></button>}
+      {overdue && <span style={{ fontSize: 10.5, fontWeight: 600, color: "var(--brand)", background: "var(--red-bg)", padding: "2px 8px", borderRadius: 999, flexShrink: 0 }}>Vencido</span>}
+      {hov && <button onClick={() => onDelete(followup.id)} style={{ color: "var(--text-tertiary)", display: "flex", flexShrink: 0 }}><X size={14} /></button>}
     </div>
   );
 }
@@ -105,18 +115,18 @@ function AddFollowupInline({ onAdd }: { onAdd: (text: string) => void }) {
 
   if (!open) return (
     <button onClick={() => setOpen(true)} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-2)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-      style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", fontSize: 13, color: "var(--text-tertiary)", transition: "background 0.1s" }}>
-      <Plus size={13} /> Agregar seguimiento
+      style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", fontSize: 13, color: "var(--text-tertiary)", fontWeight: 500, transition: "background 0.12s ease" }}>
+      <Plus size={14} /> Agregar seguimiento
     </button>
   );
 
   return (
-    <div style={{ padding: "10px 14px", display: "flex", gap: 8 }}>
+    <div style={{ padding: "12px 16px", display: "flex", gap: 8 }}>
       <input autoFocus value={text} onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") setOpen(false); }}
         placeholder="¿Qué tenés que hacer?"
-        style={{ flex: 1, padding: "7px 10px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 6, color: "var(--text-primary)", fontSize: 13, outline: "none" }} />
-      <button onClick={submit} disabled={!text.trim()} style={{ padding: "7px 12px", background: "var(--brand)", borderRadius: 6, fontSize: 12, fontWeight: 600, color: "#fff", opacity: !text.trim() ? 0.5 : 1 }}>OK</button>
+        style={{ flex: 1, padding: "8px 12px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 8, color: "var(--text-primary)", fontSize: 13, outline: "none" }} />
+      <button onClick={submit} disabled={!text.trim()} style={{ padding: "8px 14px", background: "var(--brand)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff", opacity: !text.trim() ? 0.5 : 1 }}>OK</button>
     </div>
   );
 }
@@ -220,38 +230,38 @@ export default function MiDia() {
 
   return (
     <div style={{ height: "100%", overflow: "auto" }}>
-      <div style={{ padding: "20px 24px", maxWidth: 1400, display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ padding: "32px 36px", maxWidth: 1400, display: "flex", flexDirection: "column", gap: 28 }}>
 
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>
+            <h1 style={{ fontSize: 26, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.6, lineHeight: 1.2 }}>
               {greeting()}{userName ? `, ${userName.split(" ")[0]}` : ""}
             </h1>
-            <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 3 }}>
+            <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginTop: 6 }}>
               {activeBusiness?.name} · {new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })}
             </p>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: "var(--surface)", border: `1px solid ${sc.color}33`, borderRadius: 10 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <span style={{ fontSize: 10, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Score del día</span>
-              <div style={{ display: "flex", gap: 2 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 18px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <span style={{ fontSize: 10.5, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.6px" }}>Score del día</span>
+              <div style={{ display: "flex", gap: 2.5 }}>
                 {Array.from({ length: 10 }).map((_, i) => (
-                  <div key={i} style={{ width: 6, height: 18, borderRadius: 2, background: i < Math.round(score / 10) ? sc.color : "var(--surface-3)", transition: "background 0.3s" }} />
+                  <div key={i} style={{ width: 6, height: 18, borderRadius: 2, background: i < Math.round(score / 10) ? sc.color : "var(--surface-3)", transition: "background 0.3s ease" }} />
                 ))}
               </div>
             </div>
-            <div style={{ textAlign: "right" }}>
-              <p style={{ fontSize: 28, fontWeight: 800, color: sc.color, lineHeight: 1, letterSpacing: -1 }}>{score}</p>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+              <p style={{ fontSize: 30, fontWeight: 700, color: sc.color, lineHeight: 1, letterSpacing: -1 }}>{score}</p>
               {sc.icon && <span style={{ fontSize: 16 }}>{sc.icon}</span>}
             </div>
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 28, alignItems: "start" }}>
 
           {/* LEFT */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
             {urgentItems.length > 0 && (
               <section>
                 <SectionTitle>Necesitan atención</SectionTitle>
@@ -260,10 +270,11 @@ export default function MiDia() {
             )}
             <section>
               <SectionTitle>
-                Seguimientos{followups.length > 0 && <span style={{ marginLeft: 8, color: "var(--text-primary)" }}>{followupsDone}/{followups.length}</span>}
+                Seguimientos
+                {followups.length > 0 && <span style={{ fontSize: 12, color: "var(--text-tertiary)", fontWeight: 500 }}>{followupsDone}/{followups.length}</span>}
               </SectionTitle>
               <Card>
-                {followups.length === 0 && <p style={{ padding: "12px 14px", fontSize: 13, color: "var(--text-tertiary)" }}>Sin seguimientos para hoy</p>}
+                {followups.length === 0 && <p style={{ padding: "16px", fontSize: 13, color: "var(--text-tertiary)" }}>Sin seguimientos para hoy</p>}
                 {followups.map((f) => <FollowupItem key={f.id} followup={f} onToggle={handleToggle} onDelete={handleDelete} />)}
                 <AddFollowupInline onAdd={handleAdd} />
               </Card>
@@ -273,13 +284,13 @@ export default function MiDia() {
                 <SectionTitle>Actividad reciente</SectionTitle>
                 <Card>
                   {recentMovements.map((m) => (
-                    <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 14px", borderBottom: "1px solid var(--border)" }}>
+                    <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
                       <span style={{ fontSize: 14, color: m.direction === "in" ? "var(--green)" : "var(--brand)" }}>{m.direction === "in" ? "↑" : "↓"}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: 13, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.description ?? m.type}</p>
-                        <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>{new Date(m.created_at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</p>
+                        <p style={{ fontSize: 13.5, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.description ?? m.type}</p>
+                        <p style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 2 }}>{new Date(m.created_at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</p>
                       </div>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: m.direction === "in" ? "var(--green)" : "var(--brand)", flexShrink: 0 }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 600, color: m.direction === "in" ? "var(--green)" : "var(--brand)", flexShrink: 0 }}>
                         {m.direction === "in" ? "+" : "-"}{formatMoney(m.amount, m.currency)}
                       </span>
                     </div>
@@ -290,7 +301,7 @@ export default function MiDia() {
           </div>
 
           {/* RIGHT */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
             {/* Dinero hoy */}
             <section>
@@ -388,20 +399,20 @@ export default function MiDia() {
 
 function MoneyBlock({ label, ingresos, egresos, balance, currency }: { label: string; ingresos: number; egresos: number; balance: number; currency: string }) {
   return (
-    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px" }}>
-      <p style={{ fontSize: 10, fontWeight: 600, color: "var(--text-tertiary)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</p>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
+    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px" }}>
+      <p style={{ fontSize: 10.5, fontWeight: 600, color: "var(--text-tertiary)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.6px" }}>{label}</p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
         <div>
-          <p style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Ingresos</p>
-          <p style={{ fontSize: 13, fontWeight: 600, color: "var(--green)" }}>{formatMoney(ingresos, currency)}</p>
+          <p style={{ fontSize: 10.5, color: "var(--text-tertiary)" }}>Ingresos</p>
+          <p style={{ fontSize: 13.5, fontWeight: 600, color: "var(--green)", marginTop: 1 }}>{formatMoney(ingresos, currency)}</p>
         </div>
         <div>
-          <p style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Egresos</p>
-          <p style={{ fontSize: 13, fontWeight: 600, color: "var(--brand)" }}>-{formatMoney(egresos, currency)}</p>
+          <p style={{ fontSize: 10.5, color: "var(--text-tertiary)" }}>Egresos</p>
+          <p style={{ fontSize: 13.5, fontWeight: 600, color: "var(--brand)", marginTop: 1 }}>-{formatMoney(egresos, currency)}</p>
         </div>
         <div>
-          <p style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Balance</p>
-          <p style={{ fontSize: 13, fontWeight: 700, color: balance >= 0 ? "var(--text-primary)" : "var(--brand)" }}>{formatMoney(balance, currency)}</p>
+          <p style={{ fontSize: 10.5, color: "var(--text-tertiary)" }}>Balance</p>
+          <p style={{ fontSize: 13.5, fontWeight: 700, color: balance >= 0 ? "var(--text-primary)" : "var(--brand)", marginTop: 1 }}>{formatMoney(balance, currency)}</p>
         </div>
       </div>
     </div>

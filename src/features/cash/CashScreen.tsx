@@ -95,29 +95,29 @@ export default function CashScreen() {
   const usdOut = byCurrency?.usd.egresos ?? 0;
   const arsEquivBalance = (arsIn - arsOut) + (usdIn - usdOut) * usdToArs;
 
-  const TH: React.CSSProperties = { padding: "9px 14px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px", position: "sticky", top: 0, background: "var(--bg)", zIndex: 1, whiteSpace: "nowrap" };
+  const TH: React.CSSProperties = { padding: "10px 14px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-tertiary)", position: "sticky", top: 0, background: "var(--bg)", zIndex: 1, whiteSpace: "nowrap" };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      <div style={{ padding: "20px 24px 0", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>Caja Operativa</h1>
-          <button onClick={() => setShowForm((v) => !v)} style={{ padding: "8px 14px", background: "var(--brand)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#fff" }}>
+      <div style={{ padding: "32px 36px 0", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <h1 style={{ fontSize: 25, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>Caja Operativa</h1>
+          <button onClick={() => setShowForm((v) => !v)} style={{ height: 34, padding: "7px 14px", background: "var(--brand)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff", transition: "background 0.12s ease" }}>
             + Movimiento
           </button>
         </div>
 
         {/* Period selector */}
-        <div style={{ display: "flex", gap: 2, marginBottom: 14 }}>
+        <div style={{ display: "flex", gap: 4, marginBottom: 24 }}>
           {(["today", "week", "month"] as Period[]).map((p) => (
-            <button key={p} onClick={() => setPeriod(p)} style={{ padding: "6px 14px", borderRadius: 7, fontSize: 13, background: period === p ? "var(--surface-2)" : "transparent", color: period === p ? "var(--text-primary)" : "var(--text-tertiary)", fontWeight: period === p ? 600 : 400, border: period === p ? "1px solid var(--border-strong)" : "1px solid transparent" }}>
+            <button key={p} onClick={() => setPeriod(p)} style={{ height: 32, padding: "7px 14px", borderRadius: 8, fontSize: 12.5, background: period === p ? "var(--surface-2)" : "transparent", color: period === p ? "var(--text-primary)" : "var(--text-tertiary)", fontWeight: period === p ? 600 : 500, border: period === p ? "1px solid var(--border-strong)" : "1px solid transparent", transition: "background 0.12s ease" }}>
               {PERIOD_LABELS[p]}
             </button>
           ))}
         </div>
 
         {/* 4 cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 24 }}>
           <SummaryCard label="Ingresos ARS" amount={arsIn} color="var(--green)" currency="ARS" />
           <SummaryCard label="Ingresos USD" amount={usdIn} color="var(--green)" currency="USD" />
           <SummaryCard label={`Egresos (equiv. ARS)`} amount={arsOut + usdOut * usdToArs} color="var(--brand)" currency="ARS" negative />
@@ -130,8 +130,8 @@ export default function CashScreen() {
         )}
 
         {/* Filter */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, paddingBottom: 12, borderBottom: "1px solid var(--border)" }}>
-          <span style={{ fontSize: 12, color: "var(--text-tertiary)", flexShrink: 0 }}>Filtrar:</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, paddingBottom: 14, borderBottom: "1px solid var(--border)" }}>
+          <span style={{ fontSize: 12.5, color: "var(--text-tertiary)", flexShrink: 0 }}>Filtrar:</span>
           <div style={{ width: 150 }}><Select value={filter} onChange={setFilter} options={FILTER_OPTIONS} /></div>
         </div>
       </div>
@@ -139,7 +139,7 @@ export default function CashScreen() {
       {/* Table */}
       <div style={{ flex: 1, overflow: "auto" }}>
         {isLoading ? (
-          <div style={{ padding: 24, color: "var(--text-tertiary)", fontSize: 13 }}>Cargando...</div>
+          <div style={{ padding: 28, color: "var(--text-tertiary)", fontSize: 13.5 }}>Cargando...</div>
         ) : filtered.length === 0 ? (
           <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-tertiary)", fontSize: 14 }}>
             {movements.length === 0 ? "Sin movimientos en este período" : "Sin resultados"}
@@ -171,9 +171,9 @@ export default function CashScreen() {
 
 function SummaryCard({ label, amount, color, currency, negative, bold }: { label: string; amount: number; color: string; currency: string; negative?: boolean; bold?: boolean }) {
   return (
-    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px" }}>
-      <p style={{ fontSize: 10, color: "var(--text-tertiary)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 5 }}>{label}</p>
-      <p style={{ fontSize: 18, fontWeight: bold ? 800 : 700, color, letterSpacing: -0.5 }}>
+    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+      <p style={{ fontSize: 12.5, color: "var(--text-secondary)", fontWeight: 600, marginBottom: 6 }}>{label}</p>
+      <p style={{ fontSize: 19, fontWeight: bold ? 800 : 700, color, letterSpacing: -0.5 }}>
         {negative && amount > 0 ? "-" : ""}{formatMoney(amount, currency)}
       </p>
     </div>
@@ -183,27 +183,27 @@ function SummaryCard({ label, amount, color, currency, negative, bold }: { label
 function MovementRow({ movement: m, onDelete }: { movement: CashMovement; onDelete: (id: string) => void }) {
   const [hov, setHov] = useState(false);
   const auto = m.reference_type === "sale";
-  const TD: React.CSSProperties = { padding: "10px 14px", fontSize: 13, color: "var(--text-primary)", borderBottom: "1px solid var(--border)", verticalAlign: "middle" };
+  const TD: React.CSSProperties = { padding: "11px 14px", fontSize: 13.5, color: "var(--text-primary)", borderBottom: "1px solid var(--border)", verticalAlign: "middle" };
   return (
-    <tr onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)} style={{ background: hov ? "rgba(255,255,255,0.02)" : "transparent" }}>
-      <td style={{ ...TD, color: "var(--text-tertiary)", fontSize: 12, whiteSpace: "nowrap" }}>
+    <tr onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)} style={{ background: hov ? "var(--surface)" : "transparent", transition: "background 0.12s ease" }}>
+      <td style={{ ...TD, color: "var(--text-tertiary)", fontSize: 12.5, whiteSpace: "nowrap" }}>
         {new Date(m.created_at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
       </td>
       <td style={TD}>
-        <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 4, background: m.direction === "in" ? "var(--green-bg)" : "var(--red-bg)", color: m.direction === "in" ? "var(--green)" : "var(--brand)" }}>
+        <span style={{ fontSize: 11.5, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: m.direction === "in" ? "var(--green-bg)" : "var(--red-bg)", color: m.direction === "in" ? "var(--green)" : "var(--brand)" }}>
           {TYPE_LABELS[m.type]}
         </span>
-        {auto && <span style={{ marginLeft: 6, fontSize: 10, color: "var(--text-tertiary)" }}>auto</span>}
+        {auto && <span style={{ marginLeft: 6, fontSize: 11, color: "var(--text-tertiary)" }}>auto</span>}
       </td>
       <td style={{ ...TD, color: "var(--text-secondary)" }}>{m.description ?? "—"}</td>
       <td style={{ ...TD, color: "var(--text-secondary)" }}>{m.customer_name ?? <span style={{ color: "var(--text-tertiary)" }}>—</span>}</td>
-      <td style={{ ...TD, color: "var(--text-tertiary)", fontSize: 12 }}>{m.currency}</td>
+      <td style={{ ...TD, color: "var(--text-tertiary)", fontSize: 12.5 }}>{m.currency}</td>
       <td style={{ ...TD, textAlign: "right", fontWeight: 600, color: m.direction === "in" ? "var(--green)" : "var(--brand)", whiteSpace: "nowrap" }}>
         {m.direction === "in" ? "+" : "-"}{formatMoney(m.amount, m.currency)}
       </td>
       <td style={{ ...TD, width: 40 }}>
         {!auto && hov && (
-          <button onClick={() => onDelete(m.id)} style={{ color: "var(--text-tertiary)", display: "flex" }}
+          <button onClick={() => onDelete(m.id)} style={{ color: "var(--text-tertiary)", display: "flex", transition: "background 0.12s ease" }}
             onMouseEnter={(e) => (e.currentTarget.style.color = "var(--brand)")}
             onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-tertiary)")}>
             <Trash2 size={13} />
@@ -234,12 +234,12 @@ function QuickMovementForm({ wid, bid, onSuccess, onCancel }: { wid: string; bid
     } catch { showToast("Error al registrar"); } finally { setSubmitting(false); }
   };
 
-  const iStyle: React.CSSProperties = { padding: "8px 10px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 7, color: "var(--text-primary)", fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
-  const lStyle: React.CSSProperties = { fontSize: 11, color: "var(--text-tertiary)", marginBottom: 4, display: "block" };
+  const iStyle: React.CSSProperties = { padding: "8px 10px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 8, color: "var(--text-primary)", fontSize: 13.5, outline: "none", width: "100%", boxSizing: "border-box" };
+  const lStyle: React.CSSProperties = { fontSize: 12, color: "var(--text-tertiary)", marginBottom: 5, display: "block" };
 
   return (
-    <div style={{ padding: "12px 14px", background: "var(--surface)", border: "1px solid var(--border-strong)", borderRadius: 10, marginBottom: 14 }}>
-      <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 10 }}>Registrar movimiento</p>
+    <div style={{ padding: 16, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, marginBottom: 24 }}>
+      <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 12 }}>Registrar movimiento</p>
       <div style={{ display: "grid", gridTemplateColumns: "150px 90px 110px 1fr auto auto", gap: 8, alignItems: "end" }}>
         <div>
           <label style={lStyle}>Tipo</label>
@@ -257,10 +257,10 @@ function QuickMovementForm({ wid, bid, onSuccess, onCancel }: { wid: string; bid
           <label style={lStyle}>Descripción</label>
           <input value={description} onChange={(e) => setDescription(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSubmit()} placeholder="Opcional" style={iStyle} />
         </div>
-        <button onClick={handleSubmit} disabled={submitting || !amount} style={{ padding: "8px 14px", background: "var(--brand)", borderRadius: 7, fontSize: 13, fontWeight: 600, color: "#fff", opacity: submitting || !amount ? 0.5 : 1, whiteSpace: "nowrap" }}>
+        <button onClick={handleSubmit} disabled={submitting || !amount} style={{ height: 34, padding: "7px 14px", background: "var(--brand)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff", opacity: submitting || !amount ? 0.5 : 1, whiteSpace: "nowrap", transition: "background 0.12s ease" }}>
           {submitting ? "..." : "Registrar"}
         </button>
-        <button onClick={onCancel} style={{ padding: "8px 10px", background: "var(--surface-2)", borderRadius: 7, fontSize: 13, color: "var(--text-secondary)" }}>✕</button>
+        <button onClick={onCancel} style={{ height: 34, padding: "7px 12px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)", transition: "background 0.12s ease" }}>✕</button>
       </div>
     </div>
   );

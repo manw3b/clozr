@@ -148,11 +148,9 @@ export default function TeamScreen() {
   const TH: React.CSSProperties = {
     padding: "10px 16px",
     textAlign: "left",
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: 600,
-    color: "var(--text-tertiary)",
-    textTransform: "uppercase",
-    letterSpacing: "0.5px",
+    color: "var(--text-secondary)",
     whiteSpace: "nowrap",
     position: "sticky",
     top: 0,
@@ -162,7 +160,7 @@ export default function TeamScreen() {
 
   const TD: React.CSSProperties = {
     padding: "12px 16px",
-    fontSize: 13,
+    fontSize: 13.5,
     color: "var(--text-primary)",
     borderBottom: "1px solid var(--border)",
     verticalAlign: "middle",
@@ -172,12 +170,13 @@ export default function TeamScreen() {
     width: "100%",
     padding: "9px 12px",
     background: "var(--surface-2)",
-    border: "1px solid var(--border-strong)",
+    border: "1px solid var(--border)",
     borderRadius: 8,
     color: "var(--text-primary)",
-    fontSize: 13,
+    fontSize: 13.5,
     outline: "none",
     boxSizing: "border-box",
+    transition: "background 0.12s ease",
   };
 
   return (
@@ -185,17 +184,18 @@ export default function TeamScreen() {
       {/* Header */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "20px 24px 0", flexShrink: 0,
+        padding: "24px 28px 0", flexShrink: 0,
       }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>
+        <h1 style={{ fontSize: 25, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>
           Equipo
         </h1>
         <button
           onClick={() => setModal({ type: "add" })}
           style={{
             display: "flex", alignItems: "center", gap: 6,
-            padding: "8px 14px", background: "var(--brand)",
-            borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#fff",
+            height: 34, padding: "7px 14px", background: "var(--brand)",
+            borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff",
+            transition: "background 0.12s ease",
           }}
         >
           <UserPlus size={14} />
@@ -204,25 +204,25 @@ export default function TeamScreen() {
       </div>
 
       {/* Summary cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, padding: "16px 24px 0" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, padding: "24px 28px 0" }}>
         {[
           { label: "Total miembros", value: totalCount },
           { label: "Administradores", value: adminCount },
           { label: "Vendedores", value: vendedorCount },
         ].map((card) => (
-          <div key={card.label} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
-            <p style={{ fontSize: 11, color: "var(--text-tertiary)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>{card.label}</p>
+          <div key={card.label} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+            <p style={{ fontSize: 12.5, color: "var(--text-secondary)", fontWeight: 500, marginBottom: 6 }}>{card.label}</p>
             <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>{card.value}</p>
           </div>
         ))}
       </div>
 
       {/* Table */}
-      <div style={{ flex: 1, overflow: "auto", padding: "16px 24px 24px" }}>
+      <div style={{ flex: 1, overflow: "auto", padding: "24px 28px" }}>
         {isLoading ? (
-          <div style={{ padding: 24, color: "var(--text-tertiary)", fontSize: 13 }}>Cargando...</div>
+          <div style={{ padding: 24, color: "var(--text-tertiary)", fontSize: 13.5 }}>Cargando...</div>
         ) : (
-          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -315,7 +315,7 @@ export default function TeamScreen() {
                             {!isOwner && (
                               <button
                                 onClick={() => openRoleModal(member)}
-                                style={{ padding: "4px 10px", borderRadius: 6, background: "var(--surface-2)", border: "1px solid var(--border)", fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}
+                                style={{ padding: "5px 12px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--border)", fontSize: 12.5, color: "var(--text-secondary)", fontWeight: 600, transition: "background 0.12s ease" }}
                               >
                                 Cambiar rol
                               </button>
@@ -323,7 +323,7 @@ export default function TeamScreen() {
                             <button
                               onClick={() => !isOwner && setConfirmDeleteId(member.user_id)}
                               disabled={isOwner}
-                              style={{ padding: "4px 10px", borderRadius: 6, background: "transparent", fontSize: 12, color: isOwner ? "var(--text-tertiary)" : "var(--brand)", opacity: isOwner ? 0.4 : 1, cursor: isOwner ? "not-allowed" : "pointer" }}
+                              style={{ padding: "5px 12px", borderRadius: 8, background: "transparent", fontSize: 12.5, fontWeight: 600, color: isOwner ? "var(--text-tertiary)" : "var(--brand)", opacity: isOwner ? 0.4 : 1, cursor: isOwner ? "not-allowed" : "pointer", transition: "background 0.12s ease" }}
                             >
                               Eliminar
                             </button>
@@ -412,13 +412,13 @@ export default function TeamScreen() {
             </p>
           )}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
-            <button onClick={() => { setModal(null); resetAddForm(); }} style={{ padding: "8px 16px", background: "var(--surface-2)", borderRadius: 8, fontSize: 13, color: "var(--text-secondary)" }}>
+            <button onClick={() => { setModal(null); resetAddForm(); }} style={{ height: 34, padding: "7px 14px", background: "var(--surface-2)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)", transition: "background 0.12s ease" }}>
               Cancelar
             </button>
             <button
               onClick={handleAdd}
               disabled={addSubmitting}
-              style={{ padding: "8px 18px", background: "var(--brand)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#fff", opacity: addSubmitting ? 0.6 : 1 }}
+              style={{ height: 34, padding: "7px 14px", background: "var(--brand)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff", opacity: addSubmitting ? 0.6 : 1, transition: "background 0.12s ease" }}
             >
               {addSubmitting ? "Agregando..." : "Agregar miembro"}
             </button>
@@ -443,11 +443,11 @@ export default function TeamScreen() {
               />
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
-              <button onClick={() => setModal(null)} style={{ padding: "8px 16px", background: "var(--surface-2)", borderRadius: 8, fontSize: 13, color: "var(--text-secondary)" }}>Cancelar</button>
+              <button onClick={() => setModal(null)} style={{ height: 34, padding: "7px 14px", background: "var(--surface-2)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)", transition: "background 0.12s ease" }}>Cancelar</button>
               <button
                 onClick={() => roleMutation.mutate({ uid: modal.member.user_id, role: newRole })}
                 disabled={roleMutation.isPending}
-                style={{ padding: "8px 18px", background: "var(--brand)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#fff", opacity: roleMutation.isPending ? 0.6 : 1 }}
+                style={{ height: 34, padding: "7px 14px", background: "var(--brand)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff", opacity: roleMutation.isPending ? 0.6 : 1, transition: "background 0.12s ease" }}
               >
                 {roleMutation.isPending ? "Guardando..." : "Cambiar rol"}
               </button>

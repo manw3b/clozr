@@ -31,7 +31,9 @@ export default function Modal({
         style={{
           position: "fixed",
           inset: 0,
-          background: "rgba(0,0,0,0.55)",
+          background: "rgba(0,0,0,0.45)",
+          backdropFilter: "blur(4px)",
+          WebkitBackdropFilter: "blur(4px)",
           zIndex: 40,
           opacity: isOpen ? 1 : 0,
           pointerEvents: isOpen ? "auto" : "none",
@@ -46,9 +48,10 @@ export default function Modal({
           transform: isOpen
             ? "translate(-50%,-50%) scale(1)"
             : "translate(-50%,-50%) scale(0.97)",
-          background: "var(--surface)",
-          borderRadius: 14,
+          background: "var(--surface-elevated)",
+          borderRadius: 16,
           border: "1px solid var(--border)",
+          boxShadow: "var(--shadow-lg)",
           zIndex: 50,
           width: `min(${maxWidth}px, calc(100vw - 48px))`,
           maxHeight: "85vh",
@@ -65,26 +68,29 @@ export default function Modal({
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              padding: "18px 20px",
+              padding: "18px 24px",
               borderBottom: "1px solid var(--border)",
               flexShrink: 0,
             }}
           >
-            <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>
+            <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.2px" }}>
               {title}
             </span>
             <button
               onClick={onClose}
               style={{
-                width: 28,
-                height: 28,
-                borderRadius: 6,
+                width: 30,
+                height: 30,
+                borderRadius: 8,
                 background: "var(--surface-2)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 color: "var(--text-tertiary)",
+                transition: "background 0.12s ease, color 0.12s ease",
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-3)"; e.currentTarget.style.color = "var(--text-primary)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "var(--surface-2)"; e.currentTarget.style.color = "var(--text-tertiary)"; }}
             >
               <X size={15} />
             </button>

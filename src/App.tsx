@@ -177,19 +177,21 @@ function UpdateBanner() {
 
   return (
     <div style={{
-      display: "flex", alignItems: "center", justifyContent: "center", gap: 12,
-      padding: "7px 16px", background: "var(--brand)", flexShrink: 0,
+      display: "flex", alignItems: "center", justifyContent: "center", gap: 14,
+      padding: "10px 20px", background: "var(--brand-bg)", borderBottom: "1px solid var(--border)", flexShrink: 0,
     }}>
-      <span style={{ fontSize: 12, color: "#fff", fontWeight: 500 }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--brand)" }} />
+      <span style={{ fontSize: 12.5, color: "var(--text-primary)", fontWeight: 500 }}>
         Nueva versión disponible: <strong>v{version}</strong>
       </span>
       <button
         disabled={status === "downloading"}
         onClick={() => downloadAndInstall(setStatus)}
         style={{
-          padding: "3px 12px", borderRadius: 6, fontSize: 12, fontWeight: 700,
-          background: "#fff", color: "var(--brand)",
+          padding: "5px 14px", borderRadius: 7, fontSize: 12, fontWeight: 600,
+          background: "var(--brand)", color: "#fff",
           opacity: status === "downloading" ? 0.7 : 1,
+          transition: "background 0.12s ease",
         }}
       >
         {status === "downloading" ? "Instalando..." : "Actualizar ahora"}
@@ -203,9 +205,7 @@ function UpdateBanner() {
 function LoadingScreen() {
   return (
     <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
-      <div style={{ fontSize: 42, fontWeight: 800, color: "var(--text-primary)", letterSpacing: -2, opacity: 0.5 }}>
-        Clozr<span style={{ color: "var(--brand)" }}>.</span>
-      </div>
+      <img src={logoImg} alt="Clozr" style={{ height: 56, width: "auto", objectFit: "contain", opacity: 0.4, animation: "fadeIn 0.4s ease" }} />
     </div>
   );
 }
@@ -222,15 +222,16 @@ function NavItem({ label, Icon, active, onClick }: {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        width: "100%", display: "flex", alignItems: "center", gap: 10,
-        padding: "8px 10px", borderRadius: 8, fontSize: 13,
-        fontWeight: active ? 600 : 400,
-        color: active ? "#fff" : hovered ? "var(--text-primary)" : "var(--text-secondary)",
-        background: active ? "var(--brand)" : hovered ? "var(--surface-2)" : "transparent",
-        transition: "background 0.12s, color 0.12s", textAlign: "left",
+        width: "100%", display: "flex", alignItems: "center", gap: 12,
+        padding: "9px 12px", borderRadius: 8, fontSize: 13.5,
+        fontWeight: active ? 600 : 500,
+        color: active ? "var(--text-primary)" : hovered ? "var(--text-primary)" : "var(--text-secondary)",
+        background: active ? "var(--surface-2)" : hovered ? "var(--surface-2)" : "transparent",
+        transition: "background 0.12s ease, color 0.12s ease",
+        textAlign: "left",
       }}
     >
-      <Icon size={15} strokeWidth={active ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
+      <Icon size={16} strokeWidth={active ? 2.2 : 1.8} color={active ? "var(--brand)" : "currentColor"} style={{ flexShrink: 0 }} />
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
     </button>
   );
@@ -248,6 +249,18 @@ function WorkspaceLogo({ logoPath, emoji, name }: { logoPath: string | null; emo
   return <span style={{ fontSize: 16 }}>{emoji}</span>;
 }
 
+function SidebarSectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      padding: "10px 14px 6px",
+      fontSize: 10.5, fontWeight: 600, letterSpacing: "0.6px",
+      color: "var(--text-tertiary)", textTransform: "uppercase",
+    }}>
+      {children}
+    </div>
+  );
+}
+
 function Sidebar() {
   const { activeWorkspace } = useWorkspaceStore();
   const { activeScreen, setActiveScreen } = useUIStore();
@@ -255,12 +268,12 @@ function Sidebar() {
 
   return (
     <aside style={{
-      width: 200, flexShrink: 0, display: "flex", flexDirection: "column",
+      width: "var(--sidebar-width)", flexShrink: 0, display: "flex", flexDirection: "column",
       background: "var(--surface)", borderRight: "1px solid var(--border)", overflow: "hidden",
     }}>
       {/* Logo */}
-      <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 8 }}>
-        <img src={logoImg} alt="Clozr" style={{ height: 32, width: "auto", objectFit: "contain" }} />
+      <div style={{ padding: "16px 18px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+        <img src={logoImg} alt="Clozr" style={{ height: 30, width: "auto", objectFit: "contain" }} />
         {activeWorkspace && (
           <WorkspaceLogo
             logoPath={activeWorkspace.logo_path ?? null}
@@ -270,14 +283,13 @@ function Sidebar() {
         )}
       </div>
 
-      <div style={{ height: 1, background: "var(--border)", marginBottom: 8 }} />
-
       {/* Primary nav */}
-      <nav style={{ flex: 1, padding: "4px 8px", overflow: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
+      <nav style={{ flex: 1, padding: "4px 10px 10px", overflow: "auto", display: "flex", flexDirection: "column", gap: 1 }}>
+        <SidebarSectionLabel>General</SidebarSectionLabel>
         {NAV_PRIMARY.map(({ id, label, Icon }) => (
           <NavItem key={id} label={label} Icon={Icon} active={activeScreen === id} onClick={() => setActiveScreen(id)} />
         ))}
-        <div style={{ height: 1, background: "var(--border)", margin: "8px 2px" }} />
+        <SidebarSectionLabel>Configuración</SidebarSectionLabel>
         {NAV_SECONDARY.map(({ id, label, Icon }) => (
           <NavItem key={id} label={label} Icon={Icon} active={activeScreen === id} onClick={() => setActiveScreen(id)} />
         ))}
@@ -285,15 +297,16 @@ function Sidebar() {
 
       {/* User */}
       {userName && (
-        <div style={{ padding: "12px 16px", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ padding: "14px 18px", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{
-            width: 26, height: 26, borderRadius: "50%", background: "var(--brand)",
+            width: 28, height: 28, borderRadius: "50%",
+            background: "var(--brand)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 11, fontWeight: 700, color: "#fff", flexShrink: 0,
+            fontSize: 12, fontWeight: 700, color: "#fff", flexShrink: 0,
           }}>
             {userName.charAt(0).toUpperCase()}
           </div>
-          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {userName}
           </span>
         </div>

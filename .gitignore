@@ -35,5 +35,8 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+# Assets working folder (raw multimedia files for processing)
+assets_generales/
+
 # Test coverage
 coverage/

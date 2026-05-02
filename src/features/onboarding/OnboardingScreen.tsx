@@ -6,6 +6,7 @@ import { workspaceDb } from "../../lib/db/workspace";
 import { dbExecute } from "../../lib/db/index";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useAuthStore } from "../../store/authStore";
+import logoImg from "../../assets/logo.png";
 
 const schema = z.object({
   businessName: z.string().min(2, "Mínimo 2 caracteres").max(50, "Máximo 50 caracteres"),
@@ -19,14 +20,14 @@ type FormValues = z.infer<typeof schema>;
 function inputStyle(hasError: boolean): React.CSSProperties {
   return {
     width: "100%",
-    padding: "13px 14px",
-    background: "var(--surface-2)",
+    padding: "12px 14px",
+    background: "var(--surface)",
     border: `1px solid ${hasError ? "var(--brand)" : "var(--border-strong)"}`,
     borderRadius: 10,
     color: "var(--text-primary)",
-    fontSize: 15,
+    fontSize: 14.5,
     outline: "none",
-    transition: "border-color 0.15s",
+    transition: "border-color 0.15s ease, background 0.15s ease",
   };
 }
 
@@ -82,22 +83,11 @@ export default function OnboardingScreen() {
         background: "var(--bg)",
       }}
     >
-      <div style={{ marginBottom: 52, textAlign: "center" }}>
-        <div
-          style={{
-            fontSize: 58,
-            fontWeight: 800,
-            color: "var(--text-primary)",
-            letterSpacing: -3,
-            lineHeight: 1,
-          }}
-        >
-          Clozr<span style={{ color: "var(--brand)" }}>.</span>
-        </div>
+      <div style={{ marginBottom: 48, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+        <img src={logoImg} alt="Clozr" style={{ height: 64, width: "auto", objectFit: "contain" }} />
         <p
           style={{
             color: "var(--text-secondary)",
-            marginTop: 10,
             fontSize: 15,
           }}
         >
@@ -122,9 +112,7 @@ export default function OnboardingScreen() {
               color: "var(--text-secondary)",
               fontSize: 12,
               fontWeight: 600,
-              marginBottom: 7,
-              textTransform: "uppercase",
-              letterSpacing: "0.5px",
+              marginBottom: 8,
             }}
           >
             Nombre del negocio
@@ -155,9 +143,7 @@ export default function OnboardingScreen() {
               color: "var(--text-secondary)",
               fontSize: 12,
               fontWeight: 600,
-              marginBottom: 7,
-              textTransform: "uppercase",
-              letterSpacing: "0.5px",
+              marginBottom: 8,
             }}
           >
             Tu nombre
@@ -182,12 +168,10 @@ export default function OnboardingScreen() {
               color: "var(--text-secondary)",
               fontSize: 12,
               fontWeight: 600,
-              marginBottom: 7,
-              textTransform: "uppercase",
-              letterSpacing: "0.5px",
+              marginBottom: 8,
             }}
           >
-            Tu email <span style={{ color: "var(--text-tertiary)", fontWeight: 400, textTransform: "none" }}>(opcional)</span>
+            Tu email <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>(opcional)</span>
           </label>
           <input
             {...register("userEmail")}

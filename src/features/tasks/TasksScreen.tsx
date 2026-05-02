@@ -41,7 +41,7 @@ function TaskItem({
         padding: "10px 12px",
         borderRadius: 8,
         background: hovered ? "var(--surface-2)" : "transparent",
-        transition: "background 0.1s",
+        transition: "background 0.12s ease",
       }}
     >
       <button
@@ -68,7 +68,7 @@ function TaskItem({
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{
-          fontSize: 14,
+          fontSize: 13.5,
           fontWeight: 500,
           color: done ? "var(--text-tertiary)" : "var(--text-primary)",
           textDecoration: done ? "line-through" : "none",
@@ -204,13 +204,13 @@ export default function TasksScreen() {
       {/* Left: task list */}
       <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {/* Header */}
-        <div style={{ padding: "20px 24px 0", flexShrink: 0 }}>
-          <div style={{ marginBottom: 14 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>
+        <div style={{ padding: "24px 28px 0", flexShrink: 0 }}>
+          <div style={{ marginBottom: 20 }}>
+            <h1 style={{ fontSize: 25, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>
               Tareas
             </h1>
             {pendingCount > 0 && (
-              <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>
+              <p style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 4 }}>
                 {pendingCount} pendiente{pendingCount !== 1 ? "s" : ""}
               </p>
             )}
@@ -224,12 +224,12 @@ export default function TasksScreen() {
                 onClick={() => setFilterStatus(f.value)}
                 style={{
                   padding: "8px 14px",
-                  fontSize: 13,
+                  fontSize: 13.5,
                   fontWeight: filterStatus === f.value ? 600 : 400,
                   color: filterStatus === f.value ? "var(--brand)" : "var(--text-secondary)",
                   borderBottom: filterStatus === f.value ? "2px solid var(--brand)" : "2px solid transparent",
                   marginBottom: -1,
-                  transition: "color 0.12s",
+                  transition: "background 0.12s ease",
                   whiteSpace: "nowrap",
                 }}
               >
@@ -243,13 +243,13 @@ export default function TasksScreen() {
                 onClick={() => setFilterType(t)}
                 style={{
                   padding: "6px 12px",
-                  fontSize: 12,
+                  fontSize: 12.5,
                   fontWeight: filterType === t ? 600 : 400,
                   color: filterType === t ? "var(--text-primary)" : "var(--text-tertiary)",
                   marginBottom: 4,
-                  borderRadius: 6,
+                  borderRadius: 8,
                   background: filterType === t ? "var(--surface-2)" : "transparent",
-                  transition: "background 0.12s",
+                  transition: "background 0.12s ease",
                   alignSelf: "center",
                 }}
               >
@@ -289,12 +289,10 @@ export default function TasksScreen() {
         flexShrink: 0,
       }}>
         <h2 style={{
-          fontSize: 14,
+          fontSize: 13,
           fontWeight: 600,
           color: "var(--text-secondary)",
-          marginBottom: 20,
-          textTransform: "uppercase",
-          letterSpacing: "0.5px",
+          marginBottom: 24,
         }}>
           Nueva tarea
         </h2>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import logoImg from "./assets/logo.png";
 import {
   Home,
   Users,
@@ -258,10 +259,8 @@ function Sidebar() {
       background: "var(--surface)", borderRight: "1px solid var(--border)", overflow: "hidden",
     }}>
       {/* Logo */}
-      <div style={{ padding: "16px 16px 12px", display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: -1, color: "var(--text-primary)", lineHeight: 1 }}>
-          Clozr<span style={{ color: "var(--brand)" }}>.</span>
-        </div>
+      <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 8 }}>
+        <img src={logoImg} alt="Clozr" style={{ height: 32, width: "auto", objectFit: "contain" }} />
         {activeWorkspace && (
           <WorkspaceLogo
             logoPath={activeWorkspace.logo_path ?? null}

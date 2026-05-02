@@ -16,6 +16,9 @@
     "fs:allow-stat",
     "fs:scope-home-recursive",
     "fs:scope-appdata-recursive",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "updater:allow-check",
+    "updater:allow-download-and-install",
+    "process:allow-relaunch"
   ]
 }

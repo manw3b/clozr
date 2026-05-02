@@ -37,6 +37,7 @@ import Toaster from "./components/Toaster";
 import Topbar from "./components/Topbar";
 import Modal from "./components/Modal";
 import type { CashMovementType, CashDirection, CreateCashMovementInput } from "./lib/db/types";
+import { checkForUpdate, downloadAndInstall, type UpdateStatus } from "./lib/updater";
 
 // ─── Nav config ───────────────────────────────────────────────────
 
@@ -154,6 +155,44 @@ function QuickMovementModal({ onSuccess, onCancel }: { onSuccess: () => void; on
           {submitting ? "Registrando..." : direction === "in" ? `Registrar ingreso` : `Registrar egreso`}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ─── Update banner ────────────────────────────────────────────────
+
+function UpdateBanner() {
+  const [version, setVersion] = useState<string | null>(null);
+  const [status, setStatus] = useState<UpdateStatus>("idle");
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      checkForUpdate().then((info) => { if (info) setVersion(info.version); });
+    }, 3000);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!version || status === "done") return null;
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "center", gap: 12,
+      padding: "7px 16px", background: "var(--brand)", flexShrink: 0,
+    }}>
+      <span style={{ fontSize: 12, color: "#fff", fontWeight: 500 }}>
+        Nueva versión disponible: <strong>v{version}</strong>
+      </span>
+      <button
+        disabled={status === "downloading"}
+        onClick={() => downloadAndInstall(setStatus)}
+        style={{
+          padding: "3px 12px", borderRadius: 6, fontSize: 12, fontWeight: 700,
+          background: "#fff", color: "var(--brand)",
+          opacity: status === "downloading" ? 0.7 : 1,
+        }}
+      >
+        {status === "downloading" ? "Instalando..." : "Actualizar ahora"}
+      </button>
     </div>
   );
 }
@@ -344,6 +383,7 @@ export default function App() {
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", background: "var(--bg)" }}>
       {/* Topbar — full width */}
       <Topbar />
+      <UpdateBanner />
 
       {/* Body = sidebar + main */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>

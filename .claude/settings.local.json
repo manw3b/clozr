@@ -9,7 +9,9 @@
       "PowerShell(npm --version)",
       "PowerShell(rustc --version)",
       "PowerShell(cargo --version)",
-      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"User\"\\); node --version; npm --version; gh --version; rustc --version; cargo --version)"
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"User\"\\); node --version; npm --version; gh --version; rustc --version; cargo --version)",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"User\"\\); Set-Location \"C:\\\\Users\\\\Carlo\\\\OneDrive\\\\Documentos\\\\Proyectos\\\\Clozr\"; npm.cmd run tauri -- signer generate 2>&1)",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"User\"\\); $env:CI = \"true\"; Set-Location \"C:\\\\Users\\\\Carlo\\\\OneDrive\\\\Documentos\\\\Proyectos\\\\Clozr\"; npm.cmd run tauri -- signer generate --ci -w \"$env:USERPROFILE\\\\.tauri\\\\clozr.key\" 2>&1)"
     ]
   }
 }

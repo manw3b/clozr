@@ -16,8 +16,10 @@ import { formatMoney } from "../../lib/format";
 import { resolveImageUrl } from "../../lib/images";
 import { useEffect } from "react";
 import type { CatalogItemWithImeis } from "../../lib/db/types";
-import LegacyInventory from "../../features/inventory/InventoryScreen";
 import { ProductDetailDrawer } from "./components/ProductDetailDrawer";
+import { AddProductSimpleModal } from "./components/AddProductSimpleModal";
+import { NewSaleModal } from "../ventas/components/NewSaleModal";
+import { useCreateSale } from "../ventas/useSalesData";
 
 type StockFilter = "todos" | "disponibles" | "agotados";
 
@@ -25,10 +27,12 @@ export function Inventario() {
   const { activeWorkspace } = useWorkspaceStore();
   const { showToast } = useUIStore();
   const wid = activeWorkspace?.id ?? "";
-  const [view, setView] = useState<"grid" | "legacy">("grid");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<StockFilter>("todos");
   const [selected, setSelected] = useState<CatalogItemWithImeis | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [saleOpen, setSaleOpen] = useState(false);
+  const createSaleMut = useCreateSale();
 
   const productsQ = useQuery({
     queryKey: ["inventario", "catalog", wid],
@@ -58,21 +62,7 @@ export function Inventario() {
     });
   }, [products, search, filter]);
 
-  // Si el user prefiere la vista legacy (cargar mercadería, vender unidad), la muestro
-  if (view === "legacy") {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-        <div style={{ padding: `${space[3]} ${space[5]}`, borderBottom: `1px solid ${color.border}` }}>
-          <Button variant="ghost" size="sm" onClick={() => setView("grid")}>
-            ← Volver a la grilla
-          </Button>
-        </div>
-        <div style={{ flex: 1, overflow: "auto" }}>
-          <LegacyInventory />
-        </div>
-      </div>
-    );
-  }
+  // (vista legacy retirada — todo se maneja con drawer + modales)
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: space[5], height: "100%" }}>
@@ -84,14 +74,14 @@ export function Inventario() {
             <Button
               variant="secondary"
               iconLeft={<Plus size={14} />}
-              onClick={() => { setView("legacy"); showToast("Cargá las unidades en la vista clásica", "info"); }}
+              onClick={() => setAddOpen(true)}
             >
-              Cargar mercadería
+              Agregar producto
             </Button>
             <Button
               variant="primary"
               iconLeft={<Zap size={14} />}
-              onClick={() => { setView("legacy"); showToast("Elegí una unidad para vender", "info"); }}
+              onClick={() => setSaleOpen(true)}
             >
               Venta rápida
             </Button>
@@ -134,7 +124,7 @@ export function Inventario() {
             description={search.trim() ? "Probá otro término" : "Cargá productos para empezar."}
             action={
               !search.trim()
-                ? { label: "Cargar mercadería", onClick: () => setView("legacy"), iconLeft: <Plus size={14} /> }
+                ? { label: "Agregar producto", onClick: () => setAddOpen(true), iconLeft: <Plus size={14} /> }
                 : undefined
             }
           />
@@ -158,8 +148,30 @@ export function Inventario() {
         onClose={() => setSelected(null)}
         onSellUnit={() => {
           setSelected(null);
-          setView("legacy");
-          showToast("Elegí la unidad para vender", "info");
+          setSaleOpen(true);
+        }}
+      />
+
+      <AddProductSimpleModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        wid={wid}
+        onCreated={(item) => {
+          setAddOpen(false);
+          setSelected(item);
+        }}
+      />
+
+      <NewSaleModal
+        open={saleOpen}
+        onClose={() => setSaleOpen(false)}
+        onSubmit={(data) => {
+          createSaleMut.mutate(data, {
+            onSuccess: () => {
+              showToast(data.outOfStock ? "Venta fuera de stock registrada" : "Venta registrada", "success");
+              setSaleOpen(false);
+            },
+          });
         }}
       />
     </div>

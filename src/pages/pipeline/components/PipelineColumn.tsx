@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { Plus } from 'lucide-react';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney } from '../../../lib/format';
-import type { LeadStage, StageConfig } from '../../../types/domain';
+import type { StageConfig } from '../../../types/domain';
 
 interface PipelineColumnProps {
   stage: StageConfig;

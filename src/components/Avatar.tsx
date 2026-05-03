@@ -1,5 +1,5 @@
 import { CSSProperties } from 'react';
-import { color, text, weight } from '../tokens';
+import { weight } from '../tokens';
 
 interface AvatarProps {
   name: string;

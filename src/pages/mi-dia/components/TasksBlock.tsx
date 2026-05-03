@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { CheckSquare, Check, Clock, Circle } from 'lucide-react';
 import { SectionCard, SectionRow } from './SectionCard';
 import { EmptyState } from '../../../components/EmptyState';

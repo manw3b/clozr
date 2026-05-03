@@ -1,5 +1,5 @@
 import { ReactNode, useState } from 'react';
-import { color, radius, space } from '../../tokens';
+import { color, radius } from '../../tokens';
 
 interface RowAction {
   icon: ReactNode;

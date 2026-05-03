@@ -1,4 +1,4 @@
-import { Wallet, DollarSign, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney } from '../../../lib/format';
 import type { CashSummary } from '../../../types/domain';

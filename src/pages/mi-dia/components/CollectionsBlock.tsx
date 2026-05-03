@@ -1,4 +1,4 @@
-import { Wallet, Plus, AlertCircle, Check } from 'lucide-react';
+import { Wallet, AlertCircle, Check } from 'lucide-react';
 import { SectionCard, SectionRow } from './SectionCard';
 import { EmptyState } from '../../../components/EmptyState';
 import { Button } from '../../../components/Button';

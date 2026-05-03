@@ -4,7 +4,6 @@ import {
   Phone,
   Mail,
   Plus,
-  Edit3,
   MoreVertical,
   ShoppingCart,
   CreditCard,
@@ -24,8 +23,6 @@ import {
   formatMoney,
   formatRelative,
   formatDateLong,
-  formatTime,
-  formatDaysAgo,
 } from '../../../lib/format';
 import type {
   ClientDetail,
@@ -178,7 +175,6 @@ function ClientHeader({
   client,
   onClose,
   onEdit,
-  onWhatsApp,
   onCall,
   onEmail,
 }: {

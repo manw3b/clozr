@@ -1,15 +1,10 @@
-import { useState } from 'react';
 import {
-  CreditCard,
   CheckCircle2,
   Clock,
   AlertCircle,
   MessageCircle,
-  Phone,
   ExternalLink,
   Pencil,
-  Trash2,
-  MoreVertical,
 } from 'lucide-react';
 import { DrawerPanel } from '../../../components/Drawer';
 import { Button } from '../../../components/Button';
@@ -36,7 +31,6 @@ export function SaleDrawer({
   onMarkPaid,
   onAddPayment,
   onEdit,
-  onCancel,
   onOpenClient,
 }: SaleDrawerProps) {
   const remaining = sale.amount - sale.paid;

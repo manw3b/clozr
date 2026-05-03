@@ -6,7 +6,6 @@ import {
   Phone,
   MoreHorizontal,
   Users,
-  Filter,
   Download,
 } from 'lucide-react';
 import { PageHeader } from '../../components/PageHeader';

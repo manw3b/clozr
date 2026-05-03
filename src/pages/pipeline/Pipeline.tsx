@@ -11,7 +11,7 @@ import {
   closestCorners,
 } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
-import { Search, Plus, Filter, LayoutGrid } from 'lucide-react';
+import { Search, Plus, Filter } from 'lucide-react';
 import { PageHeader } from '../../components/PageHeader';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -24,7 +24,7 @@ import { PipelineMetrics } from './components/PipelineMetrics';
 import { groupLeadsByStage } from '../../mock/leads';
 import { usePipelineLeads, useMoveLead } from './usePipelineData';
 import { useClientDetail } from '../clientes/useClientsData';
-import { color, space, text, weight } from '../../tokens';
+import { space } from '../../tokens';
 import { STAGES } from '../../types/domain';
 import type { Lead, LeadStage } from '../../types/domain';
 

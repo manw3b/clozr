@@ -1,6 +1,6 @@
-import { CSSProperties, ReactNode, useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
-import { color, radius, space, text, weight } from '../../tokens';
+import { color, radius, text, weight } from '../../tokens';
 
 /* ============================================================
  *  Tipos

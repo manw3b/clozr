@@ -8,9 +8,7 @@ import {
   Briefcase,
   Home,
   Tag,
-  Coins,
   Receipt,
-  MoreHorizontal,
 } from 'lucide-react';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney, formatTime } from '../../../lib/format';

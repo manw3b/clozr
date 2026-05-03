@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Zap, TrendingUp } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '../../../components/Button';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney, formatDateLong, greetText, plural } from '../../../lib/format';

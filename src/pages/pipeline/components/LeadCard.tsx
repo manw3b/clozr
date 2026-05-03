@@ -5,10 +5,8 @@ import {
   Clock,
   AlertCircle,
   Flame,
-  GripVertical,
 } from 'lucide-react';
 import { Avatar } from '../../../components/Avatar';
-import { Badge } from '../../../components/Badge';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney, formatRelative } from '../../../lib/format';
 import type { Lead } from '../../../types/domain';

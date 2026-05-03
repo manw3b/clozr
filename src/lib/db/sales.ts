@@ -440,4 +440,241 @@ export const salesDb = {
   getPendingRegularization,
   regularizeSale,
   getPendingCobros,
+  getMarginMetrics,
+  getTopProducts,
+  getMarginByCategory,
+  getMarginByMonth,
+  getMarginByVendor,
 };
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Margin reports — todos los montos en USD (post-refactor USD-first).
+ *
+ * Costo: catalog_items.cost_usd (column de mig 024).
+ * Revenue: sale_items.unit_price * sale_items.quantity (siempre USD).
+ *
+ * Items sin catalog_item_id (out_of_stock) se cuentan en revenue pero no
+ * en cost (no podemos calcular margen sin costo). Aparecen separados.
+ * ─────────────────────────────────────────────────────────────────── */
+
+export interface MarginMetrics {
+  revenue_this_month: number;
+  cost_this_month: number;
+  margin_this_month: number;
+  margin_pct_this_month: number;
+  revenue_last_month: number;
+  cost_last_month: number;
+  margin_last_month: number;
+  margin_pct_last_month: number;
+  /** Ítems vendidos este mes sin costo cargado (revenue conocido, cost = NULL) */
+  uncosted_revenue_this_month: number;
+}
+
+export async function getMarginMetrics(workspaceId: string): Promise<MarginMetrics> {
+  // Agregamos revenue y cost por mes via JOIN con catalog_items
+  const rows = await dbSelect<{
+    period: string;
+    revenue: number;
+    cost: number;
+    uncosted_revenue: number;
+  }>(
+    `SELECT
+       CASE
+         WHEN strftime('%Y-%m', s.sale_date) = strftime('%Y-%m', 'now') THEN 'this'
+         WHEN strftime('%Y-%m', s.sale_date) = strftime('%Y-%m', date('now', '-1 month')) THEN 'last'
+         ELSE 'other'
+       END AS period,
+       COALESCE(SUM(si.unit_price * si.quantity), 0) AS revenue,
+       COALESCE(SUM(
+         CASE WHEN ci.cost_usd > 0
+           THEN ci.cost_usd * si.quantity
+           ELSE 0
+         END
+       ), 0) AS cost,
+       COALESCE(SUM(
+         CASE WHEN ci.cost_usd IS NULL OR ci.cost_usd <= 0
+           THEN si.unit_price * si.quantity
+           ELSE 0
+         END
+       ), 0) AS uncosted_revenue
+     FROM sale_items si
+     JOIN sales s ON s.id = si.sale_id
+     LEFT JOIN catalog_items ci ON ci.id = si.catalog_item_id
+     WHERE s.workspace_id = ?
+       AND (
+         strftime('%Y-%m', s.sale_date) = strftime('%Y-%m', 'now')
+         OR strftime('%Y-%m', s.sale_date) = strftime('%Y-%m', date('now', '-1 month'))
+       )
+     GROUP BY period`,
+    [workspaceId],
+  ).catch(() => [] as Array<{ period: string; revenue: number; cost: number; uncosted_revenue: number }>);
+
+  const thisM = rows.find((r) => r.period === "this");
+  const lastM = rows.find((r) => r.period === "last");
+
+  const revenue_this = thisM?.revenue ?? 0;
+  const cost_this = thisM?.cost ?? 0;
+  const margin_this = revenue_this - cost_this;
+  const margin_pct_this = cost_this > 0 ? (margin_this / cost_this) * 100 : 0;
+
+  const revenue_last = lastM?.revenue ?? 0;
+  const cost_last = lastM?.cost ?? 0;
+  const margin_last = revenue_last - cost_last;
+  const margin_pct_last = cost_last > 0 ? (margin_last / cost_last) * 100 : 0;
+
+  return {
+    revenue_this_month: revenue_this,
+    cost_this_month: cost_this,
+    margin_this_month: margin_this,
+    margin_pct_this_month: margin_pct_this,
+    revenue_last_month: revenue_last,
+    cost_last_month: cost_last,
+    margin_last_month: margin_last,
+    margin_pct_last_month: margin_pct_last,
+    uncosted_revenue_this_month: thisM?.uncosted_revenue ?? 0,
+  };
+}
+
+export interface TopProduct {
+  catalog_item_id: string;
+  name: string;
+  category: string | null;
+  image_path: string | null;
+  units_sold: number;
+  revenue: number;
+  cost: number;
+  margin: number;
+  margin_pct: number;
+}
+
+export async function getTopProducts(
+  workspaceId: string,
+  limit = 10,
+  windowMonths = 6,
+): Promise<TopProduct[]> {
+  return dbSelect<TopProduct>(
+    `SELECT
+       ci.id AS catalog_item_id,
+       ci.name AS name,
+       ci.category AS category,
+       ci.image_path AS image_path,
+       COALESCE(SUM(si.quantity), 0) AS units_sold,
+       COALESCE(SUM(si.unit_price * si.quantity), 0) AS revenue,
+       COALESCE(SUM(COALESCE(ci.cost_usd, 0) * si.quantity), 0) AS cost,
+       COALESCE(SUM((si.unit_price - COALESCE(ci.cost_usd, 0)) * si.quantity), 0) AS margin,
+       CASE
+         WHEN SUM(COALESCE(ci.cost_usd, 0) * si.quantity) > 0
+         THEN (SUM((si.unit_price - COALESCE(ci.cost_usd, 0)) * si.quantity) * 100.0)
+              / SUM(COALESCE(ci.cost_usd, 0) * si.quantity)
+         ELSE 0
+       END AS margin_pct
+     FROM sale_items si
+     JOIN sales s ON s.id = si.sale_id
+     JOIN catalog_items ci ON ci.id = si.catalog_item_id
+     WHERE s.workspace_id = ? AND s.sale_date >= date('now', ?)
+     GROUP BY ci.id
+     ORDER BY revenue DESC
+     LIMIT ?`,
+    [workspaceId, `-${windowMonths} months`, limit],
+  ).catch(() => [] as TopProduct[]);
+}
+
+export interface CategoryStats {
+  category: string;
+  units_sold: number;
+  revenue: number;
+  cost: number;
+  margin: number;
+  margin_pct: number;
+}
+
+export async function getMarginByCategory(
+  workspaceId: string,
+  windowMonths = 6,
+): Promise<CategoryStats[]> {
+  return dbSelect<CategoryStats>(
+    `SELECT
+       COALESCE(ci.category, 'Sin categoría') AS category,
+       COALESCE(SUM(si.quantity), 0) AS units_sold,
+       COALESCE(SUM(si.unit_price * si.quantity), 0) AS revenue,
+       COALESCE(SUM(COALESCE(ci.cost_usd, 0) * si.quantity), 0) AS cost,
+       COALESCE(SUM((si.unit_price - COALESCE(ci.cost_usd, 0)) * si.quantity), 0) AS margin,
+       CASE
+         WHEN SUM(COALESCE(ci.cost_usd, 0) * si.quantity) > 0
+         THEN (SUM((si.unit_price - COALESCE(ci.cost_usd, 0)) * si.quantity) * 100.0)
+              / SUM(COALESCE(ci.cost_usd, 0) * si.quantity)
+         ELSE 0
+       END AS margin_pct
+     FROM sale_items si
+     JOIN sales s ON s.id = si.sale_id
+     LEFT JOIN catalog_items ci ON ci.id = si.catalog_item_id
+     WHERE s.workspace_id = ? AND s.sale_date >= date('now', ?)
+     GROUP BY category
+     ORDER BY revenue DESC`,
+    [workspaceId, `-${windowMonths} months`],
+  ).catch(() => [] as CategoryStats[]);
+}
+
+export interface MonthlyMargin {
+  month: string;
+  revenue: number;
+  cost: number;
+  margin: number;
+  sales_count: number;
+}
+
+export async function getMarginByMonth(
+  workspaceId: string,
+  months = 6,
+): Promise<MonthlyMargin[]> {
+  return dbSelect<MonthlyMargin>(
+    `SELECT
+       strftime('%Y-%m', s.sale_date) AS month,
+       COUNT(DISTINCT s.id) AS sales_count,
+       COALESCE(SUM(si.unit_price * si.quantity), 0) AS revenue,
+       COALESCE(SUM(COALESCE(ci.cost_usd, 0) * si.quantity), 0) AS cost,
+       COALESCE(SUM((si.unit_price - COALESCE(ci.cost_usd, 0)) * si.quantity), 0) AS margin
+     FROM sale_items si
+     JOIN sales s ON s.id = si.sale_id
+     LEFT JOIN catalog_items ci ON ci.id = si.catalog_item_id
+     WHERE s.workspace_id = ? AND s.sale_date >= date('now', ?)
+     GROUP BY month
+     ORDER BY month ASC`,
+    [workspaceId, `-${months} months`],
+  ).catch(() => [] as MonthlyMargin[]);
+}
+
+export interface VendorMarginStats {
+  seller_id: string | null;
+  seller_name: string | null;
+  sales_count: number;
+  revenue: number;
+  cost: number;
+  margin: number;
+  margin_pct: number;
+}
+
+export async function getMarginByVendor(workspaceId: string): Promise<VendorMarginStats[]> {
+  return dbSelect<VendorMarginStats>(
+    `SELECT
+       s.seller_id,
+       s.seller_name,
+       COUNT(DISTINCT s.id) AS sales_count,
+       COALESCE(SUM(si.unit_price * si.quantity), 0) AS revenue,
+       COALESCE(SUM(COALESCE(ci.cost_usd, 0) * si.quantity), 0) AS cost,
+       COALESCE(SUM((si.unit_price - COALESCE(ci.cost_usd, 0)) * si.quantity), 0) AS margin,
+       CASE
+         WHEN SUM(COALESCE(ci.cost_usd, 0) * si.quantity) > 0
+         THEN (SUM((si.unit_price - COALESCE(ci.cost_usd, 0)) * si.quantity) * 100.0)
+              / SUM(COALESCE(ci.cost_usd, 0) * si.quantity)
+         ELSE 0
+       END AS margin_pct
+     FROM sale_items si
+     JOIN sales s ON s.id = si.sale_id
+     LEFT JOIN catalog_items ci ON ci.id = si.catalog_item_id
+     WHERE s.workspace_id = ?
+     GROUP BY s.seller_id
+     ORDER BY revenue DESC`,
+    [workspaceId],
+  ).catch(() => [] as VendorMarginStats[]);
+}

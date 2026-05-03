@@ -17,6 +17,7 @@ import { resolveImageUrl } from "../../lib/images";
 import { useEffect } from "react";
 import type { CatalogItemWithImeis } from "../../lib/db/types";
 import LegacyInventory from "../../features/inventory/InventoryScreen";
+import { ProductDetailDrawer } from "./components/ProductDetailDrawer";
 
 type StockFilter = "todos" | "disponibles" | "agotados";
 
@@ -27,6 +28,7 @@ export function Inventario() {
   const [view, setView] = useState<"grid" | "legacy">("grid");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<StockFilter>("todos");
+  const [selected, setSelected] = useState<CatalogItemWithImeis | null>(null);
 
   const productsQ = useQuery({
     queryKey: ["inventario", "catalog", wid],
@@ -145,11 +147,21 @@ export function Inventario() {
             }}
           >
             {filtered.map((p) => (
-              <ProductCard key={p.id} item={p} onClick={() => setView("legacy")} />
+              <ProductCard key={p.id} item={p} onClick={() => setSelected(p)} />
             ))}
           </div>
         )}
       </div>
+
+      <ProductDetailDrawer
+        item={selected}
+        onClose={() => setSelected(null)}
+        onSellUnit={() => {
+          setSelected(null);
+          setView("legacy");
+          showToast("Elegí la unidad para vender", "info");
+        }}
+      />
     </div>
   );
 }

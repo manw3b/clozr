@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MyDay } from "./MyDay";
+import { NewSaleModal } from "../ventas/components/NewSaleModal";
+import { useCreateSale } from "../ventas/useSalesData";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useBusinessStore } from "../../store/businessStore";
 import { useAuthStore } from "../../store/authStore";
@@ -29,8 +31,10 @@ export function MyDayContainer() {
   const { activeWorkspace } = useWorkspaceStore();
   const { activeBusiness } = useBusinessStore();
   const { userName } = useAuthStore();
-  const { setActiveScreen } = useUIStore();
+  const { setActiveScreen, showToast } = useUIStore();
   const qc = useQueryClient();
+  const [newSaleOpen, setNewSaleOpen] = useState(false);
+  const createSaleMut = useCreateSale();
 
   const wid = activeWorkspace?.id ?? "";
   const bid = activeBusiness?.id ?? "";
@@ -146,8 +150,10 @@ export function MyDayContainer() {
   ]);
 
   return (
+    <>
     <MyDay
       data={data}
+      onNewSale={() => setNewSaleOpen(true)}
       onToggleTask={(id) => toggleTaskMut.mutate(id)}
       onMarkPaid={(id) => markPaidMut.mutate(id)}
       onWhatsApp={(clientId) => {
@@ -178,5 +184,18 @@ export function MyDayContainer() {
         if (target) setActiveScreen(target as never);
       }}
     />
+    <NewSaleModal
+      open={newSaleOpen}
+      onClose={() => setNewSaleOpen(false)}
+      onSubmit={(data) => {
+        createSaleMut.mutate(data, {
+          onSuccess: () => {
+            showToast(data.outOfStock ? "Venta fuera de stock registrada" : "Venta registrada", "success");
+            setNewSaleOpen(false);
+          },
+        });
+      }}
+    />
+    </>
   );
 }

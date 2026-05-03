@@ -2,11 +2,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useBusinessStore } from "../../store/businessStore";
 import { useAuthStore } from "../../store/authStore";
-import { customersDb } from "../../lib/db/customers";
 import { salesDb } from "../../lib/db/sales";
-import { dbSaleRowToDomain, PAYMENT_METHOD_TO_DB } from "../../lib/mappers";
+import { dbSaleRowToDomain } from "../../lib/mappers";
 import { qk, invalidate } from "../../lib/queryKeys";
-import type { PaymentMethod, SaleStatus } from "../../types/domain";
 
 export function useSalesList() {
   const { activeWorkspace } = useWorkspaceStore();
@@ -29,13 +27,19 @@ export function useMarkSalePaid() {
   });
 }
 
-export interface NewSaleInput {
-  clientId: string;
-  product: string;
+/** Shape esperado del NewSaleModal nuevo (Fase 7.6). */
+export interface NewSalePayload {
+  clientId: string | null;
+  clientName: string | null;
+  customerTypeId: string | null;
+  catalogItemId: string | null;
+  productDescription: string;
   amount: number;
-  paymentMethod: PaymentMethod;
-  status: SaleStatus;
-  paid: number;
+  currency: "ARS" | "USD";
+  paymentMethodId: string;
+  paymentMethodName: string;
+  paymentMethodKind: string;
+  outOfStock: boolean;
 }
 
 export function useCreateSale() {
@@ -46,35 +50,31 @@ export function useCreateSale() {
   const wid = activeWorkspace?.id ?? "";
 
   return useMutation({
-    mutationFn: async (input: NewSaleInput) => {
-      const customer = await customersDb.getById(wid, input.clientId);
-      const customerName = customer?.name ?? null;
-
+    mutationFn: async (input: NewSalePayload) => {
       await salesDb.createSale(wid, {
         business_id: activeBusiness?.id ?? null,
         customer_id: input.clientId,
-        customer_name: customerName,
+        customer_name: input.clientName,
         seller_id: userId ?? null,
         seller_name: userName ?? null,
         notes: null,
+        out_of_stock_sale: input.outOfStock,
         items: [
           {
-            description: input.product,
+            description: input.productDescription,
             quantity: 1,
             unit_price: input.amount,
+            catalog_item_id: input.catalogItemId,
           },
         ],
-        payments:
-          input.paid > 0
-            ? [
-                {
-                  method: PAYMENT_METHOD_TO_DB[input.paymentMethod],
-                  currency: "ARS",
-                  amount: input.paid,
-                  is_deposit: input.status === "partial",
-                },
-              ]
-            : [],
+        payments: [
+          {
+            method: input.paymentMethodKind,
+            currency: input.currency,
+            amount: input.amount,
+            is_deposit: false,
+          },
+        ],
       });
     },
     onSuccess: () => invalidate.afterSaleChange(qc),

@@ -8,6 +8,7 @@ import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import Select from "../../components/ui/Select";
 import ImageUpload from "../../components/ui/ImageUpload";
+import { PaymentMethodsSection } from "./PaymentMethodsSection";
 import type {
   PipelineStage, CustomerTypeRow, CatalogCategoryRow,
   CatalogFieldTemplate, CatalogFieldType,
@@ -15,13 +16,14 @@ import type {
 
 // ── Shared ────────────────────────────────────────────────────────
 
-type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "catalog" | "data";
+type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "payment-methods" | "catalog" | "data";
 
 const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "general", label: "General" },
   { id: "profile", label: "Tu perfil" },
   { id: "pipeline", label: "Pipeline" },
   { id: "customer-types", label: "Tipos de cliente" },
+  { id: "payment-methods", label: "Métodos de pago" },
   { id: "catalog", label: "Catálogo" },
   { id: "data", label: "Datos y backup" },
 ];
@@ -919,6 +921,7 @@ export default function SettingsScreen() {
       case "pipeline": return <PipelineSection wid={wid} />;
       case "customer-types": return <CustomerTypesSection wid={wid} />;
       case "catalog": return <CatalogSection wid={wid} />;
+      case "payment-methods": return <PaymentMethodsSection wid={wid} />;
       case "data": return <DataSection wid={wid} />;
     }
   };

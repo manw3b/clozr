@@ -85,11 +85,13 @@ export async function createSale(
     data.payments.find((p) => !p.is_deposit) ?? data.payments[0];
   const paymentMethod = primaryPayment?.method ?? null;
 
+  const outOfStock = data.out_of_stock_sale ? 1 : 0;
   await dbExecute(
     `INSERT INTO sales (
       id, workspace_id, business_id, customer_id, customer_name, seller_id, seller_name,
-      subtotal, total, total_paid, balance, is_paid, notes, sale_date, created_at, payment_method
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      subtotal, total, total_paid, balance, is_paid, notes, sale_date, created_at, payment_method,
+      out_of_stock_sale
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id, workspaceId,
       data.business_id ?? null,
@@ -98,7 +100,7 @@ export async function createSale(
       data.seller_id ?? null,
       data.seller_name ?? null,
       subtotal, subtotal, totalPaid, balance, isPaid,
-      data.notes ?? null, now, now, paymentMethod,
+      data.notes ?? null, now, now, paymentMethod, outOfStock,
     ],
   );
 
@@ -189,7 +191,7 @@ export async function createSale(
     sale_date: now,
     created_at: now,
     payment_method: paymentMethod,
-    out_of_stock_sale: 0,
+    out_of_stock_sale: outOfStock,
     regularized_at: null,
     regularized_by: null,
   };

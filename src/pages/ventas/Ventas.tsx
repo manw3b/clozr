@@ -116,17 +116,10 @@ export function Ventas() {
     markPaidMut.mutate(saleId);
   }
 
-  function handleNewSale(data: {
-    clientId: string;
-    product: string;
-    amount: number;
-    paymentMethod: any;
-    status: any;
-    paid: number;
-  }) {
+  function handleNewSale(data: import('./useSalesData').NewSalePayload) {
     createSaleMut.mutate(data, {
       onSuccess: () => {
-        showToast('Venta registrada', 'success');
+        showToast(data.outOfStock ? 'Venta fuera de stock registrada' : 'Venta registrada', 'success');
         setNewSaleOpen(false);
       },
     });

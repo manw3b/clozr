@@ -10,6 +10,7 @@ import { dbSelect } from "./lib/db/index";
 import { productTemplatesDb } from "./lib/db/productTemplates";
 import { seedAppleCatalog, seedWatchAndMac } from "./lib/db/quickStock";
 import { applyImagesToTemplates } from "./lib/templates/applyImages";
+import { paymentMethodsDb } from "./lib/db/paymentMethods";
 
 // New design system pages
 import { AppShell } from "./layout/AppShell";
@@ -118,6 +119,8 @@ export default function App() {
     if (!activeWorkspace) return;
     loadBusinesses(activeWorkspace.id).catch(() => {});
     loadRate(activeWorkspace.id).catch(() => {});
+    // Asegurar que existan los métodos de pago default
+    paymentMethodsDb.seedDefaults(activeWorkspace.id).catch(() => {});
   }, [activeWorkspace?.id, loadBusinesses, loadRate]);
 
   useEffect(() => {

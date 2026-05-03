@@ -1,93 +1,189 @@
-import { useState } from 'react';
-import { Search } from 'lucide-react';
-import { Modal, ModalField } from '../../../components/Modal';
-import { Button } from '../../../components/Button';
-import { Input, Select } from '../../../components/Input';
-import { color, radius, space, text, weight } from '../../../tokens';
-import { PAYMENT_METHOD_LABELS } from '../../../types/domain';
-import type { PaymentMethod, SaleStatus } from '../../../types/domain';
-import { useClientsList } from '../../clientes/useClientsData';
-import { Avatar } from '../../../components/Avatar';
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Search } from "lucide-react";
+import { Modal, ModalField } from "../../../components/Modal";
+import { Button } from "../../../components/Button";
+import { Input, Select } from "../../../components/Input";
+import { Avatar } from "../../../components/Avatar";
+import { Badge } from "../../../components/Badge";
+import { color, radius, space, text, weight } from "../../../tokens";
+import { formatMoney } from "../../../lib/format";
+import { computeSuggestedPrice, compareToSuggested } from "../../../lib/pricing";
+import { useClientsList } from "../../clientes/useClientsData";
+import { paymentMethodsDb } from "../../../lib/db/paymentMethods";
+import { settingsDb } from "../../../lib/db/settings";
+import { catalogDb } from "../../../lib/db/catalog";
+import { pricingDb } from "../../../lib/db/pricing";
+import { useWorkspaceStore } from "../../../store/workspaceStore";
+import { useExchangeRateStore } from "../../../store/exchangeRateStore";
+import type { Client } from "../../../types/domain";
+import type { CatalogItem, CustomerTypeRow, PaymentMethodRow } from "../../../lib/db/types";
+
+export interface NewSalePayload {
+  clientId: string | null;
+  clientName: string | null;
+  customerTypeId: string | null;
+  catalogItemId: string | null;
+  productDescription: string;
+  amount: number;
+  currency: "ARS" | "USD";
+  paymentMethodId: string;
+  paymentMethodName: string;
+  paymentMethodKind: string;
+  outOfStock: boolean;
+}
 
 interface NewSaleModalProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (data: {
-    clientId: string;
-    product: string;
-    amount: number;
-    paymentMethod: PaymentMethod;
-    status: SaleStatus;
-    paid: number;
-  }) => void;
+  onSubmit: (data: NewSalePayload) => void;
 }
 
-/**
- * Modal para registrar una nueva venta.
- *
- * UX:
- * - Búsqueda de cliente con resultados en vivo (4 sugerencias máx)
- * - Seleccionado el cliente, aparece el resto del formulario
- * - "Estado de pago" cambia el comportamiento del campo "Pagado"
- *   (auto-completa el monto si es "Pagado", lo deja en 0 si "Pendiente")
- */
 export function NewSaleModal({ open, onClose, onSubmit }: NewSaleModalProps) {
+  const { activeWorkspace } = useWorkspaceStore();
+  const { usdToArs } = useExchangeRateStore();
+  const wid = activeWorkspace?.id ?? "";
+
+  const [clientSearch, setClientSearch] = useState("");
+  const [client, setClient] = useState<Client | null>(null);
+
+  const [productSearch, setProductSearch] = useState("");
+  const [catalogItem, setCatalogItem] = useState<CatalogItem | null>(null);
+  const [productDescription, setProductDescription] = useState("");
+  const [outOfStock, setOutOfStock] = useState(false);
+
+  const [paymentMethodId, setPaymentMethodId] = useState("");
+  const [amountInput, setAmountInput] = useState("");
+
   const { data: allClients = [] } = useClientsList();
-  const [clientSearch, setClientSearch] = useState('');
-  const [clientId, setClientId] = useState<string | null>(null);
-  const [product, setProduct] = useState('');
-  const [amount, setAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('transferencia');
-  const [status, setStatus] = useState<SaleStatus>('paid');
-  const [paid, setPaid] = useState('');
 
-  const selectedClient = clientId ? allClients.find((c) => c.id === clientId) : null;
+  const customerTypesQ = useQuery({
+    queryKey: ["customer-types", wid],
+    queryFn: () => settingsDb.getCustomerTypes(wid),
+    enabled: open && !!wid,
+  });
 
-  const filteredClients =
-    clientSearch.trim().length === 0
-      ? allClients.slice(0, 4)
-      : allClients
-          .filter((c) =>
-            c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
-            c.phone?.toLowerCase().includes(clientSearch.toLowerCase())
-          )
-          .slice(0, 4);
+  const paymentsQ = useQuery({
+    queryKey: ["payment-methods-active", wid],
+    queryFn: () => paymentMethodsDb.getActive(wid),
+    enabled: open && !!wid,
+  });
+
+  const catalogQ = useQuery({
+    queryKey: ["catalog-items-search", wid],
+    queryFn: () => catalogDb.getAll(wid),
+    enabled: open && !!wid && !outOfStock,
+  });
 
   function reset() {
-    setClientSearch('');
-    setClientId(null);
-    setProduct('');
-    setAmount('');
-    setPaymentMethod('transferencia');
-    setStatus('paid');
-    setPaid('');
+    setClientSearch("");
+    setClient(null);
+    setProductSearch("");
+    setCatalogItem(null);
+    setProductDescription("");
+    setOutOfStock(false);
+    setPaymentMethodId("");
+    setAmountInput("");
   }
 
-  function handleStatusChange(s: SaleStatus) {
-    setStatus(s);
-    if (s === 'paid') setPaid(amount);
-    if (s === 'pending') setPaid('0');
-  }
+  // Auto-pick first payment method when modal opens
+  useEffect(() => {
+    if (open && paymentsQ.data && paymentsQ.data.length > 0 && !paymentMethodId) {
+      setPaymentMethodId(paymentsQ.data[0].id);
+    }
+  }, [open, paymentsQ.data, paymentMethodId]);
 
-  function handleAmountChange(v: string) {
-    setAmount(v);
-    if (status === 'paid') setPaid(v);
-  }
+  const customerTypes = customerTypesQ.data ?? [];
+  const customerType: CustomerTypeRow | null = useMemo(() => {
+    if (!client) return customerTypes[0] ?? null;
+    // client.type es el slug ("final", "revendedor", etc.) — match contra customer_types.name lowercased
+    return (
+      customerTypes.find((t) => t.name.toLowerCase() === client.type) ??
+      customerTypes[0] ??
+      null
+    );
+  }, [client, customerTypes]);
+
+  const paymentMethod: PaymentMethodRow | null = useMemo(
+    () => paymentsQ.data?.find((p) => p.id === paymentMethodId) ?? null,
+    [paymentsQ.data, paymentMethodId],
+  );
+
+  // Resolve catalog price
+  const priceQ = useQuery({
+    queryKey: ["resolve-price", catalogItem?.id, customerType?.id],
+    queryFn: () => {
+      if (!catalogItem || !customerType) return Promise.resolve({ priceUsd: null, source: "none" as const });
+      return pricingDb.resolvePrice(catalogItem.id, customerType.id);
+    },
+    enabled: !!catalogItem && !!customerType,
+  });
+
+  const basePriceUsd = priceQ.data?.priceUsd ?? null;
+  const breakdown = useMemo(() => {
+    if (basePriceUsd === null || !paymentMethod) return null;
+    return computeSuggestedPrice({
+      basePriceUsd,
+      usdToArs: usdToArs || 1,
+      modifierPct: paymentMethod.modifier_pct,
+      currency: paymentMethod.currency,
+    });
+  }, [basePriceUsd, paymentMethod, usdToArs]);
+
+  // Auto-fill amount when breakdown changes
+  useEffect(() => {
+    if (breakdown && amountInput === "") {
+      setAmountInput(String(Math.round(breakdown.suggested * 100) / 100));
+    }
+  }, [breakdown, amountInput]);
+
+  const charged = parseFloat(amountInput) || 0;
+  const markup = breakdown ? compareToSuggested(charged, breakdown.suggested) : null;
+
+  const filteredClients = useMemo(() => {
+    if (!clientSearch.trim()) return allClients.slice(0, 5);
+    const q = clientSearch.toLowerCase();
+    return allClients
+      .filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.phone?.toLowerCase().includes(q) ||
+          c.email?.toLowerCase().includes(q),
+      )
+      .slice(0, 5);
+  }, [allClients, clientSearch]);
+
+  const filteredCatalog = useMemo(() => {
+    if (!catalogQ.data) return [];
+    if (!productSearch.trim()) return catalogQ.data.slice(0, 5);
+    const q = productSearch.toLowerCase();
+    return catalogQ.data.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 5);
+  }, [catalogQ.data, productSearch]);
+
+  const canSubmit =
+    !!paymentMethod &&
+    charged > 0 &&
+    (outOfStock ? productDescription.trim().length >= 2 : !!catalogItem);
 
   function handleSubmit() {
-    if (!clientId || !product || !amount) return;
+    if (!canSubmit || !paymentMethod) return;
     onSubmit({
-      clientId,
-      product,
-      amount: Number(amount),
-      paymentMethod,
-      status,
-      paid: Number(paid || 0),
+      clientId: client?.id ?? null,
+      clientName: client?.name ?? null,
+      customerTypeId: customerType?.id ?? null,
+      catalogItemId: outOfStock ? null : catalogItem?.id ?? null,
+      productDescription: outOfStock
+        ? productDescription.trim()
+        : catalogItem?.name ?? "Producto",
+      amount: charged,
+      currency: paymentMethod.currency,
+      paymentMethodId: paymentMethod.id,
+      paymentMethodName: paymentMethod.name,
+      paymentMethodKind: paymentMethod.kind,
+      outOfStock,
     });
     reset();
   }
-
-  const canSubmit = !!clientId && !!product && Number(amount) > 0;
 
   return (
     <Modal
@@ -97,242 +193,392 @@ export function NewSaleModal({ open, onClose, onSubmit }: NewSaleModalProps) {
         onClose();
       }}
       title="Nueva venta"
-      subtitle="Registrá una venta y su forma de cobro"
-      maxWidth={560}
+      subtitle={outOfStock ? "Venta fuera de stock — quedará pendiente de regularizar" : "Registrá una venta del catálogo"}
+      maxWidth={600}
       footer={
         <>
-          <Button
-            variant="ghost"
-            size="md"
-            onClick={() => {
-              reset();
-              onClose();
-            }}
-          >
+          <Button variant="ghost" onClick={() => { reset(); onClose(); }}>
             Cancelar
           </Button>
-          <Button variant="primary" size="md" onClick={handleSubmit} disabled={!canSubmit}>
-            Registrar venta
+          <Button variant="primary" onClick={handleSubmit} disabled={!canSubmit}>
+            {outOfStock ? "Registrar fuera de stock" : "Registrar venta"}
           </Button>
         </>
       }
     >
       {/* CLIENTE */}
-      <ModalField label="Cliente" required>
-        {selectedClient ? (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: space[3],
-              padding: space[3],
-              background: color.surface2,
-              border: `1px solid ${color.border}`,
-              borderRadius: radius.md,
-            }}
-          >
-            <Avatar name={selectedClient.name} size={36} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text }}>
-                {selectedClient.name}
-              </div>
-              <div style={{ fontSize: text.xs, color: color.textMuted }}>{selectedClient.phone || '—'}</div>
-            </div>
-            <button
-              onClick={() => setClientId(null)}
-              style={{
-                fontSize: text.xs,
-                color: color.textMuted,
-                fontWeight: weight.medium,
-                padding: `${space[1]} ${space[2]}`,
-                borderRadius: radius.sm,
-                transition: 'all 100ms',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = color.surfaceHover;
-                e.currentTarget.style.color = color.text;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = color.textMuted;
-              }}
-            >
-              Cambiar
-            </button>
-          </div>
+      <ModalField label="Cliente" hint="Opcional — para venta de mostrador podés dejarlo vacío">
+        {client ? (
+          <SelectedClientCard
+            client={client}
+            customerType={customerType}
+            onClear={() => setClient(null)}
+          />
         ) : (
-          <>
-            <Input
-              placeholder="Buscar cliente por nombre o teléfono…"
-              iconLeft={<Search size={15} />}
-              value={clientSearch}
-              onChange={(e) => setClientSearch(e.target.value)}
-              autoFocus
-            />
-            <div
-              style={{
-                marginTop: space[2],
-                background: color.surface2,
-                border: `1px solid ${color.border}`,
-                borderRadius: radius.md,
-                overflow: 'hidden',
-              }}
-            >
-              {filteredClients.length === 0 ? (
-                <div style={{ padding: space[3], fontSize: text.sm, color: color.textMuted, textAlign: 'center' }}>
-                  Sin resultados — <button style={{ color: color.primary, fontWeight: weight.semibold }}>crear cliente</button>
-                </div>
-              ) : (
-                filteredClients.map((c, idx) => (
-                  <button
-                    key={c.id}
-                    onClick={() => setClientId(c.id)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: space[3],
-                      padding: space[3],
-                      width: '100%',
-                      textAlign: 'left',
-                      borderBottom: idx === filteredClients.length - 1 ? 'none' : `1px solid ${color.border}`,
-                      transition: 'background 100ms',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = color.surfaceHover;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                    }}
-                  >
-                    <Avatar name={c.name} size={32} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text }}>
-                        {c.name}
-                      </div>
-                      <div style={{ fontSize: text.xs, color: color.textMuted }}>{c.phone || '—'}</div>
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
-          </>
+          <ClientPicker
+            search={clientSearch}
+            setSearch={setClientSearch}
+            results={filteredClients}
+            onPick={setClient}
+          />
         )}
       </ModalField>
 
-      {/* PRODUCTO + MONTO */}
-      {selectedClient && (
-        <>
-          <ModalField label="Producto" required>
-            <Input
-              placeholder="ej. iPhone 15 128GB"
-              value={product}
-              onChange={(e) => setProduct(e.target.value)}
+      {/* PRODUCTO */}
+      <ModalField label={outOfStock ? "Descripción del producto" : "Producto"} required>
+        {outOfStock ? (
+          <Input
+            value={productDescription}
+            onChange={(e) => setProductDescription(e.target.value)}
+            placeholder='Ej: "iPhone 15 Pro Max 256GB Naranja, IMEI 35XXX"'
+          />
+        ) : catalogItem ? (
+          <SelectedCatalogCard
+            item={catalogItem}
+            priceSource={priceQ.data?.source ?? "none"}
+            onClear={() => { setCatalogItem(null); setAmountInput(""); }}
+          />
+        ) : (
+          <CatalogPicker
+            search={productSearch}
+            setSearch={setProductSearch}
+            results={filteredCatalog}
+            onPick={(p) => { setCatalogItem(p); setAmountInput(""); }}
+          />
+        )}
+        <button
+          onClick={() => { setOutOfStock(!outOfStock); setCatalogItem(null); setAmountInput(""); }}
+          style={{
+            marginTop: space[2],
+            fontSize: text.xs,
+            color: outOfStock ? color.warning : color.textMuted,
+            textDecoration: "underline",
+          }}
+        >
+          {outOfStock ? "← Volver al catálogo" : "Producto no está en el catálogo →"}
+        </button>
+      </ModalField>
+
+      {/* MÉTODO DE PAGO */}
+      <ModalField label="Método de pago" required>
+        <Select value={paymentMethodId} onChange={(e) => setPaymentMethodId(e.target.value)}>
+          <option value="">Seleccionar…</option>
+          {(paymentsQ.data ?? []).map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name} ({p.currency})
+              {p.modifier_pct !== 0 ? ` · ${p.modifier_pct > 0 ? "+" : ""}${p.modifier_pct}%` : ""}
+            </option>
+          ))}
+        </Select>
+      </ModalField>
+
+      {/* PRECIO BREAKDOWN */}
+      {breakdown && (
+        <div
+          style={{
+            background: color.surface2,
+            border: `1px solid ${color.border}`,
+            borderRadius: radius.md,
+            padding: space[3],
+            marginBottom: space[4],
+            fontSize: text.sm,
+          }}
+        >
+          <Row label={`Precio sugerido (${customerType?.name ?? "Final"})`} value={`USD ${basePriceUsd}`} />
+          {breakdown.modifierLabel !== "—" && (
+            <Row
+              label={`Modificador ${paymentMethod?.name ?? ""}`}
+              value={breakdown.modifierLabel}
+              tone={paymentMethod && paymentMethod.modifier_pct > 0 ? "warning" : "success"}
             />
-          </ModalField>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: space[3] }}>
-            <ModalField label="Monto total" required>
-              <Input
-                type="number"
-                placeholder="0"
-                value={amount}
-                onChange={(e) => handleAmountChange(e.target.value)}
-              />
-            </ModalField>
-            <ModalField label="Forma de pago">
-              <Select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}>
-                {Object.entries(PAYMENT_METHOD_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </Select>
-            </ModalField>
-          </div>
-
-          {/* ESTADO DE PAGO */}
-          <ModalField label="Estado de pago">
-            <div style={{ display: 'flex', gap: space[2] }}>
-              <PaymentStatusOption
-                active={status === 'paid'}
-                onClick={() => handleStatusChange('paid')}
-                label="Pagado"
-                tone="success"
-              />
-              <PaymentStatusOption
-                active={status === 'partial'}
-                onClick={() => handleStatusChange('partial')}
-                label="Parcial"
-                tone="warning"
-              />
-              <PaymentStatusOption
-                active={status === 'pending'}
-                onClick={() => handleStatusChange('pending')}
-                label="Pendiente"
-                tone="danger"
-              />
-            </div>
-          </ModalField>
-
-          {status === 'partial' && (
-            <ModalField label="Monto recibido (seña)" hint={`Falta ${amount ? formatRemaining(amount, paid) : '—'}`}>
-              <Input
-                type="number"
-                placeholder="0"
-                value={paid}
-                onChange={(e) => setPaid(e.target.value)}
-              />
-            </ModalField>
           )}
-        </>
+          <div style={{ height: 1, background: color.border, margin: `${space[2]} 0` }} />
+          <Row
+            label={<strong style={{ color: color.text }}>Sugerido en {breakdown.currency}</strong>}
+            value={
+              <strong style={{ color: color.text }}>
+                {formatMoney(breakdown.suggested, breakdown.currency)}
+              </strong>
+            }
+          />
+        </div>
       )}
+
+      {!breakdown && catalogItem && (
+        <div
+          style={{
+            background: color.warningBg,
+            border: `1px solid ${color.warning}`,
+            borderRadius: radius.md,
+            padding: space[3],
+            marginBottom: space[4],
+            fontSize: text.sm,
+            color: color.warning,
+          }}
+        >
+          ⚠ Sin precio sugerido cargado para este producto / tipo de cliente. Ingresalo manual.
+        </div>
+      )}
+
+      {/* MONTO A COBRAR */}
+      <ModalField label={`Monto a cobrar (${paymentMethod?.currency ?? "—"})`} required>
+        <Input
+          type="number"
+          step="0.01"
+          value={amountInput}
+          onChange={(e) => setAmountInput(e.target.value)}
+          placeholder="0"
+        />
+        {markup && markup.direction !== "match" && (
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: text.xs,
+              fontWeight: weight.semibold,
+              color: markup.direction === "above" ? color.success : color.warning,
+            }}
+          >
+            {markup.direction === "above" ? "✨ " : "▾ "}
+            {markup.label} {markup.direction === "above" ? "sobre sugerido" : "vs sugerido"}
+          </div>
+        )}
+        {markup && markup.direction === "match" && breakdown && (
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: text.xs,
+              color: color.textMuted,
+            }}
+          >
+            ✓ Precio sugerido
+          </div>
+        )}
+      </ModalField>
     </Modal>
   );
 }
 
-function formatRemaining(amount: string, paid: string): string {
-  const r = Number(amount) - Number(paid || 0);
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(Math.max(0, r));
-}
-
-function PaymentStatusOption({
-  active, onClick, label, tone,
-}: { active: boolean; onClick: () => void; label: string; tone: 'success' | 'warning' | 'danger' }) {
-  const tones = {
-    success: { active: color.success, bg: color.successBg },
-    warning: { active: color.warning, bg: color.warningBg },
-    danger: { active: color.danger, bg: color.dangerBg },
-  };
-  const t = tones[tone];
-
+function Row({ label, value, tone }: { label: React.ReactNode; value: React.ReactNode; tone?: "success" | "warning" }) {
   return (
-    <button
-      onClick={onClick}
+    <div
       style={{
-        flex: 1,
-        height: 36,
-        padding: `0 ${space[3]}`,
-        background: active ? t.bg : color.surface2,
-        border: `1px solid ${active ? t.active : color.border}`,
-        borderRadius: radius.md,
-        color: active ? t.active : color.text,
-        fontSize: text.sm,
-        fontWeight: active ? weight.semibold : weight.medium,
-        transition: 'all 100ms',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "3px 0",
+        color: color.textMuted,
       }}
     >
-      <span
-        style={{
-          width: 6,
-          height: 6,
-          borderRadius: '50%',
-          background: t.active,
-          opacity: active ? 1 : 0.4,
-        }}
+      <span>{label}</span>
+      <span style={{ color: tone === "success" ? color.success : tone === "warning" ? color.warning : color.text }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function ClientPicker({
+  search,
+  setSearch,
+  results,
+  onPick,
+}: {
+  search: string;
+  setSearch: (s: string) => void;
+  results: Client[];
+  onPick: (c: Client) => void;
+}) {
+  return (
+    <>
+      <Input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Buscar cliente por nombre o teléfono…"
+        iconLeft={<Search size={14} />}
       />
-      {label}
-    </button>
+      {results.length > 0 && (
+        <div
+          style={{
+            marginTop: space[2],
+            background: color.surface2,
+            border: `1px solid ${color.border}`,
+            borderRadius: radius.md,
+            overflow: "hidden",
+          }}
+        >
+          {results.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => onPick(c)}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                gap: space[3],
+                padding: `${space[2]} ${space[3]}`,
+                textAlign: "left",
+                color: color.text,
+                fontSize: text.sm,
+                borderBottom: `1px solid ${color.border}`,
+              }}
+            >
+              <Avatar name={c.name} size={28} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: weight.semibold }}>{c.name}</div>
+                <div style={{ fontSize: text.xs, color: color.textMuted }}>
+                  {c.phone ?? "—"} · {c.type}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+      {search.trim() && results.length === 0 && (
+        <div style={{ marginTop: space[2], fontSize: text.xs, color: color.textMuted }}>
+          Sin resultados — la venta se puede registrar sin cliente
+        </div>
+      )}
+    </>
+  );
+}
+
+function SelectedClientCard({
+  client,
+  customerType,
+  onClear,
+}: {
+  client: Client;
+  customerType: CustomerTypeRow | null;
+  onClear: () => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: space[3],
+        padding: space[3],
+        background: color.surface2,
+        border: `1px solid ${color.border}`,
+        borderRadius: radius.md,
+      }}
+    >
+      <Avatar name={client.name} size={36} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text }}>
+          {client.name}
+        </div>
+        <div style={{ fontSize: text.xs, color: color.textMuted }}>
+          {client.phone ?? "—"}
+          {customerType && (
+            <>
+              {" · "}
+              <Badge tone="info">{customerType.name}</Badge>
+            </>
+          )}
+        </div>
+      </div>
+      <button onClick={onClear} style={{ color: color.textMuted, fontSize: text.xs }}>
+        Cambiar
+      </button>
+    </div>
+  );
+}
+
+function CatalogPicker({
+  search,
+  setSearch,
+  results,
+  onPick,
+}: {
+  search: string;
+  setSearch: (s: string) => void;
+  results: CatalogItem[];
+  onPick: (item: CatalogItem) => void;
+}) {
+  return (
+    <>
+      <Input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Buscar producto del catálogo…"
+        iconLeft={<Search size={14} />}
+      />
+      {results.length > 0 && (
+        <div
+          style={{
+            marginTop: space[2],
+            background: color.surface2,
+            border: `1px solid ${color.border}`,
+            borderRadius: radius.md,
+            overflow: "hidden",
+          }}
+        >
+          {results.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => onPick(p)}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                gap: space[3],
+                padding: `${space[2]} ${space[3]}`,
+                textAlign: "left",
+                color: color.text,
+                fontSize: text.sm,
+                borderBottom: `1px solid ${color.border}`,
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: weight.semibold }}>{p.name}</div>
+                {p.category && (
+                  <div style={{ fontSize: text.xs, color: color.textMuted }}>{p.category}</div>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function SelectedCatalogCard({
+  item,
+  priceSource,
+  onClear,
+}: {
+  item: CatalogItem;
+  priceSource: "stock-override" | "catalog" | "none";
+  onClear: () => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: space[3],
+        padding: space[3],
+        background: color.surface2,
+        border: `1px solid ${color.border}`,
+        borderRadius: radius.md,
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text }}>
+          {item.name}
+        </div>
+        <div style={{ fontSize: text.xs, color: color.textMuted, marginTop: 2 }}>
+          {item.category ?? "—"}
+          {priceSource === "catalog" && " · precio del catálogo"}
+          {priceSource === "stock-override" && " · precio override"}
+          {priceSource === "none" && " · sin precio cargado"}
+        </div>
+      </div>
+      <button onClick={onClear} style={{ color: color.textMuted, fontSize: text.xs }}>
+        Cambiar
+      </button>
+    </div>
   );
 }

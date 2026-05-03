@@ -391,6 +391,8 @@ export interface CreateSaleInput {
   seller_name?: string | null;
   notes?: string | null;
   business_id?: string | null;
+  /** Migration 025: marca como venta fuera de stock (queda pendiente de regularizar). */
+  out_of_stock_sale?: boolean;
   items: Array<{
     catalog_item_id?: string | null;
     description: string;

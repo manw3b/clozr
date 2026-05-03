@@ -22,6 +22,8 @@ import { BulkActionBar } from './components/BulkActionBar';
 import { useClientsList, useClientDetail, useDeleteClients, useRecordContact } from './useClientsData';
 import { ClientFormModal } from './components/ClientFormModal';
 import { useUIStore } from '../../store/uiStore';
+import { exportToCsv as exportCsv, timestamp as csvTimestamp } from '../../lib/exportCsv';
+import { usePersistedState } from '../../lib/usePersistedState';
 import { color, space, text, weight } from '../../tokens';
 import { formatMoney, formatRelative, formatDaysAgo } from '../../lib/format';
 import type { Client, ClientType, ClientStatus } from '../../types/domain';
@@ -50,12 +52,12 @@ const statusFilters: { value: ClientStatus | 'todos'; label: string }[] = [
 
 export function Clientes() {
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>('todos');
-  const [statusFilter, setStatusFilter] = useState<string>('todos');
-  const [sort, setSort] = useState<{ columnId: string; direction: 'asc' | 'desc' } | null>({
-    columnId: 'lastContactAt',
-    direction: 'desc',
-  });
+  const [typeFilter, setTypeFilter] = usePersistedState<string>('clientes.typeFilter', 'todos');
+  const [statusFilter, setStatusFilter] = usePersistedState<string>('clientes.statusFilter', 'todos');
+  const [sort, setSort] = usePersistedState<{ columnId: string; direction: 'asc' | 'desc' } | null>(
+    'clientes.sort',
+    { columnId: 'lastContactAt', direction: 'desc' },
+  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openClientId, setOpenClientId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -68,25 +70,13 @@ export function Clientes() {
   const recordContactMut = useRecordContact();
 
   function exportToCsv(rows: typeof clientsData) {
-    const headers = ['Nombre', 'Teléfono', 'Email', 'Tipo', 'Notas'];
-    const escape = (s: string) => `"${s.replace(/"/g, '""')}"`;
-    const csvRows = [headers.join(',')];
-    for (const c of rows) {
-      csvRows.push([
-        escape(c.name),
-        escape(c.phone ?? ''),
-        escape(c.email ?? ''),
-        escape(c.type ?? ''),
-        escape(c.notes ?? ''),
-      ].join(','));
-    }
-    const blob = new Blob(['﻿' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `clientes-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    exportCsv(`clientes-${csvTimestamp()}.csv`, rows, [
+      ['Nombre', (c) => c.name],
+      ['Teléfono', (c) => c.phone ?? ''],
+      ['Email', (c) => c.email ?? ''],
+      ['Tipo', (c) => c.type ?? ''],
+      ['Notas', (c) => c.notes ?? ''],
+    ]);
   }
 
   function handleBulkDelete() {

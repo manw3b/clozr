@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Phone, MessageCircle, Check } from "lucide-react";
+import { Phone, MessageCircle, Check, Download } from "lucide-react";
 import { PageHeader } from "../../components/PageHeader";
 import { Button } from "../../components/Button";
 import { Avatar } from "../../components/Avatar";
@@ -15,6 +15,7 @@ import { useUIStore } from "../../store/uiStore";
 import { invalidate } from "../../lib/queryKeys";
 import { color, space, text, weight } from "../../tokens";
 import { formatMoney } from "../../lib/format";
+import { exportToCsv, timestamp } from "../../lib/exportCsv";
 import { useRecordContact } from "../clientes/useClientsData";
 import type { Sale } from "../../lib/db/types";
 
@@ -227,6 +228,26 @@ export function Deudas() {
       <PageHeader
         title="Deudas"
         subtitle={`${totals.customerCount} cliente${totals.customerCount === 1 ? "" : "s"} con saldo pendiente`}
+        actions={
+          <Button
+            variant="secondary"
+            iconLeft={<Download size={14} />}
+            onClick={() => {
+              if (rows.length === 0) return;
+              exportToCsv(`deudas-${timestamp()}.csv`, rows, [
+                ["Cliente", (r) => r.customerName],
+                ["Teléfono", (r) => r.customerPhone ?? ""],
+                ["Ventas pendientes", (r) => r.pendingSales],
+                ["Saldo total", (r) => r.totalDue],
+                ["Días de atraso (máx)", (r) => r.maxDaysOverdue],
+                ["Venta más vieja", (r) => new Date(r.oldestDueDate).toLocaleDateString("es-AR")],
+              ]);
+              showToast(`${rows.length} cliente${rows.length === 1 ? "" : "s"} exportado${rows.length === 1 ? "" : "s"}`, "success");
+            }}
+          >
+            Exportar
+          </Button>
+        }
       />
 
       {/* Summary cards */}

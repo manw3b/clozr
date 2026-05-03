@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Check } from "lucide-react";
 import { PageHeader } from "../../components/PageHeader";
@@ -14,6 +14,7 @@ import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import { qk, invalidate } from "../../lib/queryKeys";
+import { usePersistedState } from "../../lib/usePersistedState";
 import { color, space, text, weight } from "../../tokens";
 import type { Task as DbTask, TaskType } from "../../lib/db/types";
 
@@ -26,9 +27,15 @@ export function Tareas() {
   const qc = useQueryClient();
   const { showToast } = useUIStore();
 
-  const [statusFilter, setStatusFilter] = useState<FilterStatus>("pendientes");
-  const [typeFilter, setTypeFilter] = useState<FilterType>("todos");
+  const [statusFilter, setStatusFilter] = usePersistedState<FilterStatus>("tareas.statusFilter", "pendientes");
+  const [typeFilter, setTypeFilter] = usePersistedState<FilterType>("tareas.typeFilter", "todos");
   const [openForm, setOpenForm] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setOpenForm(true);
+    window.addEventListener("clozr:open-new-task", handler);
+    return () => window.removeEventListener("clozr:open-new-task", handler);
+  }, []);
 
   const { data: tasks = [] } = useQuery({
     queryKey: qk.tasks(wid),

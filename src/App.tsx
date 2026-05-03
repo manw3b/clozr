@@ -32,6 +32,8 @@ import SettingsScreen from "./features/settings/SettingsScreen";
 
 import Toaster from "./components/Toaster";
 import { CommandPalette } from "./components/CommandPalette";
+import { ShortcutsHelp } from "./components/ShortcutsHelp";
+import { useGlobalShortcuts } from "./lib/useGlobalShortcuts";
 import { checkForUpdate, downloadAndInstall, type UpdateStatus } from "./lib/updater";
 import logoIsotipo from "./assets/logo-isotipo.svg";
 
@@ -107,6 +109,8 @@ export default function App() {
   const { userId, userName, setUser } = useAuthStore();
   const { loadRate } = useExchangeRateStore();
   const queryClient = useQueryClient();
+
+  useGlobalShortcuts();
 
   useEffect(() => { loadWorkspaces().catch(() => {}); }, [loadWorkspaces]);
 
@@ -201,6 +205,7 @@ export default function App() {
         {renderScreen(activeScreen)}
       </AppShell>
       <CommandPalette />
+      <ShortcutsHelp />
       <Toaster />
     </>
   );

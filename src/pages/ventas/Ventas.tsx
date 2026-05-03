@@ -23,6 +23,8 @@ import { NewSaleModal } from './components/NewSaleModal';
 import { buildSalesTimeline } from '../../lib/groupings';
 import { useSalesList, useMarkSalePaid, useCreateSale } from './useSalesData';
 import { useUIStore } from '../../store/uiStore';
+import { exportToCsv, timestamp } from '../../lib/exportCsv';
+import { usePersistedState } from '../../lib/usePersistedState';
 import { color, space, text, weight } from '../../tokens';
 import { formatMoney, formatRelative } from '../../lib/format';
 import { PAYMENT_METHOD_LABELS } from '../../types/domain';
@@ -48,8 +50,8 @@ export function Ventas() {
   const createSaleMut = useCreateSale();
   const { showToast } = useUIStore();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('todos');
-  const [periodFilter, setPeriodFilter] = useState<string>('30d');
+  const [statusFilter, setStatusFilter] = usePersistedState<string>('ventas.statusFilter', 'todos');
+  const [periodFilter, setPeriodFilter] = usePersistedState<string>('ventas.periodFilter', '30d');
   const [sort, setSort] = useState<{ columnId: string; direction: 'asc' | 'desc' } | null>({
     columnId: 'createdAt',
     direction: 'desc',
@@ -144,7 +146,26 @@ export function Ventas() {
         subtitle={`${filtered.length} ${filtered.length === 1 ? 'venta' : 'ventas'} · ${formatMoney(totalPeriod)} en el período`}
         actions={
           <>
-            <Button variant="secondary" size="md" iconLeft={<Download size={14} />}>
+            <Button
+              variant="secondary"
+              size="md"
+              iconLeft={<Download size={14} />}
+              onClick={() => {
+                if (filtered.length === 0) return;
+                exportToCsv(`ventas-${timestamp()}.csv`, filtered, [
+                  ['Nro', (r) => r.number ?? ''],
+                  ['Fecha', (r) => new Date(r.createdAt).toLocaleDateString('es-AR')],
+                  ['Cliente', (r) => r.clientName],
+                  ['Producto', (r) => r.product],
+                  ['Monto', (r) => r.amount],
+                  ['Cobrado', (r) => r.paid],
+                  ['Pendiente', (r) => r.pending ?? 0],
+                  ['Estado', (r) => r.status],
+                  ['Método de pago', (r) => r.paymentMethod ?? ''],
+                ]);
+                showToast(`${filtered.length} ${filtered.length === 1 ? 'venta exportada' : 'ventas exportadas'}`, 'success');
+              }}
+            >
               Exportar
             </Button>
             <Button

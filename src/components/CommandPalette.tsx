@@ -8,16 +8,19 @@ import {
   CheckSquare,
   Wallet,
   ArrowRight,
+  Package,
 } from "lucide-react";
 import { customersDb } from "../lib/db/customers";
 import { salesDb } from "../lib/db/sales";
 import { pipelineDb } from "../lib/db/pipeline";
+import { catalogDb } from "../lib/db/catalog";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { useUIStore, type ScreenId } from "../store/uiStore";
 import { color, radius, space, text, weight } from "../tokens";
 import { formatMoney } from "../lib/format";
+import { getTemplateImageUrl } from "../lib/templates/productImageMap";
 
-type ResultKind = "client" | "sale" | "lead" | "shortcut";
+type ResultKind = "client" | "sale" | "lead" | "product" | "shortcut";
 
 interface CommandResult {
   id: string;
@@ -26,6 +29,8 @@ interface CommandResult {
   subtitle?: string;
   /** Texto a la derecha (ej: monto). */
   meta?: string;
+  /** URL de imagen para el thumbnail (productos). */
+  imageUrl?: string | null;
   /** Acción a ejecutar al elegir. */
   action: () => void;
 }
@@ -96,6 +101,12 @@ export function CommandPalette() {
   const leadsQ = useQuery({
     queryKey: ["cmdk", "leads", wid],
     queryFn: () => pipelineDb.getAll(wid),
+    enabled: open && !!wid,
+    staleTime: 60_000,
+  });
+  const catalogQ = useQuery({
+    queryKey: ["cmdk", "catalog", wid],
+    queryFn: () => catalogDb.getAll(wid),
     enabled: open && !!wid,
     staleTime: 60_000,
   });
@@ -179,8 +190,31 @@ export function CommandPalette() {
       if (out.length >= 70) break;
     }
 
+    // Filter products from catalog by name
+    for (const p of catalogQ.data ?? []) {
+      if (
+        p.name.toLowerCase().includes(q) ||
+        (p.category ?? "").toLowerCase().includes(q)
+      ) {
+        const units = p.track_stock ? (p.available_imeis ?? 0) : (p.stock ?? 0);
+        out.push({
+          id: `product-${p.id}`,
+          kind: "product",
+          title: p.name,
+          subtitle: p.category ?? undefined,
+          meta: units > 0 ? `${units} ${units === 1 ? "unidad" : "unidades"}` : "Sin stock",
+          imageUrl: getTemplateImageUrl(p.image_path ?? null),
+          action: () => {
+            setActiveScreen("inventory");
+            setOpen(false);
+          },
+        });
+      }
+      if (out.length >= 90) break;
+    }
+
     return out;
-  }, [query, customersQ.data, salesQ.data, leadsQ.data, setActiveScreen]);
+  }, [query, customersQ.data, salesQ.data, leadsQ.data, catalogQ.data, setActiveScreen]);
 
   // Reset activeIdx if results change
   useEffect(() => {
@@ -318,6 +352,7 @@ function CommandRow({
     client: Users,
     sale: ShoppingCart,
     lead: GitBranch,
+    product: Package,
     shortcut: ArrowRight,
   } as const;
   const Icon = ICON[result.kind];
@@ -351,9 +386,14 @@ function CommandRow({
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0,
+          overflow: "hidden",
         }}
       >
-        <Icon size={14} strokeWidth={2.2} />
+        {result.imageUrl ? (
+          <img src={result.imageUrl} alt={result.title} style={{ width: "85%", height: "85%", objectFit: "contain" }} />
+        ) : (
+          <Icon size={14} strokeWidth={2.2} />
+        )}
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div

@@ -178,12 +178,17 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
     setPaymentMethodId("");
   }
 
-  // Auto-pick first payment method
+  // Auto-pick payment method: usa el último usado (persisted en localStorage)
+  // como fallback al primero disponible.
   useEffect(() => {
-    if (open && paymentsQ.data && paymentsQ.data.length > 0 && !paymentMethodId) {
-      setPaymentMethodId(paymentsQ.data[0].id);
-    }
-  }, [open, paymentsQ.data, paymentMethodId]);
+    if (!open || !paymentsQ.data || paymentsQ.data.length === 0 || paymentMethodId) return;
+    const lastUsedKey = `clozr.lastPaymentMethod.${wid}`;
+    const lastUsedId = localStorage.getItem(lastUsedKey);
+    const lastUsed = lastUsedId
+      ? paymentsQ.data.find((p) => p.id === lastUsedId)
+      : null;
+    setPaymentMethodId(lastUsed?.id ?? paymentsQ.data[0].id);
+  }, [open, paymentsQ.data, paymentMethodId, wid]);
 
   const customerTypes = customerTypesQ.data ?? [];
   const customerType: CustomerTypeRow | null = useMemo(() => {
@@ -268,6 +273,10 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
     };
     try {
       await onSubmit(payload);
+      // Persistir último método de pago para la próxima venta
+      try {
+        localStorage.setItem(`clozr.lastPaymentMethod.${wid}`, paymentMethod.id);
+      } catch { /* no localStorage en algunos entornos */ }
       setSuccess({
         totalUsd,
         totalInPaymentCurrency,

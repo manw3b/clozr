@@ -3,6 +3,7 @@ import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useBusinessStore } from "../../store/businessStore";
 import { useAuthStore } from "../../store/authStore";
 import { salesDb } from "../../lib/db/sales";
+import { ensurePricingSchema } from "../../lib/db/ensureSchema";
 import { dbSaleRowToDomain } from "../../lib/mappers";
 import { qk, invalidate } from "../../lib/queryKeys";
 
@@ -51,6 +52,8 @@ export function useCreateSale() {
 
   return useMutation({
     mutationFn: async (input: NewSalePayload) => {
+      // Defensa por si las migraciones 022-025 no corrieron en esta DB
+      await ensurePricingSchema();
       await salesDb.createSale(wid, {
         business_id: activeBusiness?.id ?? null,
         customer_id: input.clientId,

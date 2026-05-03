@@ -11,6 +11,9 @@ import { dbExecute } from "./index";
  * Es idempotente: se puede correr en cada arranque sin efectos secundarios.
  */
 export async function ensurePricingSchema(): Promise<void> {
+  // ─── 022: sales.payment_method ──────────────────────────
+  await safe(() => dbExecute(`ALTER TABLE sales ADD COLUMN payment_method TEXT`));
+
   // ─── 023: payment_methods ───────────────────────────────
   await safe(() =>
     dbExecute(

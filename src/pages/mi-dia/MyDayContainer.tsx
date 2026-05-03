@@ -20,6 +20,7 @@ import {
   dbCustomerToInactive,
 } from "../../lib/mappers";
 import { qk } from "../../lib/queryKeys";
+import { useRecordContact } from "../clientes/useClientsData";
 import type { MyDayData } from "../../types/domain";
 
 const INACTIVE_DAYS_THRESHOLD = 30;
@@ -92,6 +93,8 @@ export function MyDayContainer() {
     },
   });
 
+  const recordContactMut = useRecordContact();
+
   const data: MyDayData = useMemo(() => {
     const tasks = (tasksQ.data ?? []).map(dbTaskToDomain);
     const followUps = (followupsQ.data ?? [])
@@ -153,11 +156,15 @@ export function MyDayContainer() {
           const num = customer.phone.replace(/\D/g, "");
           const final = num.startsWith("54") ? num : `54${num}`;
           window.open(`https://wa.me/${final}`, "_blank");
+          recordContactMut.mutate({ customerId: clientId, kind: "whatsapp" });
         }
       }}
       onCall={(clientId) => {
         const customer = customersQ.data?.find((c) => c.id === clientId);
-        if (customer?.phone) window.open(`tel:${customer.phone}`);
+        if (customer?.phone) {
+          window.open(`tel:${customer.phone}`);
+          recordContactMut.mutate({ customerId: clientId, kind: "call" });
+        }
       }}
       onNavigate={(page) => {
         const map: Record<string, string> = {

@@ -79,6 +79,15 @@ export async function create(
     created_at: now,
     updated_at: now,
     last_activity_at: null,
+    // Migration 021 fields — null on create, set later via update.
+    product: null,
+    next_action_at: null,
+    next_action_label: null,
+    owner_id: null,
+    owner_name: null,
+    short_note: null,
+    priority: null,
+    position: null,
   };
 }
 

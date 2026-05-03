@@ -35,6 +35,21 @@ import type {
   PaymentMethod,
 } from "../types/domain";
 
+/** Maps the DB-stored payment method (snake_case) back to the domain PaymentMethod (kebab-case). */
+function paymentMethodFromDb(m: string | null): PaymentMethod | undefined {
+  if (!m) return undefined;
+  const map: Record<string, PaymentMethod> = {
+    efectivo: "efectivo",
+    transferencia: "transferencia",
+    mercadopago: "mercadopago",
+    tarjeta_credito: "tarjeta-credito",
+    tarjeta_debito: "tarjeta-debito",
+    cuenta_corriente: "cuenta-corriente",
+    usdt: "usdt",
+  };
+  return map[m];
+}
+
 /* ── Helpers puros ──────────────────────────────────────────── */
 
 export function greetingForHour(h: number): "morning" | "afternoon" | "evening" | "night" {
@@ -99,6 +114,7 @@ export function dbSaleToDomain(s: DbSale): Sale {
     paid: s.total_paid,
     pending: s.balance,
     product: s.notes ?? "Venta",
+    paymentMethod: paymentMethodFromDb(s.payment_method),
     createdAt: s.created_at,
     paidAt: s.is_paid === 1 ? s.created_at : undefined,
     notes: s.notes ?? undefined,
@@ -117,6 +133,7 @@ export function dbSaleRowToDomain(s: DbSaleRow): Sale {
     paid: s.total_paid,
     pending: s.balance,
     product: s.items_preview ?? s.notes ?? "Venta",
+    paymentMethod: paymentMethodFromDb(s.payment_method),
     createdAt: s.created_at,
     paidAt: s.is_paid === 1 ? s.created_at : undefined,
     notes: s.notes ?? undefined,
@@ -202,7 +219,16 @@ export function leadPriorityFromInactiveDays(days: number): LeadPriority {
   return "high";
 }
 
+function isLeadPriority(s: string | null): s is LeadPriority {
+  return s === "low" || s === "medium" || s === "high" || s === "hot";
+}
+
 export function dbItemToLead(p: DbPipelineItem): Lead {
+  // Use the explicit priority if set, otherwise derive from inactive_days.
+  const priority: LeadPriority = isLeadPriority(p.priority)
+    ? p.priority
+    : leadPriorityFromInactiveDays(p.inactive_days ?? 0);
+
   return {
     id: p.id,
     clientId: p.customer_id,
@@ -211,7 +237,14 @@ export function dbItemToLead(p: DbPipelineItem): Lead {
     stage: leadStageFromDb(p.stage_name ?? p.stage_id),
     amount: p.estimated_value ?? undefined,
     currency: (p.currency as "ARS" | "USD") ?? "ARS",
-    priority: leadPriorityFromInactiveDays(p.inactive_days ?? 0),
+    priority,
+    position: p.position ?? undefined,
+    product: p.product ?? undefined,
+    nextActionAt: p.next_action_at ?? undefined,
+    nextActionLabel: p.next_action_label ?? undefined,
+    ownerId: p.owner_id ?? undefined,
+    ownerName: p.owner_name ?? undefined,
+    shortNote: p.short_note ?? undefined,
     createdAt: p.created_at,
     stageChangedAt: p.updated_at,
   };

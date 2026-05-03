@@ -176,6 +176,15 @@ export interface PipelineItem {
   created_at: string;
   updated_at: string;
   last_activity_at: string | null;
+  /** Migration 021 */
+  product: string | null;
+  next_action_at: string | null;
+  next_action_label: string | null;
+  owner_id: string | null;
+  owner_name: string | null;
+  short_note: string | null;
+  priority: string | null;
+  position: number | null;
 }
 
 export interface PipelineActivity {
@@ -219,6 +228,8 @@ export interface Sale {
   notes: string | null;
   sale_date: string;
   created_at: string;
+  /** Migration 022: denormalized from primary payment */
+  payment_method: string | null;
 }
 
 export interface SaleItem {

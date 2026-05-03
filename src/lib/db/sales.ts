@@ -79,11 +79,17 @@ export async function createSale(
   const balance = subtotal - totalPaid;
   const isPaid = balance <= 0 ? 1 : 0;
 
+  // Migration 022: denormalized payment_method for quick listing.
+  // Pick first non-deposit payment, fallback to first payment.
+  const primaryPayment =
+    data.payments.find((p) => !p.is_deposit) ?? data.payments[0];
+  const paymentMethod = primaryPayment?.method ?? null;
+
   await dbExecute(
     `INSERT INTO sales (
       id, workspace_id, business_id, customer_id, customer_name, seller_id, seller_name,
-      subtotal, total, total_paid, balance, is_paid, notes, sale_date, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      subtotal, total, total_paid, balance, is_paid, notes, sale_date, created_at, payment_method
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id, workspaceId,
       data.business_id ?? null,
@@ -92,7 +98,7 @@ export async function createSale(
       data.seller_id ?? null,
       data.seller_name ?? null,
       subtotal, subtotal, totalPaid, balance, isPaid,
-      data.notes ?? null, now, now,
+      data.notes ?? null, now, now, paymentMethod,
     ],
   );
 
@@ -182,6 +188,7 @@ export async function createSale(
     notes: data.notes ?? null,
     sale_date: now,
     created_at: now,
+    payment_method: paymentMethod,
   };
 }
 

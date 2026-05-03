@@ -1,7 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceStore } from "../../store/workspaceStore";
+import { useAuthStore } from "../../store/authStore";
 import { customersDb } from "../../lib/db/customers";
 import { salesDb } from "../../lib/db/sales";
+import { customerContactsDb, type ContactKind } from "../../lib/db/customerContacts";
 import { dbCustomerToClient, dbSaleToDomain } from "../../lib/mappers";
 import { qk, invalidate } from "../../lib/queryKeys";
 import type { Client, ClientDetail, ActivityItem } from "../../types/domain";
@@ -12,12 +14,15 @@ export function useClientsList() {
   return useQuery({
     queryKey: qk.clientsList(wid),
     queryFn: async () => {
-      const dbCustomers = await customersDb.getAll(wid);
+      const [dbCustomers, lastContactMap] = await Promise.all([
+        customersDb.getAll(wid),
+        customerContactsDb.lastContactByCustomer(wid),
+      ]);
       return dbCustomers.map((c): Client => {
         const base = dbCustomerToClient(c);
         return {
           ...base,
-          lastContactAt: c.updated_at,
+          lastContactAt: lastContactMap.get(c.id) ?? c.updated_at,
           lastPurchaseAt: c.updated_at,
           balanceDue: 0, // computed only in detail
         };
@@ -99,6 +104,30 @@ export function useDeleteClients() {
       for (const id of ids) {
         await customersDb.remove(wid, id);
       }
+    },
+    onSuccess: () => invalidate.afterClientChange(qc),
+  });
+}
+
+/**
+ * Registra una interacción (whatsapp, call, email, visit, note) con un cliente.
+ * Llamar siempre que el usuario presione un botón de contacto.
+ */
+export function useRecordContact() {
+  const qc = useQueryClient();
+  const { activeWorkspace } = useWorkspaceStore();
+  const { userId, userName } = useAuthStore();
+  const wid = activeWorkspace?.id ?? "";
+
+  return useMutation({
+    mutationFn: async (input: { customerId: string; kind: ContactKind; notes?: string }) => {
+      await customerContactsDb.record(wid, {
+        customer_id: input.customerId,
+        kind: input.kind,
+        by_user_id: userId ?? null,
+        by_user_name: userName ?? null,
+        notes: input.notes ?? null,
+      });
     },
     onSuccess: () => invalidate.afterClientChange(qc),
   });

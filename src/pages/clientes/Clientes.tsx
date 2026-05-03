@@ -19,7 +19,7 @@ import { DataTable, applySort, ColumnDef } from '../../components/data-table';
 import { RowActions } from '../../components/data-table/RowActions';
 import { ClientDrawer } from './components/ClientDrawer';
 import { BulkActionBar } from './components/BulkActionBar';
-import { useClientsList, useClientDetail, useDeleteClients } from './useClientsData';
+import { useClientsList, useClientDetail, useDeleteClients, useRecordContact } from './useClientsData';
 import { ClientFormModal } from './components/ClientFormModal';
 import { useUIStore } from '../../store/uiStore';
 import { color, space, text, weight } from '../../tokens';
@@ -65,6 +65,7 @@ export function Clientes() {
   const { data: clientsData = [] } = useClientsList();
   const { data: openClientDetail } = useClientDetail(openClientId);
   const deleteMut = useDeleteClients();
+  const recordContactMut = useRecordContact();
 
   function exportToCsv(rows: typeof clientsData) {
     const headers = ['Nombre', 'Teléfono', 'Email', 'Tipo', 'Notas'];
@@ -278,10 +279,21 @@ export function Clientes() {
               const num = openClient.phone.replace(/\D/g, "");
               const final = num.startsWith("54") ? num : `54${num}`;
               window.open(`https://wa.me/${final}`, "_blank");
+              recordContactMut.mutate({ customerId: openClient.id, kind: "whatsapp" });
             }
           }}
-          onCall={() => { if (openClient.phone) window.open(`tel:${openClient.phone}`); }}
-          onEmail={() => { if (openClient.email) window.open(`mailto:${openClient.email}`); }}
+          onCall={() => {
+            if (openClient.phone) {
+              window.open(`tel:${openClient.phone}`);
+              recordContactMut.mutate({ customerId: openClient.id, kind: "call" });
+            }
+          }}
+          onEmail={() => {
+            if (openClient.email) {
+              window.open(`mailto:${openClient.email}`);
+              recordContactMut.mutate({ customerId: openClient.id, kind: "email" });
+            }
+          }}
           onNewSale={() => setActiveScreen("sales")}
           onEdit={() => { setEditingClient(openClient); setFormOpen(true); }}
           onMarkPaid={() => {}}

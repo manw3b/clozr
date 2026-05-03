@@ -3,6 +3,7 @@ import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useBusinessStore } from "../../store/businessStore";
 import { useExchangeRateStore } from "../../store/exchangeRateStore";
 import { cashDb } from "../../lib/db/cash";
+import { cashSessionsDb } from "../../lib/db/cashSessions";
 import { getTodayISO } from "../../lib/hooks";
 import { dbCashMovementToDomain, cashCategoryToDb } from "../../lib/mappers";
 import { qk, invalidate } from "../../lib/queryKeys";
@@ -19,19 +20,27 @@ export function useCashSummary() {
   return useQuery({
     queryKey: qk.cashSummary(wid, bid, today),
     queryFn: async (): Promise<CashSummary> => {
-      const [movementsToday, byCurrency] = await Promise.all([
+      const [session, movementsToday, byCurrency] = await Promise.all([
+        cashSessionsDb.ensureForDay(wid, bid, today),
         cashDb.getMovements(wid, bid, { from: today, to: today }),
         cashDb.getSummaryByCurrency(wid, bid, { from: today, to: today }),
       ]);
 
       const movements = movementsToday.map(dbCashMovementToDomain);
+      const opening = {
+        ars: session.opened_balance_ars,
+        usd: session.opened_balance_usd,
+      };
 
       return {
         date: today,
-        openingBalance: { ars: 0, usd: 0 }, // TODO Fase 2.2: track day opening
+        openingBalance: opening,
         totalIncome: { ars: byCurrency.ars.ingresos, usd: byCurrency.usd.ingresos },
         totalExpense: { ars: byCurrency.ars.egresos, usd: byCurrency.usd.egresos },
-        currentBalance: { ars: byCurrency.ars.balance, usd: byCurrency.usd.balance },
+        currentBalance: {
+          ars: opening.ars + byCurrency.ars.balance,
+          usd: opening.usd + byCurrency.usd.balance,
+        },
         usdRate: usdToArs || 1,
         movements,
       };

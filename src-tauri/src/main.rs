@@ -112,6 +112,30 @@ fn main() {
             sql: include_str!("../migrations/018_airpods_variants.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 19,
+            description: "customer_contacts",
+            sql: include_str!("../migrations/019_customer_contacts.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 20,
+            description: "cash_day_sessions",
+            sql: include_str!("../migrations/020_cash_day_sessions.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 21,
+            description: "pipeline_extended",
+            sql: include_str!("../migrations/021_pipeline_extended.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 22,
+            description: "sales_payment_method",
+            sql: include_str!("../migrations/022_sales_payment_method.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

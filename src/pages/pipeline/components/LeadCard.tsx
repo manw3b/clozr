@@ -5,6 +5,7 @@ import {
   Clock,
   AlertCircle,
   Flame,
+  ShoppingCart,
 } from 'lucide-react';
 import { Avatar } from '../../../components/Avatar';
 import { color, radius, space, text, weight } from '../../../tokens';
@@ -20,6 +21,7 @@ interface LeadCardProps {
   onClick?: (lead: Lead) => void;
   onWhatsApp?: (lead: Lead) => void;
   onCall?: (lead: Lead) => void;
+  onConvertToSale?: (lead: Lead) => void;
   /** Listeners y attributes del DnD-kit (sortable) */
   dragHandleProps?: any;
   /** Style externo (transformación durante drag) */
@@ -35,7 +37,7 @@ interface LeadCardProps {
  * - El "isOverlay" se usa para el preview que sigue al cursor — se ve más sólido
  */
 export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadCard(
-  { lead, isDragging, isOverlay, onClick, onWhatsApp, onCall, dragHandleProps, style },
+  { lead, isDragging, isOverlay, onClick, onWhatsApp, onCall, onConvertToSale, dragHandleProps, style },
   ref
 ) {
   const stuckDays = lead.stageChangedAt
@@ -211,6 +213,18 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
         </span>
 
         <div style={{ display: 'flex', gap: 2 }}>
+          {onConvertToSale && (
+            <CardActionBtn
+              tone="primary"
+              ariaLabel="Convertir a venta"
+              onClick={(e) => {
+                e.stopPropagation();
+                onConvertToSale(lead);
+              }}
+            >
+              <ShoppingCart size={13} strokeWidth={2.2} />
+            </CardActionBtn>
+          )}
           <CardActionBtn
             tone="success"
             ariaLabel="WhatsApp"
@@ -245,8 +259,20 @@ function CardActionBtn({
   children: React.ReactNode;
   ariaLabel: string;
   onClick: (e: React.MouseEvent) => void;
-  tone?: 'success';
+  tone?: 'success' | 'primary';
 }) {
+  const baseColor =
+    tone === 'success' ? color.success
+    : tone === 'primary' ? color.primary
+    : color.textMuted;
+  const hoverBg =
+    tone === 'success' ? color.successBg
+    : tone === 'primary' ? color.primaryBg
+    : color.surfaceHover;
+  const hoverColor =
+    tone === 'success' ? color.success
+    : tone === 'primary' ? color.primary
+    : color.text;
   return (
     <button
       aria-label={ariaLabel}
@@ -258,7 +284,7 @@ function CardActionBtn({
         height: 26,
         borderRadius: radius.sm,
         background: 'transparent',
-        color: tone === 'success' ? color.success : color.textMuted,
+        color: baseColor,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -266,13 +292,12 @@ function CardActionBtn({
         cursor: 'pointer',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background =
-          tone === 'success' ? color.successBg : color.surfaceHover;
-        e.currentTarget.style.color = tone === 'success' ? color.success : color.text;
+        e.currentTarget.style.background = hoverBg;
+        e.currentTarget.style.color = hoverColor;
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.color = tone === 'success' ? color.success : color.textMuted;
+        e.currentTarget.style.color = baseColor;
       }}
     >
       {children}

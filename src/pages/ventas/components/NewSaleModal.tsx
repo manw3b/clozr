@@ -46,11 +46,15 @@ export interface NewSalePayload {
   outOfStock: boolean;
 }
 
-/** Pre-carga el modal con un producto + (opcional) IMEI específico de stock.
- * Util para "vender desde inventario" donde ya tenemos contexto. */
+/** Pre-carga el modal con datos conocidos.
+ * - Desde inventario: catalogItem + imei
+ * - Desde pipeline: client + unitPriceUsd estimado
+ * Cualquier campo es opcional y combinable. */
 export interface NewSalePreset {
-  catalogItem: CatalogItem;
+  client?: Client;
+  catalogItem?: CatalogItem;
   imei?: string | null;
+  unitPriceUsd?: number;
 }
 
 interface NewSaleModalProps {
@@ -94,11 +98,11 @@ function emptyItem(): ItemDraft {
 function presetToItem(p: NewSalePreset): ItemDraft {
   return {
     key: uid(),
-    catalogItem: p.catalogItem,
+    catalogItem: p.catalogItem ?? null,
     productDescription: "",
     outOfStock: false,
     quantity: 1,
-    unitPriceUsdInput: "",
+    unitPriceUsdInput: p.unitPriceUsd ? String(p.unitPriceUsd) : "",
     imei: p.imei ?? null,
   };
 }
@@ -109,7 +113,7 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
   const wid = activeWorkspace?.id ?? "";
 
   const [clientSearch, setClientSearch] = useState("");
-  const [client, setClient] = useState<Client | null>(null);
+  const [client, setClient] = useState<Client | null>(preset?.client ?? null);
   const [creatingClient, setCreatingClient] = useState(false);
 
   const [items, setItems] = useState<ItemDraft[]>(() =>
@@ -130,9 +134,10 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
   useEffect(() => {
     if (open && preset) {
       setItems([presetToItem(preset)]);
+      if (preset.client) setClient(preset.client);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, preset?.catalogItem.id, preset?.imei]);
+  }, [open, preset?.catalogItem?.id, preset?.imei, preset?.client?.id, preset?.unitPriceUsd]);
 
   const { data: allClients = [] } = useClientsList();
 

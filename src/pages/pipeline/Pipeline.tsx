@@ -23,11 +23,14 @@ import { PipelineColumn, ColumnEmpty } from './components/PipelineColumn';
 import { PipelineMetrics } from './components/PipelineMetrics';
 import { groupLeadsByStage } from '../../lib/groupings';
 import { usePipelineLeads, useMoveLead } from './usePipelineData';
-import { useClientDetail, useRecordContact } from '../clientes/useClientsData';
+import { useClientDetail, useRecordContact, useClientsList } from '../clientes/useClientsData';
 import { useUIStore } from '../../store/uiStore';
+import { useExchangeRateStore } from '../../store/exchangeRateStore';
 import { space } from '../../tokens';
 import { STAGES } from '../../types/domain';
 import type { Lead, LeadStage } from '../../types/domain';
+import { NewSaleModal, type NewSalePreset } from '../ventas/components/NewSaleModal';
+import { useCreateSale } from '../ventas/useSalesData';
 
 const priorityFilters = [
   { value: 'todos', label: 'Todos' },
@@ -41,6 +44,33 @@ export function Pipeline() {
   const moveLeadMut = useMoveLead();
   const { setActiveScreen, showToast } = useUIStore();
   const recordContactMut = useRecordContact();
+  const { data: allClients = [] } = useClientsList();
+  const { usdToArs } = useExchangeRateStore();
+  const createSaleMut = useCreateSale();
+
+  // Estado para "Convertir a venta"
+  const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
+  const [salePreset, setSalePreset] = useState<NewSalePreset | null>(null);
+
+  function startConvertToSale(lead: Lead) {
+    const fullClient = allClients.find((c) => c.id === lead.clientId);
+    // Convertir lead.amount a USD si está en ARS
+    let unitPriceUsd: number | undefined;
+    if (typeof lead.amount === "number" && lead.amount > 0) {
+      if (lead.currency === "USD") {
+        unitPriceUsd = lead.amount;
+      } else if (lead.currency === "ARS" && usdToArs > 0) {
+        unitPriceUsd = Math.round((lead.amount / usdToArs) * 100) / 100;
+      } else {
+        unitPriceUsd = undefined;
+      }
+    }
+    setConvertingLead(lead);
+    setSalePreset({
+      client: fullClient,
+      unitPriceUsd,
+    });
+  }
 
   function whatsappCustomer(phone: string | null | undefined, customerId: string) {
     if (!phone) {
@@ -282,6 +312,7 @@ export function Pipeline() {
                           const cid = leads.find((x) => x.id === l.id)?.clientId;
                           if (cid) setOpenClientId(cid);
                         }}
+                        onConvertToSale={startConvertToSale}
                       />
                     ))
                   )}
@@ -319,6 +350,30 @@ export function Pipeline() {
           onMarkPaid={() => showToast('Cobrar desde Deudas')}
         />
       )}
+
+      {/* Convertir lead → venta */}
+      <NewSaleModal
+        open={!!convertingLead}
+        onClose={() => {
+          setConvertingLead(null);
+          setSalePreset(null);
+        }}
+        preset={salePreset}
+        onSubmit={async (data) => {
+          await createSaleMut.mutateAsync(data);
+          // Mover el lead a "cerrado" automáticamente
+          if (convertingLead) {
+            try {
+              await moveLeadMut.mutateAsync({ leadId: convertingLead.id, newStage: 'cerrado' });
+            } catch {
+              /* si falla el move, la venta igual quedó registrada */
+            }
+          }
+          showToast('Lead convertido a venta', 'success');
+          setConvertingLead(null);
+          setSalePreset(null);
+        }}
+      />
     </div>
   );
 }

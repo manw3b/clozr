@@ -69,6 +69,17 @@ export function NewSaleModal({ open, onClose, onSubmit }: NewSaleModalProps) {
     enabled: open && !!wid,
   });
 
+  // Auto-seed métodos por default si el workspace nunca los tuvo
+  useEffect(() => {
+    if (!open || !wid) return;
+    if (paymentsQ.data && paymentsQ.data.length === 0) {
+      paymentMethodsDb
+        .seedDefaults(wid)
+        .then(() => paymentsQ.refetch())
+        .catch(() => {});
+    }
+  }, [open, wid, paymentsQ.data, paymentsQ]);
+
   const catalogQ = useQuery({
     queryKey: ["catalog-items-search", wid],
     queryFn: () => catalogDb.getAll(wid),
@@ -261,15 +272,47 @@ export function NewSaleModal({ open, onClose, onSubmit }: NewSaleModalProps) {
 
       {/* MÉTODO DE PAGO */}
       <ModalField label="Método de pago" required>
-        <Select value={paymentMethodId} onChange={(e) => setPaymentMethodId(e.target.value)}>
-          <option value="">Seleccionar…</option>
-          {(paymentsQ.data ?? []).map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name} ({p.currency})
-              {p.modifier_pct !== 0 ? ` · ${p.modifier_pct > 0 ? "+" : ""}${p.modifier_pct}%` : ""}
-            </option>
-          ))}
-        </Select>
+        {paymentsQ.data && paymentsQ.data.length === 0 ? (
+          <div
+            style={{
+              background: color.surface2,
+              border: `1px dashed ${color.border}`,
+              borderRadius: radius.md,
+              padding: space[3],
+              fontSize: text.sm,
+              color: color.textMuted,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: space[3],
+            }}
+          >
+            <span>No hay métodos de pago configurados.</span>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                if (!wid) return;
+                paymentMethodsDb
+                  .seedDefaults(wid)
+                  .then(() => paymentsQ.refetch())
+                  .catch(() => {});
+              }}
+            >
+              Cargar default
+            </Button>
+          </div>
+        ) : (
+          <Select value={paymentMethodId} onChange={(e) => setPaymentMethodId(e.target.value)}>
+            <option value="">Seleccionar…</option>
+            {(paymentsQ.data ?? []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.currency})
+                {p.modifier_pct !== 0 ? ` · ${p.modifier_pct > 0 ? "+" : ""}${p.modifier_pct}%` : ""}
+              </option>
+            ))}
+          </Select>
+        )}
       </ModalField>
 
       {/* PRECIO BREAKDOWN */}
@@ -304,24 +347,21 @@ export function NewSaleModal({ open, onClose, onSubmit }: NewSaleModalProps) {
         </div>
       )}
 
-      {!breakdown && catalogItem && (
+      {!breakdown && catalogItem && paymentMethod && (
         <div
           style={{
-            background: color.warningBg,
-            border: `1px solid ${color.warning}`,
-            borderRadius: radius.md,
-            padding: space[3],
-            marginBottom: space[4],
-            fontSize: text.sm,
-            color: color.warning,
+            marginBottom: space[3],
+            fontSize: text.xs,
+            color: color.textMuted,
+            fontStyle: "italic",
           }}
         >
-          ⚠ Sin precio sugerido cargado para este producto / tipo de cliente. Ingresalo manual.
+          Sin precio sugerido cargado para este producto. Ingresá el monto a mano (lo guardamos para la próxima desde Ajustes → Precios).
         </div>
       )}
 
       {/* MONTO A COBRAR */}
-      <ModalField label={`Monto a cobrar (${paymentMethod?.currency ?? "—"})`} required>
+      <ModalField label={`Monto a cobrar (${paymentMethod?.currency ?? "ARS"})`} required>
         <Input
           type="number"
           step="0.01"

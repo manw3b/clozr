@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Search,
   Plus,
@@ -19,7 +19,8 @@ import { DataTable, applySort, ColumnDef } from '../../components/data-table';
 import { RowActions } from '../../components/data-table/RowActions';
 import { ClientDrawer } from './components/ClientDrawer';
 import { BulkActionBar } from './components/BulkActionBar';
-import { useClientsList, useClientDetail } from './useClientsData';
+import { useClientsList, useClientDetail, useDeleteClients } from './useClientsData';
+import { ClientFormModal } from './components/ClientFormModal';
 import { useUIStore } from '../../store/uiStore';
 import { color, space, text, weight } from '../../tokens';
 import { formatMoney, formatRelative, formatDaysAgo } from '../../lib/format';
@@ -57,10 +58,69 @@ export function Clientes() {
   });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openClientId, setOpenClientId] = useState<string | null>(null);
-  const { setActiveScreen } = useUIStore();
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const { setActiveScreen, showToast } = useUIStore();
 
   const { data: clientsData = [] } = useClientsList();
   const { data: openClientDetail } = useClientDetail(openClientId);
+  const deleteMut = useDeleteClients();
+
+  function exportToCsv(rows: typeof clientsData) {
+    const headers = ['Nombre', 'Teléfono', 'Email', 'Tipo', 'Notas'];
+    const escape = (s: string) => `"${s.replace(/"/g, '""')}"`;
+    const csvRows = [headers.join(',')];
+    for (const c of rows) {
+      csvRows.push([
+        escape(c.name),
+        escape(c.phone ?? ''),
+        escape(c.email ?? ''),
+        escape(c.type ?? ''),
+        escape(c.notes ?? ''),
+      ].join(','));
+    }
+    const blob = new Blob(['﻿' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `clientes-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleBulkDelete() {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    if (!window.confirm(`¿Eliminar ${ids.length} cliente${ids.length === 1 ? '' : 's'}? Esta acción no se puede deshacer.`)) return;
+    deleteMut.mutate(ids, {
+      onSuccess: () => {
+        showToast(`${ids.length} cliente${ids.length === 1 ? '' : 's'} eliminado${ids.length === 1 ? '' : 's'}`, 'success');
+        setSelected(new Set());
+      },
+      onError: (e) => showToast(e instanceof Error ? e.message : 'Error al eliminar'),
+    });
+  }
+
+  function handleBulkExport() {
+    const ids = selected;
+    const rows = clientsData.filter((c) => ids.has(c.id));
+    if (rows.length === 0) return;
+    exportToCsv(rows);
+    showToast(`${rows.length} cliente${rows.length === 1 ? '' : 's'} exportado${rows.length === 1 ? '' : 's'}`, 'success');
+  }
+
+  function handleExportAll() {
+    if (clientsData.length === 0) return;
+    exportToCsv(clientsData);
+    showToast(`${clientsData.length} cliente${clientsData.length === 1 ? '' : 's'} exportado${clientsData.length === 1 ? '' : 's'}`, 'success');
+  }
+
+  // Open form modal when triggered from topbar "Nuevo > Cliente"
+  useEffect(() => {
+    const handler = () => { setEditingClient(null); setFormOpen(true); };
+    window.addEventListener('clozr:open-new-client', handler);
+    return () => window.removeEventListener('clozr:open-new-client', handler);
+  }, []);
 
   /* ---------- Filtrado ---------- */
   const filtered = useMemo(() => {
@@ -114,10 +174,15 @@ export function Clientes() {
         }`}
         actions={
           <>
-            <Button variant="secondary" size="md" iconLeft={<Download size={14} />}>
+            <Button variant="secondary" size="md" iconLeft={<Download size={14} />} onClick={handleExportAll}>
               Exportar
             </Button>
-            <Button variant="primary" size="md" iconLeft={<Plus size={16} />}>
+            <Button
+              variant="primary"
+              size="md"
+              iconLeft={<Plus size={16} />}
+              onClick={() => { setEditingClient(null); setFormOpen(true); }}
+            >
               Nuevo cliente
             </Button>
           </>
@@ -163,10 +228,10 @@ export function Clientes() {
         <BulkActionBar
           count={selected.size}
           onClear={() => setSelected(new Set())}
-          onSendWhatsApp={() => console.log('Bulk WhatsApp', selected)}
-          onAddTag={() => console.log('Add tag', selected)}
-          onExport={() => console.log('Export', selected)}
-          onDelete={() => console.log('Delete', selected)}
+          onSendWhatsApp={() => showToast('Mensaje masivo: próximamente')}
+          onAddTag={() => showToast('Etiquetas: próximamente')}
+          onExport={handleBulkExport}
+          onDelete={handleBulkDelete}
         />
       )}
 
@@ -219,10 +284,16 @@ export function Clientes() {
           onCall={() => { if (openClient.phone) window.open(`tel:${openClient.phone}`); }}
           onEmail={() => { if (openClient.email) window.open(`mailto:${openClient.email}`); }}
           onNewSale={() => setActiveScreen("sales")}
-          onEdit={() => {}}
+          onEdit={() => { setEditingClient(openClient); setFormOpen(true); }}
           onMarkPaid={() => {}}
         />
       )}
+
+      <ClientFormModal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        client={editingClient}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Download, Calendar } from 'lucide-react';
 import { PageHeader } from '../../components/PageHeader';
 import { Button } from '../../components/Button';
@@ -39,6 +39,12 @@ export function Caja() {
   const [period, setPeriod] = useState('today');
   const [kindFilter, setKindFilter] = useState<string>('todos');
   const [newMovOpen, setNewMovOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setNewMovOpen(true);
+    window.addEventListener('clozr:open-new-movement', handler);
+    return () => window.removeEventListener('clozr:open-new-movement', handler);
+  }, []);
 
   const filteredMovements = summary.movements.filter((m) => {
     if (kindFilter !== 'todos' && m.kind !== kindFilter) return false;

@@ -21,7 +21,7 @@ import { LeadCard } from './components/LeadCard';
 import { SortableLeadCard } from './components/SortableLeadCard';
 import { PipelineColumn, ColumnEmpty } from './components/PipelineColumn';
 import { PipelineMetrics } from './components/PipelineMetrics';
-import { groupLeadsByStage } from '../../mock/leads';
+import { groupLeadsByStage } from '../../lib/groupings';
 import { usePipelineLeads, useMoveLead } from './usePipelineData';
 import { useClientDetail } from '../clientes/useClientsData';
 import { space } from '../../tokens';

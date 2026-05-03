@@ -1,15 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search, Plus, ChevronDown, Bell, Command } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  ChevronDown,
+  Bell,
+  Command,
+  Users,
+  ShoppingCart,
+  GitBranch,
+  CheckSquare,
+  Wallet,
+} from 'lucide-react';
 import { color, duration, ease, layout, radius, space, text, weight } from '../tokens';
 import { Button } from '../components/Button';
+
+export type NewAction = 'cliente' | 'venta' | 'lead' | 'tarea' | 'movimiento';
 
 interface TopbarProps {
   workspace: { name: string; emoji?: string };
   onSearchClick: () => void;
-  onNewClick: () => void;
+  onNewAction: (action: NewAction) => void;
 }
 
-export function Topbar({ workspace, onSearchClick, onNewClick }: TopbarProps) {
+export function Topbar({ workspace, onSearchClick, onNewAction }: TopbarProps) {
   return (
     <header
       style={{
@@ -32,14 +45,134 @@ export function Topbar({ workspace, onSearchClick, onNewClick }: TopbarProps) {
 
       {/* DERECHA — Acciones */}
       <div style={{ display: 'flex', alignItems: 'center', gap: space[2] }}>
-        <IconButton aria-label="Notificaciones" badge={3}>
+        <IconButton aria-label="Notificaciones" badge={0}>
           <Bell size={16} />
         </IconButton>
-        <Button variant="primary" size="md" iconLeft={<Plus size={16} />} onClick={onNewClick}>
-          Nuevo
-        </Button>
+        <NewMenu onAction={onNewAction} />
       </div>
     </header>
+  );
+}
+
+/* ===== "Nuevo" dropdown menu ===== */
+
+const NEW_ITEMS: Array<{ id: NewAction; label: string; shortcut: string; Icon: typeof Users }> = [
+  { id: 'cliente', label: 'Cliente', shortcut: 'C', Icon: Users },
+  { id: 'venta', label: 'Venta', shortcut: 'V', Icon: ShoppingCart },
+  { id: 'lead', label: 'Lead', shortcut: 'L', Icon: GitBranch },
+  { id: 'tarea', label: 'Tarea', shortcut: 'T', Icon: CheckSquare },
+  { id: 'movimiento', label: 'Movimiento de caja', shortcut: 'M', Icon: Wallet },
+];
+
+function NewMenu({ onAction }: { onAction: (a: NewAction) => void }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    if (open) {
+      document.addEventListener('mousedown', onClickOutside);
+      document.addEventListener('keydown', onKey);
+      return () => {
+        document.removeEventListener('mousedown', onClickOutside);
+        document.removeEventListener('keydown', onKey);
+      };
+    }
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative' }}>
+      <Button variant="primary" size="md" iconLeft={<Plus size={16} />} onClick={() => setOpen((v) => !v)}>
+        Nuevo
+      </Button>
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            right: 0,
+            minWidth: 220,
+            background: color.surface,
+            border: `1px solid ${color.borderStrong}`,
+            borderRadius: radius.md,
+            boxShadow: 'var(--shadow-lg)',
+            padding: 4,
+            zIndex: 50,
+          }}
+        >
+          {NEW_ITEMS.map((item) => (
+            <NewMenuItem
+              key={item.id}
+              label={item.label}
+              shortcut={item.shortcut}
+              Icon={item.Icon}
+              onClick={() => {
+                setOpen(false);
+                onAction(item.id);
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NewMenuItem({
+  label,
+  shortcut,
+  Icon,
+  onClick,
+}: {
+  label: string;
+  shortcut: string;
+  Icon: typeof Users;
+  onClick: () => void;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: space[2],
+        width: '100%',
+        padding: `${space[2]} ${space[3]}`,
+        borderRadius: radius.sm,
+        background: hover ? color.surfaceHover : 'transparent',
+        color: color.text,
+        fontSize: text.sm,
+        textAlign: 'left',
+        transition: `background ${duration.fast} ${ease}`,
+      }}
+    >
+      <Icon size={14} color={color.textMuted} strokeWidth={2.2} />
+      <span style={{ flex: 1 }}>{label}</span>
+      <kbd
+        style={{
+          fontSize: 11,
+          fontWeight: weight.medium,
+          color: color.textMuted,
+          padding: '1px 5px',
+          background: color.bg,
+          border: `1px solid ${color.border}`,
+          borderRadius: radius.sm,
+          fontFamily: 'inherit',
+        }}
+      >
+        {shortcut}
+      </kbd>
+    </button>
   );
 }
 

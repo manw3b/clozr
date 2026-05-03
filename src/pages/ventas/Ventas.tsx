@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Search,
   Plus,
@@ -20,8 +20,9 @@ import { SalesMetrics } from './components/SalesMetrics';
 import { SalesSparkChart } from './components/SalesSparkChart';
 import { SaleDrawer } from './components/SaleDrawer';
 import { NewSaleModal } from './components/NewSaleModal';
-import { buildSalesTimeline } from '../../mock/sales';
-import { useSalesList, useMarkSalePaid } from './useSalesData';
+import { buildSalesTimeline } from '../../lib/groupings';
+import { useSalesList, useMarkSalePaid, useCreateSale } from './useSalesData';
+import { useUIStore } from '../../store/uiStore';
 import { color, space, text, weight } from '../../tokens';
 import { formatMoney, formatRelative } from '../../lib/format';
 import { PAYMENT_METHOD_LABELS } from '../../types/domain';
@@ -44,6 +45,8 @@ const periodFilters = [
 export function Ventas() {
   const { data: sales = [] } = useSalesList();
   const markPaidMut = useMarkSalePaid();
+  const createSaleMut = useCreateSale();
+  const { showToast } = useUIStore();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [periodFilter, setPeriodFilter] = useState<string>('30d');
@@ -53,6 +56,12 @@ export function Ventas() {
   });
   const [openSaleId, setOpenSaleId] = useState<string | null>(null);
   const [newSaleOpen, setNewSaleOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setNewSaleOpen(true);
+    window.addEventListener('clozr:open-new-sale', handler);
+    return () => window.removeEventListener('clozr:open-new-sale', handler);
+  }, []);
 
   /* ---------- Filtrado por período ---------- */
   const periodFiltered = useMemo(() => {
@@ -112,11 +121,23 @@ export function Ventas() {
     markPaidMut.mutate(saleId);
   }
 
-  function handleNewSale(_data: any) {
-    // TODO: wire to salesDb.createSale (needs items/payments shape conversion).
-    // The current schema requires items[] and payments[]; the modal's data shape
-    // is simpler. Will be implemented in a follow-up commit.
-    setNewSaleOpen(false);
+  function handleNewSale(data: {
+    clientId: string;
+    product: string;
+    amount: number;
+    paymentMethod: any;
+    status: any;
+    paid: number;
+  }) {
+    createSaleMut.mutate(data, {
+      onSuccess: () => {
+        showToast('Venta registrada', 'success');
+        setNewSaleOpen(false);
+      },
+      onError: (e) => {
+        showToast(e instanceof Error ? e.message : 'Error al registrar venta');
+      },
+    });
   }
 
   return (

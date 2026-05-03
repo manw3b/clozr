@@ -166,8 +166,29 @@ export default function App() {
         onNavigate={(id) => setActiveScreen(id as ScreenId)}
         workspace={{ name: activeBusiness?.name ?? activeWorkspace.name, emoji: activeBusiness?.emoji ?? activeWorkspace.emoji }}
         user={{ name: userName ?? "Usuario", email: "" }}
-        onSearchClick={() => { /* TODO: Cmd+K modal */ }}
-        onNewClick={() => { /* TODO: Quick new menu */ }}
+        onSearchClick={() => { /* TODO Fase 4: Cmd+K modal */ }}
+        onNewAction={(action) => {
+          switch (action) {
+            case "cliente":
+              setActiveScreen("customers");
+              window.dispatchEvent(new CustomEvent("clozr:open-new-client"));
+              break;
+            case "venta":
+              setActiveScreen("sales");
+              window.dispatchEvent(new CustomEvent("clozr:open-new-sale"));
+              break;
+            case "lead":
+              setActiveScreen("pipeline");
+              break;
+            case "tarea":
+              setActiveScreen("tasks");
+              break;
+            case "movimiento":
+              setActiveScreen("cash");
+              window.dispatchEvent(new CustomEvent("clozr:open-new-movement"));
+              break;
+          }
+        }}
       >
         {renderScreen(activeScreen)}
       </AppShell>

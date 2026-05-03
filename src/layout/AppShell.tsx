@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { Sidebar } from './Sidebar';
-import { Topbar } from './Topbar';
+import { Topbar, type NewAction } from './Topbar';
 import { color } from '../tokens';
 
 interface AppShellProps {
@@ -9,7 +9,7 @@ interface AppShellProps {
   workspace: { name: string; emoji?: string };
   user: { name: string; email: string };
   onSearchClick?: () => void;
-  onNewClick?: () => void;
+  onNewAction?: (action: NewAction) => void;
   children: ReactNode;
   /** Right drawer opcional. Cuando se pasa, se renderiza al costado derecho. */
   drawer?: ReactNode;
@@ -26,7 +26,7 @@ export function AppShell({
   workspace,
   user,
   onSearchClick = () => {},
-  onNewClick = () => {},
+  onNewAction = () => {},
   children,
   drawer,
 }: AppShellProps) {
@@ -58,7 +58,7 @@ export function AppShell({
           minWidth: 0,
         }}
       >
-        <Topbar workspace={workspace} onSearchClick={onSearchClick} onNewClick={onNewClick} />
+        <Topbar workspace={workspace} onSearchClick={onSearchClick} onNewAction={onNewAction} />
 
         <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
           <main

@@ -1,7 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceStore } from "../../store/workspaceStore";
+import { useBusinessStore } from "../../store/businessStore";
+import { useAuthStore } from "../../store/authStore";
+import { customersDb } from "../../lib/db/customers";
 import { salesDb } from "../../lib/db/sales";
-import type { Sale } from "../../types/domain";
+import type { PaymentMethod, SaleStatus, Sale } from "../../types/domain";
 import type { SaleRow } from "../../lib/db/types";
 
 function dbRowToSale(s: SaleRow): Sale {
@@ -43,6 +46,73 @@ export function useMarkSalePaid() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ventas"] });
       qc.invalidateQueries({ queryKey: ["mi-dia"] });
+    },
+  });
+}
+
+export interface NewSaleInput {
+  clientId: string;
+  product: string;
+  amount: number;
+  paymentMethod: PaymentMethod;
+  status: SaleStatus;
+  paid: number;
+}
+
+const PAYMENT_METHOD_TO_DB: Record<PaymentMethod, string> = {
+  efectivo: "efectivo",
+  transferencia: "transferencia",
+  mercadopago: "mercadopago",
+  "tarjeta-credito": "tarjeta_credito",
+  "tarjeta-debito": "tarjeta_debito",
+  "cuenta-corriente": "cuenta_corriente",
+  usdt: "usdt",
+};
+
+export function useCreateSale() {
+  const qc = useQueryClient();
+  const { activeWorkspace } = useWorkspaceStore();
+  const { activeBusiness } = useBusinessStore();
+  const { userId, userName } = useAuthStore();
+  const wid = activeWorkspace?.id ?? "";
+
+  return useMutation({
+    mutationFn: async (input: NewSaleInput) => {
+      const customer = await customersDb.getById(wid, input.clientId);
+      const customerName = customer?.name ?? null;
+
+      await salesDb.createSale(wid, {
+        business_id: activeBusiness?.id ?? null,
+        customer_id: input.clientId,
+        customer_name: customerName,
+        seller_id: userId ?? null,
+        seller_name: userName ?? null,
+        notes: null,
+        items: [
+          {
+            description: input.product,
+            quantity: 1,
+            unit_price: input.amount,
+          },
+        ],
+        payments:
+          input.paid > 0
+            ? [
+                {
+                  method: PAYMENT_METHOD_TO_DB[input.paymentMethod],
+                  currency: "ARS",
+                  amount: input.paid,
+                  is_deposit: input.status === "partial",
+                },
+              ]
+            : [],
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ventas"] });
+      qc.invalidateQueries({ queryKey: ["mi-dia"] });
+      qc.invalidateQueries({ queryKey: ["caja"] });
+      qc.invalidateQueries({ queryKey: ["clientes"] });
     },
   });
 }

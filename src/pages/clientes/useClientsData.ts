@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { customersDb } from "../../lib/db/customers";
 import { salesDb } from "../../lib/db/sales";
@@ -102,5 +102,23 @@ export function useClientDetail(clientId: string | null) {
       };
     },
     enabled: !!clientId && !!wid,
+  });
+}
+
+export function useDeleteClients() {
+  const qc = useQueryClient();
+  const { activeWorkspace } = useWorkspaceStore();
+  const wid = activeWorkspace?.id ?? "";
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      for (const id of ids) {
+        await customersDb.remove(wid, id);
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["clientes"] });
+      qc.invalidateQueries({ queryKey: ["mi-dia"] });
+    },
   });
 }

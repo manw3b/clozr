@@ -6,7 +6,7 @@ import { Input, Select } from '../../../components/Input';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { PAYMENT_METHOD_LABELS } from '../../../types/domain';
 import type { PaymentMethod, SaleStatus } from '../../../types/domain';
-import { clientsMock } from '../../../mock/clients';
+import { useClientsList } from '../../clientes/useClientsData';
 import { Avatar } from '../../../components/Avatar';
 
 interface NewSaleModalProps {
@@ -32,6 +32,7 @@ interface NewSaleModalProps {
  *   (auto-completa el monto si es "Pagado", lo deja en 0 si "Pendiente")
  */
 export function NewSaleModal({ open, onClose, onSubmit }: NewSaleModalProps) {
+  const { data: allClients = [] } = useClientsList();
   const [clientSearch, setClientSearch] = useState('');
   const [clientId, setClientId] = useState<string | null>(null);
   const [product, setProduct] = useState('');
@@ -40,12 +41,12 @@ export function NewSaleModal({ open, onClose, onSubmit }: NewSaleModalProps) {
   const [status, setStatus] = useState<SaleStatus>('paid');
   const [paid, setPaid] = useState('');
 
-  const selectedClient = clientId ? clientsMock.find((c) => c.id === clientId) : null;
+  const selectedClient = clientId ? allClients.find((c) => c.id === clientId) : null;
 
   const filteredClients =
     clientSearch.trim().length === 0
-      ? clientsMock.slice(0, 4)
-      : clientsMock
+      ? allClients.slice(0, 4)
+      : allClients
           .filter((c) =>
             c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
             c.phone?.toLowerCase().includes(clientSearch.toLowerCase())

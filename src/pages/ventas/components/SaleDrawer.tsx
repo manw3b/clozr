@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import {
   CheckCircle2,
   Clock,
@@ -5,15 +6,18 @@ import {
   MessageCircle,
   ExternalLink,
   Pencil,
+  Package,
 } from 'lucide-react';
-import { DrawerPanel } from '../../../components/Drawer';
+import { Drawer } from '../../../components/Drawer';
 import { Button } from '../../../components/Button';
 import { Badge } from '../../../components/Badge';
 import { Avatar } from '../../../components/Avatar';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney, formatRelative, formatDateLong, formatTime } from '../../../lib/format';
+import { salesDb } from '../../../lib/db/sales';
 import type { Sale, SaleStatus, PaymentMethod } from '../../../types/domain';
 import { PAYMENT_METHOD_LABELS } from '../../../types/domain';
+import type { SaleItem } from '../../../lib/db/types';
 
 interface SaleDrawerProps {
   sale: Sale;
@@ -37,9 +41,20 @@ export function SaleDrawer({
   const isOverdue =
     sale.status !== 'paid' && sale.dueAt && new Date(sale.dueAt).getTime() < Date.now();
 
+  const itemsQ = useQuery({
+    queryKey: ['sale-items', sale.id],
+    queryFn: () => salesDb.getItems(sale.id),
+  });
+  const paymentsQ = useQuery({
+    queryKey: ['sale-payments', sale.id],
+    queryFn: () => salesDb.getPayments(sale.id),
+  });
+
   return (
-    <DrawerPanel
+    <Drawer
+      open
       onClose={onClose}
+      width="560px"
       header={
         <SaleHeader sale={sale} onClose={onClose} onEdit={onEdit} />
       }
@@ -131,8 +146,12 @@ export function SaleDrawer({
 
       {/* Info */}
       <div style={{ padding: space[5] }}>
+        {/* Productos (multi-item) */}
+        <Section title={`Productos${itemsQ.data ? ` · ${itemsQ.data.length}` : ''}`}>
+          <ItemsList items={itemsQ.data ?? []} loading={itemsQ.isLoading} fallback={sale.product} />
+        </Section>
+
         <Section title="Detalle">
-          <Row label="Producto" value={sale.product} strong />
           <Row label="Forma de pago" value={sale.paymentMethod ? PAYMENT_METHOD_LABELS[sale.paymentMethod] : '—'} />
           <Row label="Fecha" value={`${formatDateLong(sale.createdAt)} · ${formatTime(sale.createdAt)}`} />
           {sale.paidAt && (
@@ -153,12 +172,24 @@ export function SaleDrawer({
 
         {/* Cobros */}
         <Section title="Cobros">
-          <PaymentRow
-            amount={sale.paid}
-            kind="paid"
-            method={sale.paymentMethod}
-            date={sale.paidAt || sale.createdAt}
-          />
+          {(paymentsQ.data ?? []).length > 0 ? (
+            (paymentsQ.data ?? []).map((p) => (
+              <PaymentRow
+                key={p.id}
+                amount={p.amount}
+                kind="paid"
+                method={p.method as PaymentMethod}
+                date={sale.paidAt || sale.createdAt}
+              />
+            ))
+          ) : (
+            <PaymentRow
+              amount={sale.paid}
+              kind="paid"
+              method={sale.paymentMethod}
+              date={sale.paidAt || sale.createdAt}
+            />
+          )}
           {remaining > 0 && (
             <PaymentRow amount={remaining} kind="pending" date={sale.dueAt} />
           )}
@@ -222,7 +253,112 @@ export function SaleDrawer({
           </Section>
         )}
       </div>
-    </DrawerPanel>
+    </Drawer>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * ItemsList — render multi-item con thumbnails
+ * ────────────────────────────────────────────────────────────────── */
+
+function ItemsList({
+  items,
+  loading,
+  fallback,
+}: {
+  items: SaleItem[];
+  loading: boolean;
+  fallback: string;
+}) {
+  if (loading) {
+    return (
+      <div style={{ fontSize: text.sm, color: color.textMuted, padding: space[3] }}>Cargando…</div>
+    );
+  }
+  if (items.length === 0) {
+    return (
+      <div
+        style={{
+          padding: space[3],
+          background: color.surface2,
+          border: `1px solid ${color.border}`,
+          borderRadius: radius.md,
+          fontSize: text.sm,
+          color: color.text,
+        }}
+      >
+        {fallback}
+      </div>
+    );
+  }
+  return (
+    <div
+      style={{
+        background: color.surface2,
+        border: `1px solid ${color.border}`,
+        borderRadius: radius.md,
+        overflow: 'hidden',
+      }}
+    >
+      {items.map((it, idx) => (
+        <ItemRow key={it.id} item={it} divider={idx < items.length - 1} />
+      ))}
+    </div>
+  );
+}
+
+function ItemRow({ item, divider }: { item: SaleItem; divider: boolean }) {
+  const subtotal = item.unit_price * item.quantity;
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: space[3],
+        padding: space[3],
+        borderBottom: divider ? `1px solid ${color.border}` : 'none',
+      }}
+    >
+      <div
+        style={{
+          width: 40,
+          height: 40,
+          background: color.surface,
+          borderRadius: radius.sm,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          overflow: 'hidden',
+        }}
+      >
+        <Package size={18} color={color.textDim} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: text.sm,
+            fontWeight: weight.semibold,
+            color: color.text,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {item.description}
+        </div>
+        <div style={{ fontSize: text.xs, color: color.textMuted, marginTop: 2 }}>
+          {item.quantity > 1
+            ? `${item.quantity} × ${formatMoney(item.unit_price)}`
+            : formatMoney(item.unit_price)}
+          {item.imei && ` · IMEI ${item.imei}`}
+        </div>
+      </div>
+      <div style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text, fontVariantNumeric: 'tabular-nums' }}>
+        {formatMoney(subtotal)}
+      </div>
+    </div>
   );
 }
 

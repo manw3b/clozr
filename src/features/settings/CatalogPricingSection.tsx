@@ -17,22 +17,14 @@ import type { CatalogItemWithImeis, CustomerTypeRow } from "../../lib/db/types";
 
 export function CatalogPricingSection({ wid }: { wid: string }) {
   const role = useAuthStore((s) => s.userRole);
+  const allowed = canEditPricing(role);
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<CatalogItemWithImeis | null>(null);
-
-  if (!canEditPricing(role)) {
-    return (
-      <EmptyState
-        title="Sin permisos"
-        description="Solo el owner o admin pueden editar precios del catálogo."
-      />
-    );
-  }
 
   const itemsQ = useQuery({
     queryKey: ["catalog-pricing-list", wid],
     queryFn: () => catalogDb.getAll(wid),
-    enabled: !!wid,
+    enabled: !!wid && allowed,
   });
 
   const filtered = useMemo(() => {
@@ -41,6 +33,15 @@ export function CatalogPricingSection({ wid }: { wid: string }) {
     const q = search.toLowerCase();
     return all.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 50);
   }, [itemsQ.data, search]);
+
+  if (!allowed) {
+    return (
+      <EmptyState
+        title="Sin permisos"
+        description="Solo el owner o admin pueden editar precios del catálogo."
+      />
+    );
+  }
 
   return (
     <div>

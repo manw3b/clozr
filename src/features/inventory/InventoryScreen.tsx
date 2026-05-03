@@ -10,7 +10,7 @@ import StockListScreen from "../quickStock/StockListScreen";
 import QuickSaleScreen from "./QuickSaleScreen";
 import AddProductModal from "./AddProductModal";
 import ItemFormModal from "../catalog/ItemFormModal";
-import Modal from "../../components/Modal";
+import { Modal } from "../../components/Modal";
 import type { CatalogItemWithImeis, InventorySummary } from "../../lib/db/types";
 import type { ModelWithContext, PreSelectedUnit } from "../../lib/db/quickStock";
 

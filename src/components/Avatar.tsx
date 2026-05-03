@@ -1,72 +1,57 @@
-import { useState, useEffect } from "react";
-import { resolveImageUrl } from "../lib/images";
-
-const COLORS = [
-  "#E8001D", "#0A84FF", "#30D158", "#FFD60A", "#BF5AF2",
-  "#FF9F0A", "#FF375F", "#5E5CE6", "#64D2FF", "#32D74B",
-];
-
-function pickColor(name: string): string {
-  let hash = 0;
-  for (const ch of name) hash = ch.charCodeAt(0) + ((hash << 5) - hash);
-  return COLORS[Math.abs(hash) % COLORS.length];
-}
-
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .slice(0, 2)
-    .map((n) => n[0]?.toUpperCase() ?? "")
-    .join("");
-}
+import { CSSProperties } from 'react';
+import { color, text, weight } from '../tokens';
 
 interface AvatarProps {
   name: string;
   size?: number;
-  imagePath?: string | null;
+  /** Color de fondo. Si no se especifica, se genera deterministicamente del nombre. */
+  bg?: string;
+  /** URL de imagen opcional */
+  src?: string;
 }
 
-export default function Avatar({ name, size = 36, imagePath }: AvatarProps) {
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+const palette = ['#E11D48', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#14B8A6'];
 
-  useEffect(() => {
-    if (!imagePath) { setImageUrl(null); return; }
-    resolveImageUrl(imagePath).then(setImageUrl).catch(() => setImageUrl(null));
-  }, [imagePath]);
+function hashColor(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return palette[Math.abs(hash) % palette.length];
+}
 
-  if (imageUrl) {
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+export function Avatar({ name, size = 32, bg, src }: AvatarProps) {
+  const style: CSSProperties = {
+    width: size,
+    height: size,
+    borderRadius: '50%',
+    background: bg || hashColor(name),
+    color: '#FFFFFF',
+    fontSize: Math.max(10, size * 0.4),
+    fontWeight: weight.semibold,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    overflow: 'hidden',
+    userSelect: 'none',
+  };
+
+  if (src) {
     return (
-      <div style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        overflow: "hidden",
-        flexShrink: 0,
-      }}>
-        <img src={imageUrl} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      <div style={style}>
+        <img
+          src={src}
+          alt={name}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
       </div>
     );
   }
 
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        background: pickColor(name),
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: size * 0.34,
-        fontWeight: 700,
-        color: "#fff",
-        flexShrink: 0,
-        letterSpacing: "-0.5px",
-        userSelect: "none",
-      }}
-    >
-      {initials(name)}
-    </div>
-  );
+  return <div style={style}>{initials(name)}</div>;
 }

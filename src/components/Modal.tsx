@@ -1,103 +1,210 @@
-import { useEffect, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { ReactNode, useEffect } from 'react';
+import { X } from 'lucide-react';
+import { color, radius, space, text, weight } from '../tokens';
 
 interface ModalProps {
-  isOpen: boolean;
+  /** Use 'open'. 'isOpen' also accepted for legacy compatibility. */
+  open?: boolean;
+  isOpen?: boolean;
   onClose: () => void;
   title?: string;
+  subtitle?: string;
+  /** Ancho máx (px). Default 520 */
   maxWidth?: number;
+  /** Acciones del footer */
+  footer?: ReactNode;
   children: ReactNode;
 }
 
-export default function Modal({
+/**
+ * Modal base centrado.
+ *
+ * Reglas:
+ * - Cierra con Escape
+ * - Click en overlay cierra
+ * - Animación suave (fade + scale)
+ * - El body scrollea internamente; el header y footer quedan pegados
+ */
+export function Modal({
+  open,
   isOpen,
   onClose,
   title,
-  maxWidth = 640,
+  subtitle,
+  maxWidth = 520,
+  footer,
   children,
 }: ModalProps) {
+  const visible = open ?? isOpen ?? false;
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+    if (!visible) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
     };
-    if (isOpen) document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [isOpen, onClose]);
+  }, [visible, onClose]);
+
+  if (!visible) return null;
 
   return (
     <>
       <div
         onClick={onClose}
         style={{
-          position: "fixed",
+          position: 'fixed',
           inset: 0,
-          background: "rgba(0,0,0,0.45)",
-          backdropFilter: "blur(4px)",
-          WebkitBackdropFilter: "blur(4px)",
+          background: 'rgba(0, 0, 0, 0.6)',
+          backdropFilter: 'blur(2px)',
           zIndex: 40,
-          opacity: isOpen ? 1 : 0,
-          pointerEvents: isOpen ? "auto" : "none",
-          transition: "opacity 0.2s ease",
-        }}
-      />
-      <div
-        style={{
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: isOpen
-            ? "translate(-50%,-50%) scale(1)"
-            : "translate(-50%,-50%) scale(0.97)",
-          background: "var(--surface-elevated)",
-          borderRadius: 16,
-          border: "1px solid var(--border)",
-          boxShadow: "var(--shadow-lg)",
-          zIndex: 50,
-          width: `min(${maxWidth}px, calc(100vw - 48px))`,
-          maxHeight: "85vh",
-          display: "flex",
-          flexDirection: "column",
-          opacity: isOpen ? 1 : 0,
-          pointerEvents: isOpen ? "auto" : "none",
-          transition: "transform 0.2s ease, opacity 0.2s ease",
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: space[4],
+          animation: 'clozr-modal-fade 200ms ease-out',
         }}
       >
-        {title && (
-          <div
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: color.surface,
+            border: `1px solid ${color.border}`,
+            borderRadius: radius.xl,
+            width: '100%',
+            maxWidth,
+            maxHeight: 'calc(100vh - 80px)',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
+            animation: 'clozr-modal-pop 220ms cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          {/* Header */}
+          <header
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "18px 24px",
-              borderBottom: "1px solid var(--border)",
+              padding: `${space[4]} ${space[5]}`,
+              borderBottom: title ? `1px solid ${color.border}` : 'none',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: space[3],
               flexShrink: 0,
             }}
           >
-            <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.2px" }}>
-              {title}
-            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {title && (
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: text.lg,
+                    fontWeight: weight.bold,
+                    color: color.text,
+                    letterSpacing: '-0.3px',
+                  }}
+                >
+                  {title}
+                </h2>
+              )}
+              {subtitle && (
+                <div style={{ marginTop: 2, fontSize: text.sm, color: color.textMuted }}>
+                  {subtitle}
+                </div>
+              )}
+            </div>
             <button
               onClick={onClose}
+              aria-label="Cerrar"
               style={{
-                width: 30,
-                height: 30,
-                borderRadius: 8,
-                background: "var(--surface-2)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--text-tertiary)",
-                transition: "background 0.12s ease, color 0.12s ease",
+                width: 28,
+                height: 28,
+                borderRadius: radius.sm,
+                color: color.textMuted,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 100ms',
+                flexShrink: 0,
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-3)"; e.currentTarget.style.color = "var(--text-primary)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "var(--surface-2)"; e.currentTarget.style.color = "var(--text-tertiary)"; }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = color.surfaceHover;
+                e.currentTarget.style.color = color.text;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = color.textMuted;
+              }}
             >
-              <X size={15} />
+              <X size={16} strokeWidth={2.2} />
             </button>
-          </div>
-        )}
-        <div style={{ flex: 1, overflow: "auto", padding: 24 }}>{children}</div>
+          </header>
+
+          {/* Body */}
+          <div style={{ padding: space[5], overflowY: 'auto', flex: 1 }}>{children}</div>
+
+          {/* Footer */}
+          {footer && (
+            <footer
+              style={{
+                padding: `${space[3]} ${space[5]}`,
+                borderTop: `1px solid ${color.border}`,
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: space[2],
+                flexShrink: 0,
+              }}
+            >
+              {footer}
+            </footer>
+          )}
+        </div>
       </div>
+
+      <style>{`
+        @keyframes clozr-modal-fade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes clozr-modal-pop {
+          from { opacity: 0; transform: translateY(8px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
     </>
+  );
+}
+
+/* ============================================================
+ *  ModalField — campo con label que vamos a usar en NewSale, NewMovement
+ * ============================================================ */
+
+interface ModalFieldProps {
+  label: string;
+  required?: boolean;
+  hint?: string;
+  children: ReactNode;
+}
+
+export function ModalField({ label, required, hint, children }: ModalFieldProps) {
+  return (
+    <div style={{ marginBottom: space[4] }}>
+      <label
+        style={{
+          display: 'block',
+          fontSize: text.xs,
+          fontWeight: weight.semibold,
+          color: color.textMuted,
+          textTransform: 'uppercase',
+          letterSpacing: '0.6px',
+          marginBottom: 6,
+        }}
+      >
+        {label}
+        {required && <span style={{ color: color.danger, marginLeft: 4 }}>*</span>}
+      </label>
+      {children}
+      {hint && (
+        <div style={{ marginTop: 4, fontSize: text.xs, color: color.textDim }}>{hint}</div>
+      )}
+    </div>
   );
 }

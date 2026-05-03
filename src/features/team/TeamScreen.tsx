@@ -5,7 +5,7 @@ import { teamDb } from "../../lib/db/team";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
-import Modal from "../../components/Modal";
+import { Modal } from "../../components/Modal";
 import Select from "../../components/ui/Select";
 import type { MemberRole, WorkspaceMember } from "../../lib/db/types";
 

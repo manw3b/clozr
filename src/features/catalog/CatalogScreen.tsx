@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { Plus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import Modal from "../../components/Modal";
+import { Modal } from "../../components/Modal";
 import ProductsTab from "./ProductsTab";
 import StockTab from "./StockTab";
 import ItemFormModal from "./ItemFormModal";

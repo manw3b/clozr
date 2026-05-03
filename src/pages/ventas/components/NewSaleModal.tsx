@@ -28,6 +28,7 @@ export interface NewSaleItem {
   productDescription: string;
   quantity: number;
   unitPrice: number;
+  imei?: string | null;
 }
 
 export interface NewSalePayload {
@@ -42,10 +43,18 @@ export interface NewSalePayload {
   outOfStock: boolean;
 }
 
+/** Pre-carga el modal con un producto + (opcional) IMEI específico de stock.
+ * Util para "vender desde inventario" donde ya tenemos contexto. */
+export interface NewSalePreset {
+  catalogItem: CatalogItem;
+  imei?: string | null;
+}
+
 interface NewSaleModalProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (data: NewSalePayload) => void;
+  preset?: NewSalePreset | null;
 }
 
 interface ItemDraft {
@@ -55,6 +64,7 @@ interface ItemDraft {
   outOfStock: boolean;
   quantity: number;
   unitPriceInput: string; // string para no perder lo que el usuario tipea
+  imei?: string | null;
 }
 
 function uid() {
@@ -69,10 +79,23 @@ function emptyItem(): ItemDraft {
     outOfStock: false,
     quantity: 1,
     unitPriceInput: "",
+    imei: null,
   };
 }
 
-export function NewSaleModal({ open, onClose, onSubmit }: NewSaleModalProps) {
+function presetToItem(p: NewSalePreset): ItemDraft {
+  return {
+    key: uid(),
+    catalogItem: p.catalogItem,
+    productDescription: "",
+    outOfStock: false,
+    quantity: 1,
+    unitPriceInput: "",
+    imei: p.imei ?? null,
+  };
+}
+
+export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalProps) {
   const { activeWorkspace } = useWorkspaceStore();
   const { usdToArs } = useExchangeRateStore();
   const wid = activeWorkspace?.id ?? "";
@@ -81,8 +104,18 @@ export function NewSaleModal({ open, onClose, onSubmit }: NewSaleModalProps) {
   const [client, setClient] = useState<Client | null>(null);
   const [creatingClient, setCreatingClient] = useState(false);
 
-  const [items, setItems] = useState<ItemDraft[]>([emptyItem()]);
+  const [items, setItems] = useState<ItemDraft[]>(() =>
+    preset ? [presetToItem(preset)] : [emptyItem()],
+  );
   const [paymentMethodId, setPaymentMethodId] = useState("");
+
+  // Si llega un preset nuevo mientras el modal está cerrado, lo aplicamos al abrir
+  useEffect(() => {
+    if (open && preset) {
+      setItems([presetToItem(preset)]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, preset?.catalogItem.id, preset?.imei]);
 
   const { data: allClients = [] } = useClientsList();
 
@@ -191,6 +224,7 @@ export function NewSaleModal({ open, onClose, onSubmit }: NewSaleModalProps) {
           : it.catalogItem?.name ?? "Producto",
         quantity: it.quantity,
         unitPrice: parseFloat(it.unitPriceInput) || 0,
+        imei: it.outOfStock ? null : it.imei ?? null,
       })),
       currency: paymentMethod.currency,
       paymentMethodId: paymentMethod.id,
@@ -479,7 +513,8 @@ function ItemRowEditor({
         <SelectedCatalogCard
           item={item.catalogItem}
           priceSource={priceQ.data?.source ?? "none"}
-          onClear={() => onChange({ catalogItem: null, unitPriceInput: "" })}
+          imei={item.imei ?? null}
+          onClear={() => onChange({ catalogItem: null, unitPriceInput: "", imei: null })}
         />
       ) : (
         <CatalogPicker
@@ -909,10 +944,12 @@ function CatalogPicker({
 function SelectedCatalogCard({
   item,
   priceSource,
+  imei,
   onClear,
 }: {
   item: CatalogItem;
   priceSource: "stock-override" | "catalog" | "none";
+  imei: string | null;
   onClear: () => void;
 }) {
   const img = getTemplateImageUrl(item.image_path ?? null);
@@ -934,14 +971,16 @@ function SelectedCatalogCard({
         <div style={{ width: 40, height: 40, background: color.surface2, borderRadius: radius.sm, flexShrink: 0 }} />
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text }}>
+        <div style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text, display: "flex", alignItems: "center", gap: space[2] }}>
           {item.name}
+          {imei && <Badge tone="success">unidad #{imei.slice(-6)}</Badge>}
         </div>
         <div style={{ fontSize: text.xs, color: color.textMuted, marginTop: 2 }}>
           {item.category ?? "—"}
           {priceSource === "catalog" && " · precio del catálogo"}
           {priceSource === "stock-override" && " · precio override"}
           {priceSource === "none" && " · sin precio cargado"}
+          {imei && ` · IMEI ${imei}`}
         </div>
       </div>
       <button onClick={onClear} style={{ color: color.textMuted, fontSize: text.xs }}>

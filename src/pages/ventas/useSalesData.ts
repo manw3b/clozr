@@ -34,6 +34,8 @@ export interface NewSaleItem {
   productDescription: string;
   quantity: number;
   unitPrice: number; // en la currency del payment method
+  /** IMEI/serie de la unidad específica vendida (si aplica). Marca el catalog_imei como vendido. */
+  imei?: string | null;
 }
 
 /** Shape esperado del NewSaleModal multi-item. */
@@ -74,6 +76,8 @@ export function useCreateSale() {
           quantity: it.quantity,
           unit_price: it.unitPrice,
           catalog_item_id: it.catalogItemId,
+          imei: it.imei ?? null,
+          from_stock: !!it.imei,
         })),
         payments: [
           {

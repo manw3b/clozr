@@ -18,7 +18,8 @@ interface Props {
   item: CatalogItemWithImeis | null;
   onClose: () => void;
   onEdit?: (item: CatalogItemWithImeis) => void;
-  onSellUnit?: (item: CatalogItemWithImeis) => void;
+  /** Si se pasa imei, vende esa unidad específica; sin imei, sale modal genérica con el producto. */
+  onSellUnit?: (item: CatalogItemWithImeis, imei?: string | null) => void;
 }
 
 export function ProductDetailDrawer({ item, onClose, onEdit, onSellUnit }: Props) {
@@ -268,6 +269,27 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onSellUnit }: Props
                     <Badge tone="neutral">vendida</Badge>
                   ) : (
                     <Badge tone="success">disponible</Badge>
+                  )}
+                  {!u.sold_at && onSellUnit && (
+                    <button
+                      onClick={() => onSellUnit(item, u.imei)}
+                      title="Vender esta unidad"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        padding: "4px 10px",
+                        borderRadius: radius.sm,
+                        background: color.primary,
+                        color: "#fff",
+                        fontSize: 11,
+                        fontWeight: weight.semibold,
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <ShoppingCart size={11} /> Vender
+                    </button>
                   )}
                   {!u.sold_at && (
                     <button

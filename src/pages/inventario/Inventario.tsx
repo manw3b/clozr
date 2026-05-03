@@ -20,7 +20,7 @@ import type { CatalogItemWithImeis } from "../../lib/db/types";
 import { ProductDetailDrawer } from "./components/ProductDetailDrawer";
 import { AddProductSimpleModal } from "./components/AddProductSimpleModal";
 import { VisualProductPicker } from "./components/VisualProductPicker";
-import { NewSaleModal } from "../ventas/components/NewSaleModal";
+import { NewSaleModal, type NewSalePreset } from "../ventas/components/NewSaleModal";
 import { useCreateSale } from "../ventas/useSalesData";
 
 type StockFilter = "todos" | "disponibles" | "agotados";
@@ -35,6 +35,7 @@ export function Inventario() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [saleOpen, setSaleOpen] = useState(false);
+  const [salePreset, setSalePreset] = useState<NewSalePreset | null>(null);
   const createSaleMut = useCreateSale();
 
   const productsQ = useQuery({
@@ -149,8 +150,9 @@ export function Inventario() {
       <ProductDetailDrawer
         item={selected}
         onClose={() => setSelected(null)}
-        onSellUnit={() => {
+        onSellUnit={(catalogItem, imei) => {
           setSelected(null);
+          setSalePreset({ catalogItem, imei: imei ?? null });
           setSaleOpen(true);
         }}
       />
@@ -181,12 +183,17 @@ export function Inventario() {
 
       <NewSaleModal
         open={saleOpen}
-        onClose={() => setSaleOpen(false)}
+        onClose={() => {
+          setSaleOpen(false);
+          setSalePreset(null);
+        }}
+        preset={salePreset}
         onSubmit={(data) => {
           createSaleMut.mutate(data, {
             onSuccess: () => {
               showToast(data.outOfStock ? "Venta fuera de stock registrada" : "Venta registrada", "success");
               setSaleOpen(false);
+              setSalePreset(null);
             },
           });
         }}

@@ -28,14 +28,20 @@ export function useMarkSalePaid() {
   });
 }
 
-/** Shape esperado del NewSaleModal nuevo (Fase 7.6). */
+/** Item de la venta (uno o varios por venta). */
+export interface NewSaleItem {
+  catalogItemId: string | null;
+  productDescription: string;
+  quantity: number;
+  unitPrice: number; // en la currency del payment method
+}
+
+/** Shape esperado del NewSaleModal multi-item. */
 export interface NewSalePayload {
   clientId: string | null;
   clientName: string | null;
   customerTypeId: string | null;
-  catalogItemId: string | null;
-  productDescription: string;
-  amount: number;
+  items: NewSaleItem[];
   currency: "ARS" | "USD";
   paymentMethodId: string;
   paymentMethodName: string;
@@ -54,6 +60,7 @@ export function useCreateSale() {
     mutationFn: async (input: NewSalePayload) => {
       // Defensa por si las migraciones 022-025 no corrieron en esta DB
       await ensurePricingSchema();
+      const total = input.items.reduce((s, it) => s + it.unitPrice * it.quantity, 0);
       await salesDb.createSale(wid, {
         business_id: activeBusiness?.id ?? null,
         customer_id: input.clientId,
@@ -62,19 +69,17 @@ export function useCreateSale() {
         seller_name: userName ?? null,
         notes: null,
         out_of_stock_sale: input.outOfStock,
-        items: [
-          {
-            description: input.productDescription,
-            quantity: 1,
-            unit_price: input.amount,
-            catalog_item_id: input.catalogItemId,
-          },
-        ],
+        items: input.items.map((it) => ({
+          description: it.productDescription,
+          quantity: it.quantity,
+          unit_price: it.unitPrice,
+          catalog_item_id: it.catalogItemId,
+        })),
         payments: [
           {
             method: input.paymentMethodKind,
             currency: input.currency,
-            amount: input.amount,
+            amount: total,
             is_deposit: false,
           },
         ],

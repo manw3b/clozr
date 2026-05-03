@@ -97,7 +97,6 @@ export function Clientes() {
         showToast(`${ids.length} cliente${ids.length === 1 ? '' : 's'} eliminado${ids.length === 1 ? '' : 's'}`, 'success');
         setSelected(new Set());
       },
-      onError: (e) => showToast(e instanceof Error ? e.message : 'Error al eliminar'),
     });
   }
 

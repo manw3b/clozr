@@ -4,51 +4,9 @@ import { useBusinessStore } from "../../store/businessStore";
 import { useExchangeRateStore } from "../../store/exchangeRateStore";
 import { cashDb } from "../../lib/db/cash";
 import { getTodayISO } from "../../lib/hooks";
-import type {
-  CashSummary,
-  CashMovement as DomainMovement,
-  CashMovementKind,
-  CashCategory,
-} from "../../types/domain";
-import type { CashMovement as DbMovement, CashMovementType, CashDirection } from "../../lib/db/types";
-
-function categoryFromDb(type: CashMovementType, direction: CashDirection): CashCategory {
-  if (direction === "in") {
-    if (type === "venta" || type === "cobro") return "sale-payment";
-    return "cash-in";
-  }
-  if (type === "compra") return "supplier";
-  if (type === "gasto") return "other";
-  return "other";
-}
-
-function kindFromDb(direction: CashDirection): CashMovementKind {
-  return direction === "in" ? "income" : "expense";
-}
-
-function dbToDomain(m: DbMovement): DomainMovement {
-  return {
-    id: m.id,
-    kind: kindFromDb(m.direction),
-    amount: m.amount,
-    currency: (m.currency as "ARS" | "USD") ?? "ARS",
-    description: m.description ?? "(sin descripción)",
-    category: categoryFromDb(m.type, m.direction),
-    createdAt: m.created_at,
-    saleId: m.reference_type === "sale" ? m.reference_id ?? undefined : undefined,
-    clientName: m.customer_name ?? undefined,
-  };
-}
-
-function categoryToDb(category: CashCategory, kind: CashMovementKind): { type: CashMovementType; direction: CashDirection } {
-  const direction: CashDirection = kind === "income" ? "in" : "out";
-  let type: CashMovementType = "otro";
-  if (category === "sale-payment") type = kind === "income" ? "cobro" : "otro";
-  else if (category === "supplier") type = "compra";
-  else if (category === "cash-in" || category === "transfer-in") type = "otro";
-  else if (kind === "expense") type = "gasto";
-  return { type, direction };
-}
+import { dbCashMovementToDomain, cashCategoryToDb } from "../../lib/mappers";
+import { qk, invalidate } from "../../lib/queryKeys";
+import type { CashSummary, CashMovementKind, CashCategory } from "../../types/domain";
 
 export function useCashSummary() {
   const { activeWorkspace } = useWorkspaceStore();
@@ -59,18 +17,18 @@ export function useCashSummary() {
   const today = getTodayISO();
 
   return useQuery({
-    queryKey: ["caja", "summary", wid, bid, today],
+    queryKey: qk.cashSummary(wid, bid, today),
     queryFn: async (): Promise<CashSummary> => {
       const [movementsToday, byCurrency] = await Promise.all([
         cashDb.getMovements(wid, bid, { from: today, to: today }),
         cashDb.getSummaryByCurrency(wid, bid, { from: today, to: today }),
       ]);
 
-      const movements = movementsToday.map(dbToDomain);
+      const movements = movementsToday.map(dbCashMovementToDomain);
 
       return {
         date: today,
-        openingBalance: { ars: 0, usd: 0 }, // TODO: track day opening properly
+        openingBalance: { ars: 0, usd: 0 }, // TODO Fase 2.2: track day opening
         totalIncome: { ars: byCurrency.ars.ingresos, usd: byCurrency.usd.ingresos },
         totalExpense: { ars: byCurrency.ars.egresos, usd: byCurrency.usd.egresos },
         currentBalance: { ars: byCurrency.ars.balance, usd: byCurrency.usd.balance },
@@ -97,7 +55,7 @@ export function useCreateMovement() {
       category: CashCategory;
       description: string;
     }) => {
-      const { type, direction } = categoryToDb(input.category, input.kind);
+      const { type, direction } = cashCategoryToDb(input.category, input.kind);
       await cashDb.createMovement(wid, bid, {
         type,
         direction,
@@ -106,9 +64,6 @@ export function useCreateMovement() {
         description: input.description,
       });
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["caja"] });
-      qc.invalidateQueries({ queryKey: ["mi-dia"] });
-    },
+    onSuccess: () => invalidate.afterCashChange(qc),
   });
 }

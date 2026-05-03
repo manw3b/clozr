@@ -15,10 +15,11 @@ import {
   greetingForHour,
   dbTaskToDomain,
   dbFollowupToDomain,
-  dbSaleToDomain,
+  dbSaleRowToDomain,
   dbSaleToDueCollection,
   dbCustomerToInactive,
-} from "./mappers";
+} from "../../lib/mappers";
+import { qk } from "../../lib/queryKeys";
 import type { MyDayData } from "../../types/domain";
 
 const INACTIVE_DAYS_THRESHOLD = 30;
@@ -34,50 +35,43 @@ export function MyDayContainer() {
   const bid = activeBusiness?.id ?? "";
   const today = getTodayISO();
 
-  // Tasks
   const tasksQ = useQuery({
-    queryKey: ["mi-dia", "tasks", wid],
+    queryKey: qk.tasks(wid),
     queryFn: () => tasksDb.getAll(wid),
     enabled: !!wid,
   });
 
-  // Follow-ups del día
   const followupsQ = useQuery({
-    queryKey: ["mi-dia", "followups", wid, bid, today],
+    queryKey: qk.followupsForDay(wid, bid, today),
     queryFn: () => followupsDb.getForDay(wid, bid, today),
     enabled: !!wid && !!bid,
   });
 
-  // Ventas de hoy
   const salesTodayQ = useQuery({
-    queryKey: ["mi-dia", "sales-today", wid],
+    queryKey: qk.salesByPeriod(wid, "today"),
     queryFn: () => salesDb.getRows(wid, "today"),
     enabled: !!wid,
   });
 
-  // Cobros pendientes
   const pendingCobrosQ = useQuery({
-    queryKey: ["mi-dia", "pending-cobros", wid],
+    queryKey: qk.pendingCobros(wid),
     queryFn: () => salesDb.getPendingCobros(wid, 5),
     enabled: !!wid,
   });
 
-  // Clientes inactivos (sin compra hace >30 días)
   const customersQ = useQuery({
-    queryKey: ["mi-dia", "customers", wid],
+    queryKey: qk.clientsList(wid),
     queryFn: () => customersDb.getAll(wid),
     enabled: !!wid,
   });
 
-  // Score del día
   const scoreQ = useQuery({
-    queryKey: ["mi-dia", "score", wid],
+    queryKey: qk.dayScore(wid),
     queryFn: () => scoreDb.calculateDayScore(wid),
     enabled: !!wid,
     refetchInterval: 60_000,
   });
 
-  // Mutations
   const toggleTaskMut = useMutation({
     mutationFn: async (id: string) => {
       const t = tasksQ.data?.find((x) => x.id === id);
@@ -85,29 +79,27 @@ export function MyDayContainer() {
       await tasksDb.toggleComplete(id, t.completed === 0);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["mi-dia", "tasks"] });
-      qc.invalidateQueries({ queryKey: ["mi-dia", "score"] });
+      qc.invalidateQueries({ queryKey: qk.tasks(wid) });
+      qc.invalidateQueries({ queryKey: qk.dayScore(wid) });
     },
   });
 
   const markPaidMut = useMutation({
     mutationFn: (saleId: string) => salesDb.markAsPaid(saleId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["mi-dia", "pending-cobros"] });
-      qc.invalidateQueries({ queryKey: ["mi-dia", "sales-today"] });
+      qc.invalidateQueries({ queryKey: ["mi-dia"] });
+      qc.invalidateQueries({ queryKey: ["ventas"] });
     },
   });
 
-  // Build MyDayData
   const data: MyDayData = useMemo(() => {
     const tasks = (tasksQ.data ?? []).map(dbTaskToDomain);
     const followUps = (followupsQ.data ?? [])
       .filter((f) => f.completed === 0)
       .map(dbFollowupToDomain);
-    const todaySales = (salesTodayQ.data ?? []).map(dbSaleToDomain);
+    const todaySales = (salesTodayQ.data ?? []).map(dbSaleRowToDomain);
     const dueCollections = (pendingCobrosQ.data ?? []).map(dbSaleToDueCollection);
 
-    // Inactivos = customers con last contact > 30d (proxy: status dormido/perdido o sin compras)
     const now = Date.now();
     const inactiveClients = (customersQ.data ?? [])
       .filter((c) => c.status === "dormido" || c.status === "perdido")
@@ -117,7 +109,6 @@ export function MyDayContainer() {
         return dbCustomerToInactive(c, Math.max(INACTIVE_DAYS_THRESHOLD, days));
       });
 
-    // Goal
     const goalAmount = activeWorkspace?.daily_goal ?? 0;
     const todayRevenue = todaySales.reduce((sum, s) => sum + s.amount, 0);
 

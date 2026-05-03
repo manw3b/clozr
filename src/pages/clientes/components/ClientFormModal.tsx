@@ -4,6 +4,7 @@ import { Modal, ModalField } from '../../../components/Modal';
 import { Button } from '../../../components/Button';
 import { Input, Select } from '../../../components/Input';
 import { customersDb } from '../../../lib/db/customers';
+import { invalidate } from '../../../lib/queryKeys';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
 import { useUIStore } from '../../../store/uiStore';
 import type { Client, ClientType } from '../../../types/domain';
@@ -66,13 +67,9 @@ export function ClientFormModal({ open, onClose, client }: ClientFormModalProps)
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['clientes'] });
-      qc.invalidateQueries({ queryKey: ['mi-dia'] });
+      invalidate.afterClientChange(qc);
       showToast(editing ? 'Cliente actualizado' : 'Cliente creado', 'success');
       onClose();
-    },
-    onError: (e) => {
-      showToast(e instanceof Error ? e.message : 'Error al guardar');
     },
   });
 

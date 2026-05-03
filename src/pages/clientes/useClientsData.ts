@@ -2,34 +2,15 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { customersDb } from "../../lib/db/customers";
 import { salesDb } from "../../lib/db/sales";
-import { dbCustomerToClient } from "../mi-dia/mappers";
-import type { Client, ClientDetail, Sale, ActivityItem } from "../../types/domain";
-import type { Sale as DbSale } from "../../lib/db/types";
-
-function dbSaleToDomainBasic(s: DbSale): Sale {
-  const status: Sale["status"] = s.is_paid === 1 ? "paid" : s.total_paid > 0 ? "partial" : "pending";
-  return {
-    id: s.id,
-    number: `V-${s.id.slice(0, 6).toUpperCase()}`,
-    clientId: s.customer_id ?? "",
-    clientName: s.customer_name ?? "",
-    amount: s.total,
-    currency: "ARS",
-    status,
-    paid: s.total_paid,
-    pending: s.balance,
-    product: s.notes ?? "Venta",
-    createdAt: s.created_at,
-    paidAt: s.is_paid === 1 ? s.created_at : undefined,
-    notes: s.notes ?? undefined,
-  };
-}
+import { dbCustomerToClient, dbSaleToDomain } from "../../lib/mappers";
+import { qk, invalidate } from "../../lib/queryKeys";
+import type { Client, ClientDetail, ActivityItem } from "../../types/domain";
 
 export function useClientsList() {
   const { activeWorkspace } = useWorkspaceStore();
   const wid = activeWorkspace?.id ?? "";
   return useQuery({
-    queryKey: ["clientes", "list", wid],
+    queryKey: qk.clientsList(wid),
     queryFn: async () => {
       const dbCustomers = await customersDb.getAll(wid);
       return dbCustomers.map((c): Client => {
@@ -52,14 +33,14 @@ export function useClientDetail(clientId: string | null) {
   const wid = activeWorkspace?.id ?? "";
 
   return useQuery({
-    queryKey: ["clientes", "detail", wid, clientId],
+    queryKey: qk.clientDetail(wid, clientId),
     queryFn: async (): Promise<ClientDetail | null> => {
       if (!clientId || !wid) return null;
       const customer = await customersDb.getById(wid, clientId);
       if (!customer) return null;
 
       const dbSales = await salesDb.getByCustomer(wid, clientId);
-      const sales = dbSales.map(dbSaleToDomainBasic);
+      const sales = dbSales.map(dbSaleToDomain);
 
       const outstandingDebts = dbSales
         .filter((s) => s.is_paid === 0 && s.balance > 0)
@@ -67,7 +48,10 @@ export function useClientDetail(clientId: string | null) {
           saleId: s.id,
           amount: s.balance,
           dueAt: s.created_at,
-          daysOverdue: Math.max(0, Math.floor((Date.now() - new Date(s.created_at).getTime()) / 86400000) - 30),
+          daysOverdue: Math.max(
+            0,
+            Math.floor((Date.now() - new Date(s.created_at).getTime()) / 86400000) - 30,
+          ),
           product: s.notes ?? "Venta",
         }));
 
@@ -116,9 +100,6 @@ export function useDeleteClients() {
         await customersDb.remove(wid, id);
       }
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["clientes"] });
-      qc.invalidateQueries({ queryKey: ["mi-dia"] });
-    },
+    onSuccess: () => invalidate.afterClientChange(qc),
   });
 }

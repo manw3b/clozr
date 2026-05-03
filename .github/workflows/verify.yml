@@ -26,3 +26,6 @@ jobs:
 
       - name: Typecheck + frontend build
         run: npm run build
+
+      - name: Unit tests
+        run: npm test

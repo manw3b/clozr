@@ -134,9 +134,6 @@ export function Ventas() {
         showToast('Venta registrada', 'success');
         setNewSaleOpen(false);
       },
-      onError: (e) => {
-        showToast(e instanceof Error ? e.message : 'Error al registrar venta');
-      },
     });
   }
 

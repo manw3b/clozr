@@ -189,6 +189,9 @@ export async function createSale(
     sale_date: now,
     created_at: now,
     payment_method: paymentMethod,
+    out_of_stock_sale: 0,
+    regularized_at: null,
+    regularized_by: null,
   };
 }
 

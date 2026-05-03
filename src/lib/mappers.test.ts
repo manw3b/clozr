@@ -124,6 +124,9 @@ describe("dbSaleToDomain", () => {
     sale_date: "2026-01-01",
     created_at: "2026-01-01T00:00:00Z",
     payment_method: null,
+    out_of_stock_sale: 0,
+    regularized_at: null,
+    regularized_by: null,
   };
 
   it("status=pending when nothing paid", () => {

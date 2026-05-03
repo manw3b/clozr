@@ -136,6 +136,24 @@ fn main() {
             sql: include_str!("../migrations/022_sales_payment_method.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 23,
+            description: "payment_methods",
+            sql: include_str!("../migrations/023_payment_methods.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 24,
+            description: "catalog_pricing",
+            sql: include_str!("../migrations/024_catalog_pricing.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 25,
+            description: "stock_pricing",
+            sql: include_str!("../migrations/025_stock_pricing.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

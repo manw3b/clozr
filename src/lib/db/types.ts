@@ -230,6 +230,50 @@ export interface Sale {
   created_at: string;
   /** Migration 022: denormalized from primary payment */
   payment_method: string | null;
+  /** Migration 025: marca de venta fuera de stock pendiente de regularizar */
+  out_of_stock_sale: number;
+  regularized_at: string | null;
+  regularized_by: string | null;
+}
+
+/** Migration 023: método de pago configurable por workspace */
+export type PaymentMethodKind =
+  | "efectivo"
+  | "transferencia"
+  | "mercadopago"
+  | "tarjeta_credito"
+  | "tarjeta_debito"
+  | "cuenta_corriente"
+  | "usdt"
+  | "otro";
+
+export interface PaymentMethodRow {
+  id: string;
+  workspace_id: string;
+  name: string;
+  modifier_pct: number;
+  currency: "ARS" | "USD";
+  kind: PaymentMethodKind;
+  active: number;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Migration 024: precios del catálogo por tipo de cliente */
+export interface CatalogPriceRow {
+  catalog_item_id: string;
+  customer_type_id: string;
+  price_usd: number;
+  updated_at: string;
+}
+
+/** Migration 025: precios override por unidad individual de stock */
+export interface StockItemPriceRow {
+  stock_item_id: string;
+  customer_type_id: string;
+  price_usd: number;
+  updated_at: string;
 }
 
 export interface SaleItem {

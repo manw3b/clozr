@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Search,
   Plus,
@@ -13,10 +14,17 @@ import {
   AlertCircle,
   Clock,
   TrendingUp,
+  Check,
 } from 'lucide-react';
 import { color, duration, ease, layout, radius, space, text, weight } from '../tokens';
 import { Button } from '../components/Button';
+import { Modal, ModalField } from '../components/Modal';
+import { Input } from '../components/Input';
 import { useNotifications, type NotificationItem } from '../lib/notifications';
+import { useBusinessStore } from '../store/businessStore';
+import { useWorkspaceStore } from '../store/workspaceStore';
+import { useUIStore } from '../store/uiStore';
+import { businessesDb } from '../lib/db/businesses';
 
 export type NewAction = 'cliente' | 'venta' | 'lead' | 'tarea' | 'movimiento';
 export type NotifNavigate = 'tasks' | 'cash' | 'pipeline';
@@ -29,6 +37,7 @@ interface TopbarProps {
 }
 
 export function Topbar({ workspace, onSearchClick, onNewAction, onNotificationClick }: TopbarProps) {
+  void workspace; // ahora usamos el store directamente en BusinessSwitcher
   return (
     <header
       style={{
@@ -43,8 +52,8 @@ export function Topbar({ workspace, onSearchClick, onNewAction, onNotificationCl
         flexShrink: 0,
       }}
     >
-      {/* IZQUIERDA — Workspace selector */}
-      <WorkspaceSelector workspace={workspace} />
+      {/* IZQUIERDA — Business switcher */}
+      <BusinessSwitcher />
 
       {/* CENTRO — Búsqueda global */}
       <SearchTrigger onClick={onSearchClick} />
@@ -334,54 +343,313 @@ function NewMenuItem({
   );
 }
 
-/* ===== Workspace selector ===== */
+/* ===== Business switcher (dropdown + crear nuevo) ===== */
 
-function WorkspaceSelector({ workspace }: { workspace: { name: string; emoji?: string } }) {
+function BusinessSwitcher() {
+  const { businesses, activeBusiness, setActiveBusiness, addBusiness } = useBusinessStore();
+  const { activeWorkspace } = useWorkspaceStore();
+  const { showToast } = useUIStore();
+  const qc = useQueryClient();
+  const [hover, setHover] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    if (open) {
+      document.addEventListener('mousedown', onClickOutside);
+      document.addEventListener('keydown', onKey);
+      return () => {
+        document.removeEventListener('mousedown', onClickOutside);
+        document.removeEventListener('keydown', onKey);
+      };
+    }
+  }, [open]);
+
+  const display = activeBusiness ?? { name: activeWorkspace?.name ?? 'Sin negocio', emoji: '🏪' };
+
+  return (
+    <>
+      <div ref={wrapRef} style={{ position: 'relative' }}>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          onMouseEnter={() => setHover(true)}
+          onMouseLeave={() => setHover(false)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: space[2],
+            padding: `${space[1]} ${space[2]} ${space[1]} ${space[1]}`,
+            borderRadius: radius.md,
+            background: hover || open ? color.surfaceHover : 'transparent',
+            transition: `background ${duration.fast} ${ease}`,
+            cursor: 'pointer',
+          }}
+        >
+          <span
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: radius.md,
+              background: color.surface2,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 16,
+              flexShrink: 0,
+            }}
+          >
+            {display.emoji || '🏪'}
+          </span>
+          <span
+            style={{
+              fontSize: text.sm,
+              fontWeight: weight.semibold,
+              color: color.text,
+              maxWidth: 180,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {display.name}
+          </span>
+          <ChevronDown size={14} color={color.textDim} strokeWidth={2.2} />
+        </button>
+
+        {open && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 6px)',
+              left: 0,
+              minWidth: 260,
+              background: color.surface,
+              border: `1px solid ${color.borderStrong}`,
+              borderRadius: radius.md,
+              boxShadow: 'var(--shadow-lg)',
+              padding: 4,
+              zIndex: 50,
+            }}
+          >
+            <div
+              style={{
+                fontSize: text.xs,
+                fontWeight: weight.semibold,
+                color: color.textDim,
+                textTransform: 'uppercase',
+                letterSpacing: '0.6px',
+                padding: `${space[2]} ${space[3]}`,
+              }}
+            >
+              Negocios
+            </div>
+
+            {businesses.length === 0 ? (
+              <div style={{ padding: `${space[2]} ${space[3]}`, fontSize: text.sm, color: color.textMuted }}>
+                Sin negocios todavía.
+              </div>
+            ) : (
+              businesses.map((b) => {
+                const isActive = activeBusiness?.id === b.id;
+                return (
+                  <BusinessRow
+                    key={b.id}
+                    name={b.name}
+                    emoji={b.emoji ?? '🏪'}
+                    active={isActive}
+                    onClick={() => {
+                      setActiveBusiness(b);
+                      setOpen(false);
+                    }}
+                  />
+                );
+              })
+            )}
+
+            <div style={{ height: 1, background: color.border, margin: `${space[1]} 0` }} />
+
+            <button
+              onClick={() => {
+                setOpen(false);
+                setCreateOpen(true);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: space[2],
+                width: '100%',
+                padding: `${space[2]} ${space[3]}`,
+                borderRadius: radius.sm,
+                background: 'transparent',
+                color: color.text,
+                fontSize: text.sm,
+                textAlign: 'left',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = color.surfaceHover)}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              <Plus size={14} color={color.textMuted} strokeWidth={2.2} />
+              <span>Nuevo negocio</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      <CreateBusinessModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        wid={activeWorkspace?.id ?? ''}
+        onCreated={(b) => {
+          addBusiness(b);
+          setActiveBusiness(b);
+          qc.invalidateQueries();
+          showToast(`Negocio "${b.name}" creado`, 'success');
+          setCreateOpen(false);
+        }}
+      />
+    </>
+  );
+}
+
+function BusinessRow({
+  name,
+  emoji,
+  active,
+  onClick,
+}: {
+  name: string;
+  emoji: string;
+  active: boolean;
+  onClick: () => void;
+}) {
   const [hover, setHover] = useState(false);
   return (
     <button
+      onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: space[2],
-        padding: `${space[1]} ${space[2]} ${space[1]} ${space[1]}`,
-        borderRadius: radius.md,
+        width: '100%',
+        padding: `${space[2]} ${space[3]}`,
+        borderRadius: radius.sm,
         background: hover ? color.surfaceHover : 'transparent',
+        color: color.text,
+        fontSize: text.sm,
+        textAlign: 'left',
+        cursor: 'pointer',
         transition: `background ${duration.fast} ${ease}`,
       }}
     >
-      <span
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: radius.md,
-          background: color.surface2,
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 16,
-          flexShrink: 0,
-        }}
-      >
-        {workspace.emoji || '🏪'}
-      </span>
-      <span
-        style={{
-          fontSize: text.sm,
-          fontWeight: weight.semibold,
-          color: color.text,
-          maxWidth: 180,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {workspace.name}
-      </span>
-      <ChevronDown size={14} color={color.textDim} strokeWidth={2.2} />
+      <span style={{ fontSize: 16, width: 22, textAlign: 'center' }}>{emoji}</span>
+      <span style={{ flex: 1, fontWeight: active ? weight.semibold : weight.medium }}>{name}</span>
+      {active && <Check size={14} color={color.primary} strokeWidth={2.4} />}
     </button>
+  );
+}
+
+function CreateBusinessModal({
+  open,
+  onClose,
+  wid,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  wid: string;
+  onCreated: (b: import('../lib/db/types').Business) => void;
+}) {
+  const [name, setName] = useState('');
+  const [emoji, setEmoji] = useState('🏪');
+
+  const reset = () => {
+    setName('');
+    setEmoji('🏪');
+  };
+
+  const mut = useMutation({
+    mutationFn: () => businessesDb.create(wid, { name: name.trim(), emoji }),
+    onSuccess: (b) => {
+      onCreated(b);
+      reset();
+    },
+  });
+
+  const EMOJIS = ['🏪', '📱', '💻', '🎧', '⌚', '🛒', '💼', '🚀', '🏬', '🔧'];
+
+  return (
+    <Modal
+      open={open}
+      onClose={() => {
+        reset();
+        onClose();
+      }}
+      title="Nuevo negocio"
+      subtitle="Cada negocio tiene su propia caja, ventas y reportes."
+      maxWidth={460}
+      footer={
+        <>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              reset();
+              onClose();
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => mut.mutate()}
+            loading={mut.isPending}
+            disabled={!name.trim() || !wid}
+          >
+            Crear
+          </Button>
+        </>
+      }
+    >
+      <ModalField label="Nombre">
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Ej: iPhone Club Caballito"
+          autoFocus
+        />
+      </ModalField>
+
+      <ModalField label="Emoji">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: space[2] }}>
+          {EMOJIS.map((e) => (
+            <button
+              key={e}
+              onClick={() => setEmoji(e)}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: radius.md,
+                background: emoji === e ? color.primary : color.surface2,
+                border: `1px solid ${emoji === e ? color.primary : color.border}`,
+                fontSize: 18,
+                cursor: 'pointer',
+              }}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      </ModalField>
+    </Modal>
   );
 }
 

@@ -91,7 +91,26 @@ export function Sidebar({ active, onNavigate, collapsed, onToggleCollapse, user 
           borderBottom: `1px solid ${color.border}`,
         }}
       >
-        <ClozrLogo collapsed={collapsed} />
+        {collapsed ? (
+          <button
+            onClick={onToggleCollapse}
+            aria-label="Expandir sidebar"
+            title="Expandir (Cmd+B)"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+            }}
+          >
+            <ClozrLogo collapsed={collapsed} />
+          </button>
+        ) : (
+          <ClozrLogo collapsed={collapsed} />
+        )}
         {!collapsed && (
           <button
             onClick={onToggleCollapse}

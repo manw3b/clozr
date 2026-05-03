@@ -20,7 +20,8 @@ import { DataTable, applySort, ColumnDef } from '../../components/data-table';
 import { RowActions } from '../../components/data-table/RowActions';
 import { ClientDrawer } from './components/ClientDrawer';
 import { BulkActionBar } from './components/BulkActionBar';
-import { clientsMock, clientDetailsMock, clientDetailMock } from '../../mock/clients';
+import { useClientsList, useClientDetail } from './useClientsData';
+import { useUIStore } from '../../store/uiStore';
 import { color, space, text, weight } from '../../tokens';
 import { formatMoney, formatRelative, formatDaysAgo } from '../../lib/format';
 import type { Client, ClientType, ClientStatus } from '../../types/domain';
@@ -57,10 +58,14 @@ export function Clientes() {
   });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openClientId, setOpenClientId] = useState<string | null>(null);
+  const { setActiveScreen } = useUIStore();
+
+  const { data: clientsData = [] } = useClientsList();
+  const { data: openClientDetail } = useClientDetail(openClientId);
 
   /* ---------- Filtrado ---------- */
   const filtered = useMemo(() => {
-    return clientsMock.filter((c) => {
+    return clientsData.filter((c) => {
       if (typeFilter !== 'todos' && c.type !== typeFilter) return false;
       if (statusFilter !== 'todos' && c.status !== statusFilter) return false;
       if (search.trim()) {
@@ -99,21 +104,14 @@ export function Clientes() {
   }, [filtered, sort]);
 
   /* ---------- Drawer ---------- */
-  const openClient = openClientId
-    ? clientDetailsMock[openClientId] || {
-        ...clientsMock.find((c) => c.id === openClientId)!,
-        sales: [],
-        outstandingDebts: [],
-        activity: [],
-      }
-    : null;
+  const openClient = openClientDetail ?? null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: space[5], height: '100%' }}>
       <PageHeader
         title="Clientes"
-        subtitle={`${filtered.length} de ${clientsMock.length} ${
-          clientsMock.length === 1 ? 'cliente' : 'clientes'
+        subtitle={`${filtered.length} de ${clientsData.length} ${
+          clientsData.length === 1 ? 'cliente' : 'clientes'
         }`}
         actions={
           <>
@@ -212,12 +210,18 @@ export function Clientes() {
         <ClientDrawer
           client={openClient}
           onClose={() => setOpenClientId(null)}
-          onWhatsApp={() => console.log('WhatsApp', openClient.id)}
-          onCall={() => console.log('Call', openClient.id)}
-          onEmail={() => console.log('Email', openClient.id)}
-          onNewSale={() => console.log('New sale', openClient.id)}
-          onEdit={() => console.log('Edit', openClient.id)}
-          onMarkPaid={(id) => console.log('Mark paid', id)}
+          onWhatsApp={() => {
+            if (openClient.phone) {
+              const num = openClient.phone.replace(/\D/g, "");
+              const final = num.startsWith("54") ? num : `54${num}`;
+              window.open(`https://wa.me/${final}`, "_blank");
+            }
+          }}
+          onCall={() => { if (openClient.phone) window.open(`tel:${openClient.phone}`); }}
+          onEmail={() => { if (openClient.email) window.open(`mailto:${openClient.email}`); }}
+          onNewSale={() => setActiveScreen("sales")}
+          onEdit={() => {}}
+          onMarkPaid={() => {}}
         />
       )}
     </div>

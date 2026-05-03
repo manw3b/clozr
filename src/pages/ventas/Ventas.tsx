@@ -21,7 +21,8 @@ import { SalesMetrics } from './components/SalesMetrics';
 import { SalesSparkChart } from './components/SalesSparkChart';
 import { SaleDrawer } from './components/SaleDrawer';
 import { NewSaleModal } from './components/NewSaleModal';
-import { salesMock, buildSalesTimeline } from '../../mock/sales';
+import { buildSalesTimeline } from '../../mock/sales';
+import { useSalesList, useMarkSalePaid } from './useSalesData';
 import { color, space, text, weight } from '../../tokens';
 import { formatMoney, formatRelative } from '../../lib/format';
 import { PAYMENT_METHOD_LABELS } from '../../types/domain';
@@ -42,7 +43,8 @@ const periodFilters = [
 ];
 
 export function Ventas() {
-  const [sales, setSales] = useState<Sale[]>(salesMock);
+  const { data: sales = [] } = useSalesList();
+  const markPaidMut = useMarkSalePaid();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [periodFilter, setPeriodFilter] = useState<string>('30d');
@@ -108,36 +110,13 @@ export function Ventas() {
 
   /* ---------- Handlers ---------- */
   function handleMarkPaid(saleId: string) {
-    setSales((prev) =>
-      prev.map((s) =>
-        s.id === saleId
-          ? { ...s, status: 'paid', paid: s.amount, pending: 0, paidAt: new Date().toISOString() }
-          : s
-      )
-    );
+    markPaidMut.mutate(saleId);
   }
 
-  function handleNewSale(data: any) {
-    const client = salesMock.find((s) => s.clientId === data.clientId);
-    const id = `s${Date.now()}`;
-    setSales((prev) => [
-      {
-        id,
-        number: `V-${String(prev.length + 18).padStart(4, '0')}`,
-        clientId: data.clientId,
-        clientName: client?.clientName || 'Cliente',
-        amount: data.amount,
-        status: data.status,
-        paid: data.paid,
-        pending: data.amount - data.paid,
-        product: data.product,
-        paymentMethod: data.paymentMethod,
-        createdAt: new Date().toISOString(),
-        paidAt: data.status === 'paid' ? new Date().toISOString() : undefined,
-        ownerName: 'Pyter',
-      },
-      ...prev,
-    ]);
+  function handleNewSale(_data: any) {
+    // TODO: wire to salesDb.createSale (needs items/payments shape conversion).
+    // The current schema requires items[] and payments[]; the modal's data shape
+    // is simpler. Will be implemented in a follow-up commit.
     setNewSaleOpen(false);
   }
 

@@ -21,8 +21,9 @@ import { LeadCard } from './components/LeadCard';
 import { SortableLeadCard } from './components/SortableLeadCard';
 import { PipelineColumn, ColumnEmpty } from './components/PipelineColumn';
 import { PipelineMetrics } from './components/PipelineMetrics';
-import { leadsMock, groupLeadsByStage } from '../../mock/leads';
-import { clientDetailsMock, clientsMock } from '../../mock/clients';
+import { groupLeadsByStage } from '../../mock/leads';
+import { usePipelineLeads, useMoveLead } from './usePipelineData';
+import { useClientDetail } from '../clientes/useClientsData';
 import { color, space, text, weight } from '../../tokens';
 import { STAGES } from '../../types/domain';
 import type { Lead, LeadStage } from '../../types/domain';
@@ -35,11 +36,24 @@ const priorityFilters = [
 ];
 
 export function Pipeline() {
-  const [leads, setLeads] = useState<Lead[]>(leadsMock);
+  const { data: dbLeads = [] } = usePipelineLeads();
+  const moveLeadMut = useMoveLead();
   const [search, setSearch] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('todos');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [openClientId, setOpenClientId] = useState<string | null>(null);
+  const { data: openClientDetail } = useClientDetail(openClientId);
+
+  // Local optimistic state for drag&drop reorder. Mutation handles persistence.
+  const [localLeads, setLocalLeads] = useState<Lead[] | null>(null);
+  const leads = localLeads ?? dbLeads;
+  const setLeads = (updater: (prev: Lead[]) => Lead[]) => setLocalLeads(updater(leads));
+
+  // Reset local state when server data changes
+  useMemo(() => {
+    if (!moveLeadMut.isPending) setLocalLeads(null);
+    return null;
+  }, [dbLeads, moveLeadMut.isPending]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -127,19 +141,15 @@ export function Pipeline() {
       return prev;
     });
 
-    // En producción: invocar mutation para persistir el cambio en SQLite (Tauri)
-    console.log('Lead movido:', activeId, '→', leads.find((l) => l.id === activeId)?.stage);
+    // Persist stage change to SQLite
+    const movedLead = leads.find((l) => l.id === activeId);
+    if (movedLead) {
+      moveLeadMut.mutate({ leadId: activeId, newStage: movedLead.stage });
+    }
   }
 
-  /* ---------- Drawer del cliente ---------- */
-  const openClient = openClientId
-    ? clientDetailsMock[openClientId] || {
-        ...clientsMock.find((c) => c.id === openClientId)!,
-        sales: [],
-        outstandingDebts: [],
-        activity: [],
-      }
-    : null;
+  /* ---------- Drawer del cliente (real DB) ---------- */
+  const openClient = openClientDetail ?? null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: space[5], height: '100%' }}>

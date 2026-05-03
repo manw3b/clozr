@@ -7,9 +7,19 @@ import { CashBalanceCard } from './components/CashBalanceCard';
 import { CashFlowCards } from './components/CashFlowCards';
 import { CashMovementsList } from './components/CashMovementsList';
 import { NewMovementModal } from './components/NewMovementModal';
-import { cashSummaryMock } from '../../mock/cash';
 import { space } from '../../tokens';
-import type { CashMovement, CashMovementKind } from '../../types/domain';
+import { useCashSummary, useCreateMovement } from './useCashData';
+import type { CashSummary, CashMovementKind } from '../../types/domain';
+
+const EMPTY_SUMMARY: CashSummary = {
+  date: new Date().toISOString().slice(0, 10),
+  openingBalance: { ars: 0, usd: 0 },
+  totalIncome: { ars: 0, usd: 0 },
+  totalExpense: { ars: 0, usd: 0 },
+  currentBalance: { ars: 0, usd: 0 },
+  usdRate: 1,
+  movements: [],
+};
 
 const periodFilters = [
   { value: 'today', label: 'Hoy' },
@@ -24,7 +34,8 @@ const kindFilters: { value: 'todos' | CashMovementKind; label: string }[] = [
 ];
 
 export function Caja() {
-  const [summary, setSummary] = useState(cashSummaryMock);
+  const { data: summary = EMPTY_SUMMARY } = useCashSummary();
+  const createMovementMut = useCreateMovement();
   const [period, setPeriod] = useState('today');
   const [kindFilter, setKindFilter] = useState<string>('todos');
   const [newMovOpen, setNewMovOpen] = useState(false);
@@ -35,42 +46,16 @@ export function Caja() {
   });
 
   function handleNewMovement(data: any) {
-    const newMov: CashMovement = {
-      id: `m${Date.now()}`,
-      kind: data.kind,
-      amount: data.amount,
-      currency: data.currency,
-      description: data.description,
-      category: data.category,
-      paymentMethod: data.paymentMethod,
-      createdAt: new Date().toISOString(),
-      by: 'Pyter',
-    };
-
-    setSummary((prev) => {
-      const movements = [newMov, ...prev.movements];
-      const totalIncomeArs =
-        prev.totalIncome.ars + (data.kind === 'income' && data.currency === 'ARS' ? data.amount : 0);
-      const totalIncomeUsd =
-        prev.totalIncome.usd + (data.kind === 'income' && data.currency === 'USD' ? data.amount : 0);
-      const totalExpenseArs =
-        prev.totalExpense.ars + (data.kind === 'expense' && data.currency === 'ARS' ? data.amount : 0);
-      const totalExpenseUsd =
-        prev.totalExpense.usd + (data.kind === 'expense' && data.currency === 'USD' ? data.amount : 0);
-
-      return {
-        ...prev,
-        movements,
-        totalIncome: { ars: totalIncomeArs, usd: totalIncomeUsd },
-        totalExpense: { ars: totalExpenseArs, usd: totalExpenseUsd },
-        currentBalance: {
-          ars: prev.openingBalance.ars + totalIncomeArs - totalExpenseArs,
-          usd: prev.openingBalance.usd + totalIncomeUsd - totalExpenseUsd,
-        },
-      };
-    });
-
-    setNewMovOpen(false);
+    createMovementMut.mutate(
+      {
+        kind: data.kind,
+        amount: data.amount,
+        currency: data.currency,
+        category: data.category,
+        description: data.description ?? '',
+      },
+      { onSuccess: () => setNewMovOpen(false) },
+    );
   }
 
   return (

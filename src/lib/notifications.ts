@@ -32,22 +32,32 @@ async function getCounts(workspaceId: string): Promise<{
 }> {
   if (!workspaceId) return { counts: { overdueTasks: 0, overdueCollections: 0, stuckLeads: 0, total: 0 }, items: [] };
 
+  // Defensivo: cada query envuelta en try/catch para que si una tabla/columna
+  // no existe en una DB vieja, las otras notificaciones sigan funcionando y
+  // no rompamos toda la app con un toast de error global.
+  const safeSelect = async <T>(sql: string, params: unknown[]): Promise<T[]> => {
+    try {
+      return await dbSelect<T>(sql, params);
+    } catch {
+      return [];
+    }
+  };
   const [tasks, collections, leads] = await Promise.all([
-    dbSelect<{ id: string; title: string; due_at: string }>(
+    safeSelect<{ id: string; title: string; due_at: string }>(
       `SELECT id, title, due_at FROM tasks
        WHERE workspace_id = ? AND completed = 0 AND type = 'puntual'
          AND due_at IS NOT NULL AND date(due_at) < date('now')
        ORDER BY due_at ASC LIMIT 20`,
       [workspaceId],
     ),
-    dbSelect<{ id: string; customer_name: string | null; balance: number; created_at: string }>(
+    safeSelect<{ id: string; customer_name: string | null; balance: number; created_at: string }>(
       `SELECT id, customer_name, balance, created_at FROM sales
        WHERE workspace_id = ? AND is_paid = 0 AND balance > 0
          AND date(created_at) < date('now', '-30 days')
        ORDER BY created_at ASC LIMIT 20`,
       [workspaceId],
     ),
-    dbSelect<{ id: string; customer_name: string | null; stage_name: string; updated_at: string }>(
+    safeSelect<{ id: string; customer_name: string | null; stage_name: string; updated_at: string }>(
       `SELECT id, customer_name, stage_name, updated_at FROM pipeline_items
        WHERE workspace_id = ? AND status = 'open'
          AND CAST((julianday('now') - julianday(COALESCE(updated_at, created_at))) AS INTEGER) >= 7

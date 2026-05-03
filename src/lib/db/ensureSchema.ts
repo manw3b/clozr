@@ -502,6 +502,9 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
   await safe(() => dbExecute(`ALTER TABLE pipeline_items ADD COLUMN short_note TEXT`));
   await safe(() => dbExecute(`ALTER TABLE pipeline_items ADD COLUMN priority TEXT`));
   await safe(() => dbExecute(`ALTER TABLE pipeline_items ADD COLUMN position INTEGER`));
+  // customer_name denormalizado (varios queries lo SELECTean, pero ninguna
+  // migración nativa la define; defensivo)
+  await safe(() => dbExecute(`ALTER TABLE pipeline_items ADD COLUMN customer_name TEXT`));
 
   // ════════════════════════════════════════════════════════════
   // 022 — sales.payment_method

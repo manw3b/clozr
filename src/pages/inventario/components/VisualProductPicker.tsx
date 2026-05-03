@@ -10,6 +10,7 @@ import {
   getModels,
   getColorsForModel,
   getStorageForColor,
+  resolveVariant,
   type ProductCategory,
   type ProductFamily,
   type ProductModel,
@@ -40,6 +41,8 @@ interface Picked {
   color?: string;
   colorHex?: string | null;
   storage?: string | null;
+  /** image del variante seleccionado (cae al modelo si no existe) */
+  variantImage?: string | null;
 }
 
 export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToManual }: Props) {
@@ -103,12 +106,16 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
     mutationFn: async () => {
       if (!picked.category || !picked.model) throw new Error("Faltan datos");
       await ensurePricingSchema();
+      // Imagen final: variante > modelo (variantes Apple suelen no tener
+      // image_path propio, así que en la práctica usa la del modelo, pero
+      // si llegara a haber variant.image_path se prioriza).
+      const finalImage = picked.variantImage ?? picked.model.image_path ?? undefined;
       const item = await catalogDb.create(wid, {
         name: finalName,
         category: picked.category.name,
         track_stock: true,
         currency: "ARS",
-        image_path: picked.model.image_path ?? undefined,
+        image_path: finalImage,
       });
       const cost = parseFloat(costUsd);
       if (Number.isFinite(cost) && cost > 0) {
@@ -158,8 +165,17 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
     setPicked((p) => ({ ...p, color: color_, colorHex: color_hex, storage: undefined }));
     setStep("storage");
   };
-  const pickStorage = (s: string | null) => {
+  const pickStorage = async (s: string | null) => {
     setPicked((p) => ({ ...p, storage: s }));
+    // Resolver el variant para obtener su image_path (si existe)
+    if (picked.model && picked.color) {
+      try {
+        const v = await resolveVariant(picked.model.id, picked.color, s);
+        setPicked((p) => ({ ...p, variantImage: v?.image_path ?? null }));
+      } catch {
+        /* ignore */
+      }
+    }
     setStep("confirm");
   };
 
@@ -268,6 +284,7 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
           name={finalName}
           model={picked.model}
           colorHex={picked.colorHex ?? null}
+          variantImage={picked.variantImage ?? null}
           costUsd={costUsd}
           onCostChange={setCostUsd}
         />
@@ -340,17 +357,20 @@ function PickCard({
   onClick,
   children,
   height = 140,
+  featured = false,
 }: {
   onClick: () => void;
   children: React.ReactNode;
   height?: number;
+  featured?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       style={{
+        position: "relative",
         background: color.surface,
-        border: `1px solid ${color.border}`,
+        border: `1px solid ${featured ? color.primary : color.border}`,
         borderRadius: radius.md,
         padding: space[3],
         height,
@@ -362,13 +382,14 @@ function PickCard({
         cursor: "pointer",
         transition: "all 120ms",
         textAlign: "center",
+        boxShadow: featured ? `0 0 0 3px rgba(225, 29, 72, 0.15)` : "none",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = color.primary;
         e.currentTarget.style.background = color.surfaceHover;
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = color.border;
+        e.currentTarget.style.borderColor = featured ? color.primary : color.border;
         e.currentTarget.style.background = color.surface;
       }}
     >
@@ -439,10 +460,31 @@ function ModelGrid({
   if (models.length === 0) return <Empty msg="Sin modelos." />;
   return (
     <div style={gridStyle(180)}>
-      {models.map((m) => {
+      {models.map((m, idx) => {
         const img = getTemplateImageUrl(m.image_path);
+        const featured = idx === 0; // primero por sort_order = más reciente/tendencia
         return (
-          <PickCard key={m.id} onClick={() => onPick(m)} height={180}>
+          <PickCard key={m.id} onClick={() => onPick(m)} height={196} featured={featured}>
+            {featured && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: 6,
+                  right: 6,
+                  fontSize: 10,
+                  fontWeight: weight.bold,
+                  color: color.primary,
+                  background: color.surface,
+                  border: `1px solid ${color.primary}`,
+                  borderRadius: radius.sm,
+                  padding: "2px 6px",
+                  letterSpacing: "0.4px",
+                  textTransform: "uppercase",
+                }}
+              >
+                Tendencia
+              </span>
+            )}
             <div
               style={{
                 flex: 1,
@@ -551,16 +593,19 @@ function ConfirmPanel({
   name,
   model,
   colorHex,
+  variantImage,
   costUsd,
   onCostChange,
 }: {
   name: string;
   model: ProductModel;
   colorHex: string | null;
+  variantImage: string | null;
   costUsd: string;
   onCostChange: (v: string) => void;
 }) {
-  const img = getTemplateImageUrl(model.image_path);
+  // Variante > modelo
+  const img = getTemplateImageUrl(variantImage) ?? getTemplateImageUrl(model.image_path);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: space[4] }}>
       <div

@@ -14,6 +14,7 @@ import { useUIStore } from "../../store/uiStore";
 import { color, space, text, weight } from "../../tokens";
 import { formatMoney } from "../../lib/format";
 import { resolveImageUrl } from "../../lib/images";
+import { getTemplateImageUrl } from "../../lib/templates/productImageMap";
 import { useEffect } from "react";
 import type { CatalogItemWithImeis } from "../../lib/db/types";
 import { ProductDetailDrawer } from "./components/ProductDetailDrawer";
@@ -201,9 +202,18 @@ function ProductCard({ item, onClick }: { item: CatalogItemWithImeis; onClick: (
   const [imgUrl, setImgUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (item.image_path) {
-      resolveImageUrl(item.image_path).then(setImgUrl).catch(() => setImgUrl(null));
+    if (!item.image_path) {
+      setImgUrl(null);
+      return;
     }
+    // 1) Catálogo built-in (Apple): paths empiezan con /src/assets/products/
+    const templateUrl = getTemplateImageUrl(item.image_path);
+    if (templateUrl) {
+      setImgUrl(templateUrl);
+      return;
+    }
+    // 2) Imágenes subidas por el usuario (appData)
+    resolveImageUrl(item.image_path).then(setImgUrl).catch(() => setImgUrl(null));
   }, [item.image_path]);
 
   return (

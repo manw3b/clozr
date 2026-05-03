@@ -11,6 +11,7 @@ import { useWorkspaceStore } from "../../../store/workspaceStore";
 import { color, radius, space, text, weight } from "../../../tokens";
 import { formatMoney } from "../../../lib/format";
 import { resolveImageUrl } from "../../../lib/images";
+import { getTemplateImageUrl } from "../../../lib/templates/productImageMap";
 import type { CatalogItemWithImeis } from "../../../lib/db/types";
 
 interface Props {
@@ -33,9 +34,13 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onSellUnit }: Props
 
   useEffect(() => {
     setImgUrl(null);
-    if (item?.image_path) {
-      resolveImageUrl(item.image_path).then(setImgUrl).catch(() => setImgUrl(null));
+    if (!item?.image_path) return;
+    const templateUrl = getTemplateImageUrl(item.image_path);
+    if (templateUrl) {
+      setImgUrl(templateUrl);
+      return;
     }
+    resolveImageUrl(item.image_path).then(setImgUrl).catch(() => setImgUrl(null));
   }, [item?.image_path]);
 
   const imeisQ = useQuery({

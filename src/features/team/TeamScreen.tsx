@@ -150,7 +150,7 @@ export default function TeamScreen() {
     textAlign: "left",
     fontSize: 13,
     fontWeight: 600,
-    color: "var(--text-secondary)",
+    color: "var(--text-muted)",
     whiteSpace: "nowrap",
     position: "sticky",
     top: 0,
@@ -161,7 +161,7 @@ export default function TeamScreen() {
   const TD: React.CSSProperties = {
     padding: "12px 16px",
     fontSize: 13.5,
-    color: "var(--text-primary)",
+    color: "var(--text)",
     borderBottom: "1px solid var(--border)",
     verticalAlign: "middle",
   };
@@ -172,7 +172,7 @@ export default function TeamScreen() {
     background: "var(--surface-2)",
     border: "1px solid var(--border)",
     borderRadius: 8,
-    color: "var(--text-primary)",
+    color: "var(--text)",
     fontSize: 13.5,
     outline: "none",
     boxSizing: "border-box",
@@ -186,14 +186,14 @@ export default function TeamScreen() {
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "24px 28px 0", flexShrink: 0,
       }}>
-        <h1 style={{ fontSize: 25, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>
+        <h1 style={{ fontSize: 25, fontWeight: 700, color: "var(--text)", letterSpacing: -0.5 }}>
           Equipo
         </h1>
         <button
           onClick={() => setModal({ type: "add" })}
           style={{
             display: "flex", alignItems: "center", gap: 6,
-            height: 34, padding: "7px 14px", background: "var(--brand)",
+            height: 34, padding: "7px 14px", background: "var(--primary)",
             borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff",
             transition: "background 0.12s ease",
           }}
@@ -211,8 +211,8 @@ export default function TeamScreen() {
           { label: "Vendedores", value: vendedorCount },
         ].map((card) => (
           <div key={card.label} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
-            <p style={{ fontSize: 12.5, color: "var(--text-secondary)", fontWeight: 500, marginBottom: 6 }}>{card.label}</p>
-            <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>{card.value}</p>
+            <p style={{ fontSize: 12.5, color: "var(--text-muted)", fontWeight: 500, marginBottom: 6 }}>{card.label}</p>
+            <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", letterSpacing: -0.5 }}>{card.value}</p>
           </div>
         ))}
       </div>
@@ -220,7 +220,7 @@ export default function TeamScreen() {
       {/* Table */}
       <div style={{ flex: 1, overflow: "auto", padding: "24px 28px" }}>
         {isLoading ? (
-          <div style={{ padding: 24, color: "var(--text-tertiary)", fontSize: 13.5 }}>Cargando...</div>
+          <div style={{ padding: 24, color: "var(--text-dim)", fontSize: 13.5 }}>Cargando...</div>
         ) : (
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -248,13 +248,13 @@ export default function TeamScreen() {
                             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                               <span style={{ fontWeight: 500 }}>{member.name}</span>
                               {isMe && (
-                                <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", background: "var(--surface-2)", color: "var(--text-tertiary)", borderRadius: 4 }}>
+                                <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", background: "var(--surface-2)", color: "var(--text-dim)", borderRadius: 4 }}>
                                   Vos
                                 </span>
                               )}
                             </div>
                             {member.notes && (
-                              <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }} title={member.notes}>
+                              <p style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 1 }} title={member.notes}>
                                 {member.notes.length > 40 ? member.notes.slice(0, 40) + "…" : member.notes}
                               </p>
                             )}
@@ -263,10 +263,10 @@ export default function TeamScreen() {
                       </td>
 
                       {/* Email */}
-                      <td style={{ ...TD, color: "var(--text-secondary)" }}>{member.email}</td>
+                      <td style={{ ...TD, color: "var(--text-muted)" }}>{member.email}</td>
 
                       {/* Teléfono */}
-                      <td style={{ ...TD, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                      <td style={{ ...TD, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
                         {member.phone ? (
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                             <span>{member.phone}</span>
@@ -281,7 +281,7 @@ export default function TeamScreen() {
                             </a>
                           </div>
                         ) : (
-                          <span style={{ color: "var(--text-tertiary)" }}>—</span>
+                          <span style={{ color: "var(--text-dim)" }}>—</span>
                         )}
                       </td>
 
@@ -293,12 +293,12 @@ export default function TeamScreen() {
                       </td>
 
                       {/* Descripción del rol */}
-                      <td style={{ ...TD, color: "var(--text-secondary)", fontSize: 12 }}>
+                      <td style={{ ...TD, color: "var(--text-muted)", fontSize: 12 }}>
                         {member.role_description ?? "—"}
                       </td>
 
                       {/* Fecha */}
-                      <td style={{ ...TD, color: "var(--text-secondary)", fontSize: 12 }}>
+                      <td style={{ ...TD, color: "var(--text-muted)", fontSize: 12 }}>
                         {new Date(member.joined_at).toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" })}
                       </td>
 
@@ -306,16 +306,16 @@ export default function TeamScreen() {
                       <td style={TD}>
                         {isConfirming ? (
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>¿Eliminar?</span>
-                            <button onClick={() => removeMutation.mutate(member.user_id)} style={{ fontSize: 12, fontWeight: 600, color: "var(--brand)", padding: "3px 8px", background: "rgba(232,0,29,0.1)", borderRadius: 5 }}>Sí</button>
-                            <button onClick={() => setConfirmDeleteId(null)} style={{ fontSize: 12, color: "var(--text-tertiary)", padding: "3px 8px" }}>No</button>
+                            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>¿Eliminar?</span>
+                            <button onClick={() => removeMutation.mutate(member.user_id)} style={{ fontSize: 12, fontWeight: 600, color: "var(--primary)", padding: "3px 8px", background: "rgba(232,0,29,0.1)", borderRadius: 5 }}>Sí</button>
+                            <button onClick={() => setConfirmDeleteId(null)} style={{ fontSize: 12, color: "var(--text-dim)", padding: "3px 8px" }}>No</button>
                           </div>
                         ) : (
                           <div style={{ display: "flex", gap: 6 }}>
                             {!isOwner && (
                               <button
                                 onClick={() => openRoleModal(member)}
-                                style={{ padding: "5px 12px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--border)", fontSize: 12.5, color: "var(--text-secondary)", fontWeight: 600, transition: "background 0.12s ease" }}
+                                style={{ padding: "5px 12px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--border)", fontSize: 12.5, color: "var(--text-muted)", fontWeight: 600, transition: "background 0.12s ease" }}
                               >
                                 Cambiar rol
                               </button>
@@ -323,7 +323,7 @@ export default function TeamScreen() {
                             <button
                               onClick={() => !isOwner && setConfirmDeleteId(member.user_id)}
                               disabled={isOwner}
-                              style={{ padding: "5px 12px", borderRadius: 8, background: "transparent", fontSize: 12.5, fontWeight: 600, color: isOwner ? "var(--text-tertiary)" : "var(--brand)", opacity: isOwner ? 0.4 : 1, cursor: isOwner ? "not-allowed" : "pointer", transition: "background 0.12s ease" }}
+                              style={{ padding: "5px 12px", borderRadius: 8, background: "transparent", fontSize: 12.5, fontWeight: 600, color: isOwner ? "var(--text-dim)" : "var(--primary)", opacity: isOwner ? 0.4 : 1, cursor: isOwner ? "not-allowed" : "pointer", transition: "background 0.12s ease" }}
                             >
                               Eliminar
                             </button>
@@ -349,19 +349,19 @@ export default function TeamScreen() {
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Nombre completo *</label>
+              <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>Nombre completo *</label>
               <input value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="Ej: Ana García" style={inputStyle} autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Email *</label>
+              <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>Email *</label>
               <input type="email" value={addEmail} onChange={(e) => setAddEmail(e.target.value)} placeholder="ana@ejemplo.com" style={inputStyle} />
             </div>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Teléfono</label>
+              <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>Teléfono</label>
               <input type="tel" value={addPhone} onChange={(e) => setAddPhone(e.target.value)} placeholder="+54 9 11..." style={inputStyle} />
             </div>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Rol en el equipo</label>
+              <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>Rol en el equipo</label>
               <Select
                 value={addRole}
                 onChange={(v) => setAddRole(v as Exclude<MemberRole, "owner">)}
@@ -371,12 +371,12 @@ export default function TeamScreen() {
           </div>
 
           <div>
-            <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Descripción del rol</label>
+            <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>Descripción del rol</label>
             <input value={addRoleDesc} onChange={(e) => setAddRoleDesc(e.target.value)} placeholder="Ej: Vendedor zona norte" style={inputStyle} />
           </div>
 
           <div>
-            <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 8, display: "block" }}>Color de avatar</label>
+            <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)", marginBottom: 8, display: "block" }}>Color de avatar</label>
             <div style={{ display: "flex", gap: 8 }}>
               {AVATAR_COLORS.map((c) => (
                 <button
@@ -396,7 +396,7 @@ export default function TeamScreen() {
           </div>
 
           <div>
-            <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Notas internas</label>
+            <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>Notas internas</label>
             <textarea
               value={addNotes}
               onChange={(e) => setAddNotes(e.target.value)}
@@ -407,18 +407,18 @@ export default function TeamScreen() {
           </div>
 
           {addError && (
-            <p style={{ fontSize: 12, color: "var(--brand)", padding: "8px 12px", background: "rgba(232,0,29,0.1)", borderRadius: 6 }}>
+            <p style={{ fontSize: 12, color: "var(--primary)", padding: "8px 12px", background: "rgba(232,0,29,0.1)", borderRadius: 6 }}>
               {addError}
             </p>
           )}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
-            <button onClick={() => { setModal(null); resetAddForm(); }} style={{ height: 34, padding: "7px 14px", background: "var(--surface-2)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)", transition: "background 0.12s ease" }}>
+            <button onClick={() => { setModal(null); resetAddForm(); }} style={{ height: 34, padding: "7px 14px", background: "var(--surface-2)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)", transition: "background 0.12s ease" }}>
               Cancelar
             </button>
             <button
               onClick={handleAdd}
               disabled={addSubmitting}
-              style={{ height: 34, padding: "7px 14px", background: "var(--brand)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff", opacity: addSubmitting ? 0.6 : 1, transition: "background 0.12s ease" }}
+              style={{ height: 34, padding: "7px 14px", background: "var(--primary)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff", opacity: addSubmitting ? 0.6 : 1, transition: "background 0.12s ease" }}
             >
               {addSubmitting ? "Agregando..." : "Agregar miembro"}
             </button>
@@ -431,11 +431,11 @@ export default function TeamScreen() {
         {modal?.type === "role" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div style={{ padding: "10px 12px", background: "var(--surface-2)", borderRadius: 8 }}>
-              <p style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>{modal.member.name}</p>
-              <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>{modal.member.email}</p>
+              <p style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>{modal.member.name}</p>
+              <p style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>{modal.member.email}</p>
             </div>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Nuevo rol</label>
+              <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>Nuevo rol</label>
               <Select
                 value={newRole}
                 onChange={(v) => setNewRole(v as Exclude<MemberRole, "owner">)}
@@ -443,11 +443,11 @@ export default function TeamScreen() {
               />
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
-              <button onClick={() => setModal(null)} style={{ height: 34, padding: "7px 14px", background: "var(--surface-2)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)", transition: "background 0.12s ease" }}>Cancelar</button>
+              <button onClick={() => setModal(null)} style={{ height: 34, padding: "7px 14px", background: "var(--surface-2)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)", transition: "background 0.12s ease" }}>Cancelar</button>
               <button
                 onClick={() => roleMutation.mutate({ uid: modal.member.user_id, role: newRole })}
                 disabled={roleMutation.isPending}
-                style={{ height: 34, padding: "7px 14px", background: "var(--brand)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff", opacity: roleMutation.isPending ? 0.6 : 1, transition: "background 0.12s ease" }}
+                style={{ height: 34, padding: "7px 14px", background: "var(--primary)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff", opacity: roleMutation.isPending ? 0.6 : 1, transition: "background 0.12s ease" }}
               >
                 {roleMutation.isPending ? "Guardando..." : "Cambiar rol"}
               </button>

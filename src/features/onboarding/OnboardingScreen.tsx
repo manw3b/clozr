@@ -6,30 +6,26 @@ import { workspaceDb } from "../../lib/db/workspace";
 import { dbExecute } from "../../lib/db/index";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useAuthStore } from "../../store/authStore";
-import logoImg from "../../assets/logo.png";
+import { Input } from "../../components/Input";
+import { Button } from "../../components/Button";
+import { color, radius, space, text, weight } from "../../tokens";
+import { errorMessage } from "../../lib/logger";
+import logoIsotipo from "../../assets/logo-isotipo.svg";
 
 const schema = z.object({
   businessName: z.string().min(2, "Mínimo 2 caracteres").max(50, "Máximo 50 caracteres"),
   userName: z.string().min(2, "Mínimo 2 caracteres").max(50, "Máximo 50 caracteres"),
-  userEmail: z.string().optional().nullable()
-    .refine((v) => !v || z.string().email().safeParse(v).success, "Email inválido"),
+  userEmail: z
+    .string()
+    .optional()
+    .nullable()
+    .refine(
+      (v) => !v || z.string().email().safeParse(v).success,
+      "Email inválido",
+    ),
 });
 
 type FormValues = z.infer<typeof schema>;
-
-function inputStyle(hasError: boolean): React.CSSProperties {
-  return {
-    width: "100%",
-    padding: "12px 14px",
-    background: "var(--surface)",
-    border: `1px solid ${hasError ? "var(--brand)" : "var(--border-strong)"}`,
-    borderRadius: 10,
-    color: "var(--text-primary)",
-    fontSize: 14.5,
-    outline: "none",
-    transition: "border-color 0.15s ease, background 0.15s ease",
-  };
-}
 
 export default function OnboardingScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,9 +59,7 @@ export default function OnboardingScreen() {
       setUser(userId, data.userName);
       addWorkspace(workspace);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Error al crear el espacio de trabajo",
-      );
+      setError(errorMessage(err, "Error al crear el espacio de trabajo"));
     } finally {
       setIsSubmitting(false);
     }
@@ -74,151 +68,101 @@ export default function OnboardingScreen() {
   return (
     <div
       style={{
-        height: "100vh",
+        minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "32px 24px",
-        background: "var(--bg)",
+        padding: `${space[10]} ${space[6]}`,
+        background: color.bg,
+        gap: space[8],
       }}
     >
-      <div style={{ marginBottom: 48, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
-        <img src={logoImg} alt="Clozr" style={{ height: 64, width: "auto", objectFit: "contain" }} />
-        <p
-          style={{
-            color: "var(--text-secondary)",
-            fontSize: 15,
-          }}
-        >
-          Tu CRM de ventas
-        </p>
+      <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: space[3] }}>
+        <img src={logoIsotipo} alt="Clozr" style={{ height: 64 }} />
+        <div>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: text["2xl"],
+              fontWeight: weight.bold,
+              color: color.text,
+              letterSpacing: "-0.5px",
+            }}
+          >
+            Bienvenido a Clozr
+          </h1>
+          <p style={{ marginTop: space[1], fontSize: text.sm, color: color.textMuted }}>
+            Tu CRM de ventas — empezá en 30 segundos
+          </p>
+        </div>
       </div>
 
       <form
         onSubmit={handleSubmit(onSubmit)}
         style={{
           width: "100%",
-          maxWidth: 360,
+          maxWidth: 380,
           display: "flex",
           flexDirection: "column",
-          gap: 16,
+          gap: space[4],
+          padding: space[6],
+          background: color.surface,
+          border: `1px solid ${color.border}`,
+          borderRadius: radius.xl,
         }}
       >
-        <div>
-          <label
-            style={{
-              display: "block",
-              color: "var(--text-secondary)",
-              fontSize: 12,
-              fontWeight: 600,
-              marginBottom: 8,
-            }}
-          >
-            Nombre del negocio
-          </label>
-          <input
-            {...register("businessName")}
-            placeholder="Ej: Electrónica García"
-            autoComplete="off"
-            style={inputStyle(!!errors.businessName)}
-          />
-          {errors.businessName && (
-            <p
-              style={{
-                color: "var(--brand-light)",
-                fontSize: 12,
-                marginTop: 5,
-              }}
-            >
-              {errors.businessName.message}
-            </p>
-          )}
-        </div>
+        <Input
+          label="Nombre del negocio"
+          {...register("businessName")}
+          placeholder="Ej: Electrónica García"
+          autoComplete="off"
+          error={errors.businessName?.message}
+        />
 
-        <div>
-          <label
-            style={{
-              display: "block",
-              color: "var(--text-secondary)",
-              fontSize: 12,
-              fontWeight: 600,
-              marginBottom: 8,
-            }}
-          >
-            Tu nombre
-          </label>
-          <input
-            {...register("userName")}
-            placeholder="Ej: Carlos"
-            autoComplete="off"
-            style={inputStyle(!!errors.userName)}
-          />
-          {errors.userName && (
-            <p style={{ color: "var(--brand-light)", fontSize: 12, marginTop: 5 }}>
-              {errors.userName.message}
-            </p>
-          )}
-        </div>
+        <Input
+          label="Tu nombre"
+          {...register("userName")}
+          placeholder="Ej: Carlos"
+          autoComplete="off"
+          error={errors.userName?.message}
+        />
 
-        <div>
-          <label
-            style={{
-              display: "block",
-              color: "var(--text-secondary)",
-              fontSize: 12,
-              fontWeight: 600,
-              marginBottom: 8,
-            }}
-          >
-            Tu email <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>(opcional)</span>
-          </label>
-          <input
-            {...register("userEmail")}
-            type="email"
-            placeholder="tu@email.com"
-            autoComplete="email"
-            style={inputStyle(!!errors.userEmail)}
-          />
-          {errors.userEmail && (
-            <p style={{ color: "var(--brand-light)", fontSize: 12, marginTop: 5 }}>
-              {errors.userEmail.message}
-            </p>
-          )}
-        </div>
+        <Input
+          label="Tu email"
+          type="email"
+          {...register("userEmail")}
+          placeholder="tu@email.com (opcional)"
+          autoComplete="email"
+          error={errors.userEmail?.message}
+          hint="Opcional — podés agregarlo después"
+        />
 
         {error && (
-          <p
+          <div
             style={{
-              color: "var(--brand-light)",
-              fontSize: 13,
-              padding: "10px 12px",
-              background: "var(--red-bg)",
-              borderRadius: 8,
-              border: "1px solid rgba(232,0,29,0.3)",
+              fontSize: text.sm,
+              padding: space[3],
+              background: color.dangerBg,
+              border: `1px solid ${color.danger}`,
+              borderRadius: radius.md,
+              color: color.danger,
             }}
           >
             {error}
-          </p>
+          </div>
         )}
 
-        <button
+        <Button
           type="submit"
-          disabled={isSubmitting}
-          style={{
-            marginTop: 8,
-            padding: "14px",
-            background: isSubmitting ? "var(--surface-3)" : "var(--brand)",
-            color: isSubmitting ? "var(--text-tertiary)" : "#fff",
-            borderRadius: 12,
-            fontSize: 15,
-            fontWeight: 600,
-            cursor: isSubmitting ? "not-allowed" : "pointer",
-            transition: "background 0.15s, color 0.15s",
-          }}
+          variant="primary"
+          size="lg"
+          fullWidth
+          loading={isSubmitting}
+          style={{ marginTop: space[2] }}
         >
-          {isSubmitting ? "Creando..." : "Empezar"}
-        </button>
+          {isSubmitting ? "Creando…" : "Empezar"}
+        </Button>
       </form>
     </div>
   );

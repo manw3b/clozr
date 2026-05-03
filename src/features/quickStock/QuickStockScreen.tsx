@@ -434,12 +434,12 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
         {parts.map((p, i) => (
           <span key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            {i > 0 && <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>/</span>}
+            {i > 0 && <span style={{ color: "var(--text-muted)", fontSize: 12 }}>/</span>}
             <button
               onClick={p.onClick}
               style={{
                 fontSize: 12,
-                color: i === parts.length - 1 ? "var(--text-primary)" : "var(--brand)",
+                color: i === parts.length - 1 ? "var(--text)" : "var(--primary)",
                 fontWeight: i === parts.length - 1 ? 600 : 400,
                 background: "none",
                 cursor: "pointer",
@@ -488,7 +488,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                   transition: "border-color 0.15s, transform 0.1s",
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--brand)";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--primary)";
                   (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
                 }}
                 onMouseLeave={(e) => {
@@ -499,7 +499,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                 <span style={{ fontSize: cat.id === "cat-iphone" ? 48 : 36 }}>
                   {cat.emoji}
                 </span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
                   {cat.name}
                 </span>
               </button>
@@ -530,7 +530,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                   textAlign: "left",
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--brand)";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--primary)";
                   (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-2)";
                 }}
                 onMouseLeave={(e) => {
@@ -538,10 +538,10 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                   (e.currentTarget as HTMLButtonElement).style.background = "var(--surface)";
                 }}
               >
-                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
                   {fam.name}
                 </span>
-                <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>›</span>
+                <span style={{ fontSize: 12, color: "var(--text-muted)" }}>›</span>
               </button>
             ))}
           </div>
@@ -570,7 +570,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                   transition: "border-color 0.15s, transform 0.1s",
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--brand)";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--primary)";
                   (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
                 }}
                 onMouseLeave={(e) => {
@@ -579,7 +579,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                 }}
               >
                 <ProductImage path={model.image_path} size={120} alt={model.name} />
-                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", textAlign: "center" }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", textAlign: "center" }}>
                   {model.name}
                 </span>
               </button>
@@ -607,14 +607,14 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                   📱
                 </div>
               )}
-              <p style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", textAlign: "center" }}>
+              <p style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", textAlign: "center" }}>
                 {selectedModel?.name}
               </p>
             </div>
 
             {/* Color */}
             <div>
-              <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 Color
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -642,12 +642,12 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                           borderRadius: "50%",
                           background: c.color_hex ?? "#888",
                           border: selected
-                            ? "2px solid var(--brand)"
+                            ? "2px solid var(--primary)"
                             : "2px solid var(--border)",
                           transform: selected ? "scale(1.25)" : hovered ? "scale(1.1)" : "scale(1)",
                           transition: "transform 0.15s, border-color 0.15s",
                           cursor: "pointer",
-                          boxShadow: selected ? "0 0 0 2px var(--bg), 0 0 0 4px var(--brand)" : "none",
+                          boxShadow: selected ? "0 0 0 2px var(--bg), 0 0 0 4px var(--primary)" : "none",
                         }}
                       />
                       {hovered && (
@@ -657,7 +657,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                             bottom: "calc(100% + 6px)",
                             left: "50%",
                             transform: "translateX(-50%)",
-                            background: "var(--text-primary)",
+                            background: "var(--text)",
                             color: "var(--bg)",
                             fontSize: 11,
                             fontWeight: 500,
@@ -676,7 +676,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                 })}
               </div>
               {selectedColor && (
-                <p style={{ marginTop: 8, fontSize: 12, color: "var(--text-secondary)" }}>
+                <p style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)" }}>
                   {selectedColor}
                 </p>
               )}
@@ -685,7 +685,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
             {/* Storage chips — only when there are real (non-null) options */}
             {selectedColor && storages.length > 0 && (
               <div>
-                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   Capacidad
                 </p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -700,9 +700,9 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                           borderRadius: 20,
                           fontSize: 13,
                           fontWeight: 600,
-                          background: sel ? "var(--brand)" : "var(--surface-2)",
-                          color: sel ? "#fff" : "var(--text-primary)",
-                          border: sel ? "1.5px solid var(--brand)" : "1.5px solid var(--border)",
+                          background: sel ? "var(--primary)" : "var(--surface-2)",
+                          color: sel ? "#fff" : "var(--text)",
+                          border: sel ? "1.5px solid var(--primary)" : "1.5px solid var(--border)",
                           cursor: "pointer",
                           transition: "background 0.15s, color 0.15s",
                         }}
@@ -723,7 +723,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                 style={{
                   width: "100%",
                   padding: "13px",
-                  background: "var(--brand)",
+                  background: "var(--primary)",
                   color: "#fff",
                   borderRadius: 10,
                   fontSize: 14,
@@ -770,7 +770,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                 );
               })()}
               <div>
-                <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
                   {selectedModel?.name}
                 </p>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
@@ -787,7 +787,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                       }}
                     />
                   )}
-                  <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                  <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
                     {selectedColor} · {selectedStorage}
                   </span>
                 </div>
@@ -796,7 +796,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
 
             {/* IMEI Input */}
             <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 IMEI
               </label>
               <div style={{ position: "relative" }}>
@@ -820,7 +820,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                       imeiError ? "var(--red, #ef4444)" : imeiValid ? "var(--green, #22c55e)" : "var(--border-strong)"
                     }`,
                     borderRadius: 10,
-                    color: "var(--text-primary)",
+                    color: "var(--text)",
                     fontSize: 16,
                     fontFamily: "monospace",
                     letterSpacing: "0.1em",
@@ -853,7 +853,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                 style={{
                   width: "100%", padding: "10px 14px", textAlign: "left",
                   display: "flex", alignItems: "center", gap: 8,
-                  fontSize: 13, color: "var(--text-secondary)", background: "none",
+                  fontSize: 13, color: "var(--text-muted)", background: "none",
                 }}
               >
                 <ChevronDown size={14} style={{ transform: showCost ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
@@ -862,17 +862,17 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
               {showCost && (
                 <div style={{ padding: "12px 14px", borderTop: "1px solid var(--border)", display: "flex", gap: 10 }}>
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.04em" }}>Precio pagado</p>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.04em" }}>Precio pagado</p>
                     <input
                       type="number"
                       value={costAmount}
                       onChange={(e) => setCostAmount(e.target.value)}
                       placeholder="0"
-                      style={{ width: "100%", padding: "8px 10px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 7, color: "var(--text-primary)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                      style={{ width: "100%", padding: "8px 10px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 7, color: "var(--text)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
                     />
                   </div>
                   <div style={{ width: 90 }}>
-                    <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.04em" }}>Moneda</p>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.04em" }}>Moneda</p>
                     <Select value={costCurrency} onChange={setCostCurrency} options={[{ value: "USD", label: "USD" }, { value: "ARS", label: "ARS" }]} />
                   </div>
                 </div>
@@ -886,7 +886,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
               style={{
                 width: "100%",
                 padding: "13px",
-                background: "var(--brand)",
+                background: "var(--primary)",
                 color: "#fff",
                 borderRadius: 10,
                 fontSize: 14,
@@ -902,7 +902,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
             {/* Session list */}
             {lastAdded.length > 0 && (
               <div>
-                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   Cargados en esta sesión ({lastAdded.length})
                 </p>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -931,15 +931,15 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                           }}
                         />
                       )}
-                      <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 600, color: "var(--text-primary)", flex: 1 }}>
+                      <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 600, color: "var(--text)", flex: 1 }}>
                         {item.imei}
                       </span>
-                      <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
                         {item.color} · {item.storage}
                       </span>
                       <button
                         onClick={() => handleRemoveSession(item.id)}
-                        style={{ color: "var(--text-secondary)", cursor: "pointer", background: "none", padding: 2 }}
+                        style={{ color: "var(--text-muted)", cursor: "pointer", background: "none", padding: 2 }}
                         title="Eliminar"
                       >
                         <XCircle size={14} />
@@ -968,7 +968,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                   borderRadius: 8,
                   fontSize: 13,
                   fontWeight: 600,
-                  color: "var(--text-secondary)",
+                  color: "var(--text-muted)",
                   cursor: "pointer",
                 }}
               >
@@ -984,7 +984,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                   borderRadius: 8,
                   fontSize: 13,
                   fontWeight: 600,
-                  color: "var(--text-secondary)",
+                  color: "var(--text-muted)",
                   cursor: "pointer",
                 }}
               >
@@ -995,7 +995,7 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                 style={{
                   flex: 1,
                   padding: "10px",
-                  background: "var(--brand)",
+                  background: "var(--primary)",
                   borderRadius: 8,
                   fontSize: 13,
                   fontWeight: 600,
@@ -1033,13 +1033,13 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
                 else if (step === "variant") { setStep("model"); setSelectedColor(null); setSelectedStorage(null); }
                 else if (step === "imei") { setStep("variant"); setSelectedVariant(null); }
               }}
-              style={{ color: "var(--text-secondary)", cursor: "pointer", background: "none", padding: 2, display: "flex", alignItems: "center" }}
+              style={{ color: "var(--text-muted)", cursor: "pointer", background: "none", padding: 2, display: "flex", alignItems: "center" }}
             >
               <ArrowLeft size={16} />
             </button>
           )}
-          <Layers size={18} color="var(--brand)" />
-          <h1 style={{ fontSize: 17, fontWeight: 700, color: "var(--text-primary)" }}>
+          <Layers size={18} color="var(--primary)" />
+          <h1 style={{ fontSize: 17, fontWeight: 700, color: "var(--text)" }}>
             {stepTitles[step]}
           </h1>
         </div>

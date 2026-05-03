@@ -66,7 +66,7 @@ function SummaryCard({
         flex: 1,
       }}
     >
-      <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+      <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
         {label}
       </p>
       <p style={{ fontSize: 24, fontWeight: 800, color }}>{value}</p>
@@ -141,8 +141,8 @@ export default function StockListScreen({ onQuickLoad, modelFilter, onSellUnit }
     borderRadius: 20,
     fontSize: 13,
     fontWeight: active ? 600 : 400,
-    background: active ? "var(--brand)" : "transparent",
-    color: active ? "#fff" : "var(--text-secondary)",
+    background: active ? "var(--primary)" : "transparent",
+    color: active ? "#fff" : "var(--text-muted)",
     cursor: "pointer",
     border: active ? "none" : "1px solid var(--border)",
     transition: "background 0.15s, color 0.15s",
@@ -158,7 +158,7 @@ export default function StockListScreen({ onQuickLoad, modelFilter, onSellUnit }
           fontSize: 11,
           fontWeight: 600,
           background: isAvail ? "rgba(34,197,94,0.15)" : "rgba(148,163,184,0.15)",
-          color: isAvail ? "var(--green, #22c55e)" : "var(--text-secondary)",
+          color: isAvail ? "var(--green, #22c55e)" : "var(--text-muted)",
         }}
       >
         {isAvail ? "Disponible" : "Vendido"}
@@ -172,8 +172,8 @@ export default function StockListScreen({ onQuickLoad, modelFilter, onSellUnit }
       <div style={{ padding: "20px 28px 16px", borderBottom: "1px solid var(--border)", background: "var(--surface)", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Package size={18} color="var(--brand)" />
-            <h1 style={{ fontSize: 17, fontWeight: 700, color: "var(--text-primary)" }}>Stock</h1>
+            <Package size={18} color="var(--primary)" />
+            <h1 style={{ fontSize: 17, fontWeight: 700, color: "var(--text)" }}>Stock</h1>
           </div>
           <button
             onClick={() => onQuickLoad ? onQuickLoad() : setActiveScreen("stock")}
@@ -182,7 +182,7 @@ export default function StockListScreen({ onQuickLoad, modelFilter, onSellUnit }
               alignItems: "center",
               gap: 6,
               padding: "8px 14px",
-              background: "var(--brand)",
+              background: "var(--primary)",
               borderRadius: 8,
               fontSize: 13,
               fontWeight: 600,
@@ -197,9 +197,9 @@ export default function StockListScreen({ onQuickLoad, modelFilter, onSellUnit }
 
         {/* Summary cards */}
         <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-          <SummaryCard label="Total en stock" value={summary.total} color="var(--text-primary)" />
+          <SummaryCard label="Total en stock" value={summary.total} color="var(--text)" />
           <SummaryCard label="Disponibles" value={summary.available} color="var(--green, #22c55e)" />
-          <SummaryCard label="Vendidos" value={summary.sold} color="var(--text-secondary)" />
+          <SummaryCard label="Vendidos" value={summary.sold} color="var(--text-muted)" />
         </div>
 
         {/* Filters row */}
@@ -212,7 +212,7 @@ export default function StockListScreen({ onQuickLoad, modelFilter, onSellUnit }
             ))}
           </div>
           <div style={{ flex: 1, position: "relative" }}>
-            <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
+            <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
             <input
               type="text"
               value={search}
@@ -224,7 +224,7 @@ export default function StockListScreen({ onQuickLoad, modelFilter, onSellUnit }
                 background: "var(--surface-2)",
                 border: "1px solid var(--border)",
                 borderRadius: 8,
-                color: "var(--text-primary)",
+                color: "var(--text)",
                 fontSize: 13,
                 outline: "none",
                 boxSizing: "border-box",
@@ -237,16 +237,16 @@ export default function StockListScreen({ onQuickLoad, modelFilter, onSellUnit }
       {/* Table */}
       <div style={{ flex: 1, overflow: "auto" }}>
         {loading ? (
-          <div style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)", fontSize: 14 }}>
+          <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
             Cargando...
           </div>
         ) : items.length === 0 ? (
           <div style={{ padding: 60, textAlign: "center" }}>
-            <Package size={40} color="var(--text-secondary)" style={{ margin: "0 auto 12px" }} />
-            <p style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 6 }}>
+            <Package size={40} color="var(--text-muted)" style={{ margin: "0 auto 12px" }} />
+            <p style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>
               {search || statusFilter !== "all" ? "Sin resultados" : "Stock vacío"}
             </p>
-            <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 20 }}>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20 }}>
               {search || statusFilter !== "all"
                 ? "Probá ajustando los filtros"
                 : "Usá la carga rápida para agregar equipos"}
@@ -256,7 +256,7 @@ export default function StockListScreen({ onQuickLoad, modelFilter, onSellUnit }
                 onClick={() => onQuickLoad ? onQuickLoad() : setActiveScreen("stock")}
                 style={{
                   padding: "10px 20px",
-                  background: "var(--brand)",
+                  background: "var(--primary)",
                   color: "#fff",
                   borderRadius: 8,
                   fontSize: 13,
@@ -280,7 +280,7 @@ export default function StockListScreen({ onQuickLoad, modelFilter, onSellUnit }
                       textAlign: "left",
                       fontSize: 11,
                       fontWeight: 600,
-                      color: "var(--text-secondary)",
+                      color: "var(--text-muted)",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                       background: "var(--surface)",
@@ -306,8 +306,8 @@ export default function StockListScreen({ onQuickLoad, modelFilter, onSellUnit }
                     <ProductThumb path={item.image_path} alt={item.model_name} />
                   </td>
                   <td style={{ padding: "10px 16px" }}>
-                    <p style={{ fontWeight: 600, color: "var(--text-primary)" }}>{item.model_name}</p>
-                    <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 1 }}>{item.category_name}</p>
+                    <p style={{ fontWeight: 600, color: "var(--text)" }}>{item.model_name}</p>
+                    <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 1 }}>{item.category_name}</p>
                   </td>
                   <td style={{ padding: "10px 16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -323,17 +323,17 @@ export default function StockListScreen({ onQuickLoad, modelFilter, onSellUnit }
                           }}
                         />
                       )}
-                      <span style={{ color: "var(--text-primary)" }}>{item.color}</span>
+                      <span style={{ color: "var(--text)" }}>{item.color}</span>
                     </div>
                   </td>
-                  <td style={{ padding: "10px 16px", color: "var(--text-primary)" }}>{item.storage}</td>
+                  <td style={{ padding: "10px 16px", color: "var(--text)" }}>{item.storage}</td>
                   <td style={{ padding: "10px 16px" }}>
-                    <span style={{ fontFamily: "monospace", fontWeight: 600, color: "var(--text-primary)", letterSpacing: "0.05em" }}>
+                    <span style={{ fontFamily: "monospace", fontWeight: 600, color: "var(--text)", letterSpacing: "0.05em" }}>
                       {item.imei}
                     </span>
                   </td>
                   <td style={{ padding: "10px 16px" }}>{statusBadge(item.status)}</td>
-                  <td style={{ padding: "10px 16px", color: "var(--text-secondary)", fontSize: 12 }}>
+                  <td style={{ padding: "10px 16px", color: "var(--text-muted)", fontSize: 12 }}>
                     {item.created_at?.slice(0, 10)}
                   </td>
                   <td style={{ padding: "10px 16px" }}>
@@ -387,7 +387,7 @@ export default function StockListScreen({ onQuickLoad, modelFilter, onSellUnit }
                             style={{
                               padding: "5px 8px",
                               background: "var(--surface-2)",
-                              color: "var(--text-secondary)",
+                              color: "var(--text-muted)",
                               borderRadius: 6,
                               fontSize: 11,
                               cursor: "pointer",
@@ -402,7 +402,7 @@ export default function StockListScreen({ onQuickLoad, modelFilter, onSellUnit }
                           title="Eliminar"
                           style={{
                             padding: "5px 7px",
-                            color: "var(--text-secondary)",
+                            color: "var(--text-muted)",
                             background: "none",
                             borderRadius: 6,
                             cursor: "pointer",

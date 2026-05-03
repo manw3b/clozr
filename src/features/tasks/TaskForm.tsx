@@ -69,9 +69,9 @@ function inputCss(error: boolean): React.CSSProperties {
     width: "100%",
     padding: "10px 12px",
     background: "var(--surface-2)",
-    border: `1px solid ${error ? "var(--brand)" : "var(--border-strong)"}`,
+    border: `1px solid ${error ? "var(--primary)" : "var(--border-strong)"}`,
     borderRadius: 8,
-    color: "var(--text-primary)",
+    color: "var(--text)",
     fontSize: 14,
     outline: "none",
     boxSizing: "border-box",
@@ -83,7 +83,7 @@ function Label({ children }: { children: React.ReactNode }) {
     <label
       style={{
         display: "block",
-        color: "var(--text-secondary)",
+        color: "var(--text-muted)",
         fontSize: 12,
         fontWeight: 600,
         marginBottom: 5,
@@ -165,7 +165,7 @@ export default function TaskForm({ inline = false, onSubmit, onCancel }: TaskFor
           style={inputCss(!!errors.title)}
         />
         {errors.title && (
-          <p style={{ color: "var(--brand-light)", fontSize: 11, marginTop: 4 }}>
+          <p style={{ color: "var(--primary-hover)", fontSize: 11, marginTop: 4 }}>
             {errors.title.message}
           </p>
         )}
@@ -188,9 +188,9 @@ export default function TaskForm({ inline = false, onSubmit, onCancel }: TaskFor
                 fontSize: 13,
                 fontWeight: 600,
                 cursor: "pointer",
-                background: type === t ? "var(--brand)" : "var(--surface-2)",
-                color: type === t ? "#fff" : "var(--text-secondary)",
-                border: `1px solid ${type === t ? "var(--brand)" : "var(--border)"}`,
+                background: type === t ? "var(--primary)" : "var(--surface-2)",
+                color: type === t ? "#fff" : "var(--text-muted)",
+                border: `1px solid ${type === t ? "var(--primary)" : "var(--border)"}`,
                 transition: "background 0.15s, color 0.15s",
               }}
             >
@@ -222,7 +222,7 @@ export default function TaskForm({ inline = false, onSubmit, onCancel }: TaskFor
             )}
           />
           {errors.frequency && (
-            <p style={{ color: "var(--brand-light)", fontSize: 11, marginTop: 4 }}>
+            <p style={{ color: "var(--primary-hover)", fontSize: 11, marginTop: 4 }}>
               {errors.frequency.message}
             </p>
           )}
@@ -247,9 +247,9 @@ export default function TaskForm({ inline = false, onSubmit, onCancel }: TaskFor
                     borderRadius: 8,
                     fontSize: 11,
                     fontWeight: 700,
-                    background: active ? "var(--brand)" : "var(--surface-2)",
-                    color: active ? "#fff" : "var(--text-secondary)",
-                    border: `1px solid ${active ? "var(--brand)" : "var(--border)"}`,
+                    background: active ? "var(--primary)" : "var(--surface-2)",
+                    color: active ? "#fff" : "var(--text-muted)",
+                    border: `1px solid ${active ? "var(--primary)" : "var(--border)"}`,
                     transition: "all 0.15s",
                     cursor: "pointer",
                   }}
@@ -260,7 +260,7 @@ export default function TaskForm({ inline = false, onSubmit, onCancel }: TaskFor
             })}
           </div>
           {(customDays ?? []).length === 0 && (
-            <p style={{ color: "var(--text-tertiary)", fontSize: 11, marginTop: 4 }}>
+            <p style={{ color: "var(--text-dim)", fontSize: 11, marginTop: 4 }}>
               Seleccioná al menos un día
             </p>
           )}
@@ -296,7 +296,7 @@ export default function TaskForm({ inline = false, onSubmit, onCancel }: TaskFor
               borderRadius: 10,
               fontSize: 14,
               fontWeight: 600,
-              color: "var(--text-secondary)",
+              color: "var(--text-muted)",
             }}
           >
             Cancelar
@@ -309,11 +309,11 @@ export default function TaskForm({ inline = false, onSubmit, onCancel }: TaskFor
             flex: inline ? undefined : 2,
             width: inline ? "100%" : undefined,
             padding: "11px",
-            background: submitting ? "var(--surface-3)" : "var(--brand)",
+            background: submitting ? "var(--surface-2)" : "var(--primary)",
             borderRadius: 10,
             fontSize: 14,
             fontWeight: 600,
-            color: submitting ? "var(--text-tertiary)" : "#fff",
+            color: submitting ? "var(--text-dim)" : "#fff",
             cursor: submitting ? "not-allowed" : "pointer",
             transition: "background 0.15s",
           }}

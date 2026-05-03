@@ -19,11 +19,13 @@ import { Pipeline } from "./pages/pipeline/Pipeline";
 import { Ventas } from "./pages/ventas/Ventas";
 import { Caja } from "./pages/caja/Caja";
 
-// Legacy screens (still using old layout, will migrate later)
+// Migrated to new design system
+import { Tareas } from "./pages/tareas/Tareas";
+import { Equipo } from "./pages/equipo/Equipo";
+
+// Legacy screens (skin pass applied; will be fully migrated later)
 import OnboardingScreen from "./features/onboarding/OnboardingScreen";
-import TasksScreen from "./features/tasks/TasksScreen";
 import InventoryScreen from "./features/inventory/InventoryScreen";
-import TeamScreen from "./features/team/TeamScreen";
 import SettingsScreen from "./features/settings/SettingsScreen";
 
 import Toaster from "./components/Toaster";
@@ -148,12 +150,12 @@ export default function App() {
       case "customers": return <Clientes />;
       case "pipeline": return <Pipeline />;
       case "sales": return <Ventas />;
-      case "tasks": return <TasksScreen />;
+      case "tasks": return <Tareas />;
       case "inventory":
       case "catalog":
       case "stock":
       case "stock-list": return <InventoryScreen />;
-      case "team": return <TeamScreen />;
+      case "team": return <Equipo />;
       case "settings": return <SettingsScreen />;
     }
   };

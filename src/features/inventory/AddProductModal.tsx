@@ -111,7 +111,7 @@ export default function AddProductModal({ onSuccess, onCancel }: Props) {
     background: "var(--surface-2)",
     border: "1px solid var(--border-strong)",
     borderRadius: 8,
-    color: "var(--text-primary)",
+    color: "var(--text)",
     fontSize: 14,
     outline: "none",
     boxSizing: "border-box",
@@ -120,7 +120,7 @@ export default function AddProductModal({ onSuccess, onCancel }: Props) {
   const labelStyle: React.CSSProperties = {
     fontSize: 12,
     fontWeight: 600,
-    color: "var(--text-secondary)",
+    color: "var(--text-muted)",
     marginBottom: 6,
     display: "block",
     textTransform: "uppercase",
@@ -139,7 +139,7 @@ export default function AddProductModal({ onSuccess, onCancel }: Props) {
         fontWeight: 600,
         border: condition === val ? `2px solid ${color}` : "2px solid transparent",
         background: condition === val ? `${color}22` : "var(--surface-2)",
-        color: condition === val ? color : "var(--text-secondary)",
+        color: condition === val ? color : "var(--text-muted)",
         cursor: "pointer",
         transition: "all 0.15s",
       }}
@@ -155,7 +155,7 @@ export default function AddProductModal({ onSuccess, onCancel }: Props) {
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div ref={searchRef} style={{ position: "relative" }}>
           <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-            <Search size={16} color="var(--text-secondary)" style={{ position: "absolute", left: 12, pointerEvents: "none" }} />
+            <Search size={16} color="var(--text-muted)" style={{ position: "absolute", left: 12, pointerEvents: "none" }} />
             <input
               autoFocus
               value={query}
@@ -189,11 +189,11 @@ export default function AddProductModal({ onSuccess, onCancel }: Props) {
                       }
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tpl.name}</p>
+                      <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tpl.name}</p>
                       <div style={{ display: "flex", gap: 5, marginTop: 3, flexWrap: "wrap" }}>
-                        {tpl.storage && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "var(--surface-3)", color: "var(--text-secondary)" }}>{tpl.storage}</span>}
-                        {tpl.color && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "var(--surface-3)", color: "var(--text-secondary)" }}>{tpl.color}</span>}
-                        {tpl.year && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "var(--surface-3)", color: "var(--text-secondary)" }}>{tpl.year}</span>}
+                        {tpl.storage && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "var(--surface-2)", color: "var(--text-muted)" }}>{tpl.storage}</span>}
+                        {tpl.color && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "var(--surface-2)", color: "var(--text-muted)" }}>{tpl.color}</span>}
+                        {tpl.year && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "var(--surface-2)", color: "var(--text-muted)" }}>{tpl.year}</span>}
                       </div>
                     </div>
                   </button>
@@ -203,7 +203,7 @@ export default function AddProductModal({ onSuccess, onCancel }: Props) {
           )}
           {showResults && query.length >= 2 && results.length === 0 && (
             <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 20, background: "var(--surface)", border: "1px solid var(--border-strong)", borderRadius: 8, padding: "12px 14px" }}>
-              <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>Sin resultados</p>
+              <p style={{ fontSize: 13, color: "var(--text-muted)" }}>Sin resultados</p>
             </div>
           )}
         </div>
@@ -212,14 +212,14 @@ export default function AddProductModal({ onSuccess, onCancel }: Props) {
           <button
             type="button"
             onClick={() => setMode("manual")}
-            style={{ fontSize: 13, color: "var(--text-secondary)", textDecoration: "underline", cursor: "pointer", background: "none" }}
+            style={{ fontSize: 13, color: "var(--text-muted)", textDecoration: "underline", cursor: "pointer", background: "none" }}
           >
             No encuentro lo que busco → Crear manualmente
           </button>
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 4, borderTop: "1px solid var(--border)" }}>
-          <button type="button" onClick={onCancel} style={{ padding: "9px 16px", background: "var(--surface-2)", borderRadius: 8, fontSize: 13, color: "var(--text-secondary)" }}>
+          <button type="button" onClick={onCancel} style={{ padding: "9px 16px", background: "var(--surface-2)", borderRadius: 8, fontSize: 13, color: "var(--text-muted)" }}>
             Cancelar
           </button>
         </div>
@@ -242,21 +242,21 @@ export default function AddProductModal({ onSuccess, onCancel }: Props) {
             }
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {selectedTpl.name}
             </p>
             {(selectedTpl.color || selectedTpl.storage) && (
-              <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3 }}>
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>
                 {[selectedTpl.color, selectedTpl.storage].filter(Boolean).join(" · ")}
               </p>
             )}
-            <p style={{ fontSize: 11, color: "var(--brand)", marginTop: 4 }}>
+            <p style={{ fontSize: 11, color: "var(--primary)", marginTop: 4 }}>
               ✓ Imagen asignada automáticamente
             </p>
           </div>
           <button
             onClick={() => { setSelectedTpl(null); setMode("catalog-search"); }}
-            style={{ color: "var(--text-secondary)", cursor: "pointer", background: "none", display: "flex" }}
+            style={{ color: "var(--text-muted)", cursor: "pointer", background: "none", display: "flex" }}
           >
             <X size={14} />
           </button>
@@ -286,34 +286,34 @@ export default function AddProductModal({ onSuccess, onCancel }: Props) {
         <div>
           <label style={labelStyle}>Condición</label>
           <div style={{ display: "flex", gap: 8 }}>
-            {condBtn("new", "var(--green)", "Nuevo")}
-            {condBtn("used", "var(--amber)", "Usado")}
-            {condBtn("refurbished", "var(--blue)", "Reacond.")}
+            {condBtn("new", "var(--success)", "Nuevo")}
+            {condBtn("used", "var(--warning)", "Usado")}
+            {condBtn("refurbished", "var(--info)", "Reacond.")}
           </div>
         </div>
 
         {/* Track stock */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "var(--surface-2)", borderRadius: 8 }}>
           <div>
-            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Controla unidades por IMEI</p>
-            <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>Registra cada unidad individualmente</p>
+            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Controla unidades por IMEI</p>
+            <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Registra cada unidad individualmente</p>
           </div>
           <button
             type="button"
             onClick={() => setTrackStock((v) => !v)}
-            style={{ width: 42, height: 24, borderRadius: 12, background: trackStock ? "var(--brand)" : "var(--surface-3)", position: "relative", transition: "background 0.2s", flexShrink: 0 }}
+            style={{ width: 42, height: 24, borderRadius: 12, background: trackStock ? "var(--primary)" : "var(--surface-2)", position: "relative", transition: "background 0.2s", flexShrink: 0 }}
           >
             <span style={{ position: "absolute", top: 3, left: trackStock ? 21 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
           </button>
         </div>
 
-        {error && <p style={{ fontSize: 12, color: "var(--brand)", padding: "8px 12px", background: "rgba(232,0,29,0.1)", borderRadius: 6 }}>{error}</p>}
+        {error && <p style={{ fontSize: 12, color: "var(--primary)", padding: "8px 12px", background: "rgba(232,0,29,0.1)", borderRadius: 6 }}>{error}</p>}
 
         <div style={{ display: "flex", gap: 10, paddingTop: 4, borderTop: "1px solid var(--border)" }}>
           <button
             type="button"
             onClick={() => setMode("catalog-search")}
-            style={{ display: "flex", alignItems: "center", gap: 4, padding: "9px 14px", background: "var(--surface-2)", borderRadius: 8, fontSize: 13, color: "var(--text-secondary)" }}
+            style={{ display: "flex", alignItems: "center", gap: 4, padding: "9px 14px", background: "var(--surface-2)", borderRadius: 8, fontSize: 13, color: "var(--text-muted)" }}
           >
             <ArrowLeft size={13} /> Volver
           </button>
@@ -321,7 +321,7 @@ export default function AddProductModal({ onSuccess, onCancel }: Props) {
             type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 18px", background: "var(--brand)", borderRadius: 8, fontSize: 13, fontWeight: 700, color: "#fff", opacity: submitting ? 0.5 : 1 }}
+            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 18px", background: "var(--primary)", borderRadius: 8, fontSize: 13, fontWeight: 700, color: "#fff", opacity: submitting ? 0.5 : 1 }}
           >
             {submitting ? "Guardando..." : <><CheckCircle size={14} /> Agregar al inventario</>}
           </button>
@@ -380,30 +380,30 @@ export default function AddProductModal({ onSuccess, onCancel }: Props) {
       <div>
         <label style={labelStyle}>Condición</label>
         <div style={{ display: "flex", gap: 8 }}>
-          {condBtn("new", "var(--green)", "Nuevo")}
-          {condBtn("used", "var(--amber)", "Usado")}
-          {condBtn("refurbished", "var(--blue)", "Reacond.")}
+          {condBtn("new", "var(--success)", "Nuevo")}
+          {condBtn("used", "var(--warning)", "Usado")}
+          {condBtn("refurbished", "var(--info)", "Reacond.")}
         </div>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "var(--surface-2)", borderRadius: 8 }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Controla stock</p>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Controla stock</p>
         <button
           type="button"
           onClick={() => setTrackStock((v) => !v)}
-          style={{ width: 42, height: 24, borderRadius: 12, background: trackStock ? "var(--brand)" : "var(--surface-3)", position: "relative", transition: "background 0.2s", flexShrink: 0 }}
+          style={{ width: 42, height: 24, borderRadius: 12, background: trackStock ? "var(--primary)" : "var(--surface-2)", position: "relative", transition: "background 0.2s", flexShrink: 0 }}
         >
           <span style={{ position: "absolute", top: 3, left: trackStock ? 21 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
         </button>
       </div>
 
-      {error && <p style={{ fontSize: 12, color: "var(--brand)", padding: "8px 12px", background: "rgba(232,0,29,0.1)", borderRadius: 6 }}>{error}</p>}
+      {error && <p style={{ fontSize: 12, color: "var(--primary)", padding: "8px 12px", background: "rgba(232,0,29,0.1)", borderRadius: 6 }}>{error}</p>}
 
       <div style={{ display: "flex", gap: 10, paddingTop: 4, borderTop: "1px solid var(--border)" }}>
         <button
           type="button"
           onClick={() => setMode("catalog-search")}
-          style={{ display: "flex", alignItems: "center", gap: 4, padding: "9px 14px", background: "var(--surface-2)", borderRadius: 8, fontSize: 13, color: "var(--text-secondary)" }}
+          style={{ display: "flex", alignItems: "center", gap: 4, padding: "9px 14px", background: "var(--surface-2)", borderRadius: 8, fontSize: 13, color: "var(--text-muted)" }}
         >
           <ArrowLeft size={13} /> Volver
         </button>
@@ -411,7 +411,7 @@ export default function AddProductModal({ onSuccess, onCancel }: Props) {
           type="button"
           onClick={handleSubmit}
           disabled={submitting || !manualName.trim()}
-          style={{ flex: 1, padding: "9px 18px", background: "var(--brand)", borderRadius: 8, fontSize: 13, fontWeight: 700, color: "#fff", opacity: submitting || !manualName.trim() ? 0.5 : 1 }}
+          style={{ flex: 1, padding: "9px 18px", background: "var(--primary)", borderRadius: 8, fontSize: 13, fontWeight: 700, color: "#fff", opacity: submitting || !manualName.trim() ? 0.5 : 1 }}
         >
           {submitting ? "Guardando..." : "Crear producto"}
         </button>

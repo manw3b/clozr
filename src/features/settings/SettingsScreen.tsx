@@ -42,9 +42,9 @@ function colorCss(color: string) {
 function SectionHeader({ title, description }: { title: string; description?: string }) {
   return (
     <div style={{ marginBottom: 24 }}>
-      <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.2 }}>{title}</h2>
+      <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", letterSpacing: -0.2 }}>{title}</h2>
       {description && (
-        <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginTop: 4 }}>{description}</p>
+        <p style={{ fontSize: 13, color: "var(--text-dim)", marginTop: 4 }}>{description}</p>
       )}
     </div>
   );
@@ -56,7 +56,7 @@ const inputStyle: React.CSSProperties = {
   background: "var(--surface-2)",
   border: "1px solid var(--border-strong)",
   borderRadius: 8,
-  color: "var(--text-primary)",
+  color: "var(--text)",
   fontSize: 13,
   outline: "none",
   boxSizing: "border-box",
@@ -65,7 +65,7 @@ const inputStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
   fontSize: 12,
   fontWeight: 500,
-  color: "var(--text-secondary)",
+  color: "var(--text-muted)",
   marginBottom: 6,
   display: "block",
 };
@@ -76,7 +76,7 @@ function SaveBtn({ onSave, saving, label = "Guardar" }: { onSave: () => void; sa
       onClick={onSave}
       disabled={saving}
       style={{
-        padding: "8px 18px", background: "var(--brand)", borderRadius: 8,
+        padding: "8px 18px", background: "var(--primary)", borderRadius: 8,
         fontSize: 13, fontWeight: 600, color: "#fff", opacity: saving ? 0.6 : 1,
       }}
     >
@@ -198,15 +198,15 @@ function GeneralSection({ wid }: { wid: string }) {
             border: "1px solid var(--border)", borderRadius: 10,
             gap: 6, minWidth: 160,
           }}>
-            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: -1, color: "var(--text-primary)" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: -1, color: "var(--text)" }}>
               Clozr<span style={{ color }}>.</span>
             </div>
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+            <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
               {emoji || "🏪"} {name || "Mi negocio"}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
               <div style={{ width: 20, height: 20, borderRadius: 5, background: color }} />
-              <span style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>Inicio</span>
+              <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>Inicio</span>
             </div>
           </div>
         </div>
@@ -229,7 +229,7 @@ function GeneralSection({ wid }: { wid: string }) {
               options={[{ value: "USD", label: "USD" }, { value: "ARS", label: "ARS" }]}
             />
           </div>
-          <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 5 }}>
+          <p style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 5 }}>
             Se muestra como barra de progreso en Mi Día
           </p>
         </div>
@@ -387,11 +387,11 @@ function PipelineSection({ wid }: { wid: string }) {
             {/* Order buttons */}
             <div style={{ display: "flex", flexDirection: "column", gap: 1, flexShrink: 0 }}>
               <button onClick={() => handleMove(idx, -1)} disabled={idx === 0}
-                style={{ fontSize: 11, lineHeight: 1, padding: "2px 5px", color: idx === 0 ? "var(--text-tertiary)" : "var(--text-secondary)", borderRadius: 3 }}>
+                style={{ fontSize: 11, lineHeight: 1, padding: "2px 5px", color: idx === 0 ? "var(--text-dim)" : "var(--text-muted)", borderRadius: 3 }}>
                 ↑
               </button>
               <button onClick={() => handleMove(idx, 1)} disabled={idx === stages.length - 1}
-                style={{ fontSize: 11, lineHeight: 1, padding: "2px 5px", color: idx === stages.length - 1 ? "var(--text-tertiary)" : "var(--text-secondary)", borderRadius: 3 }}>
+                style={{ fontSize: 11, lineHeight: 1, padding: "2px 5px", color: idx === stages.length - 1 ? "var(--text-dim)" : "var(--text-muted)", borderRadius: 3 }}>
                 ↓
               </button>
             </div>
@@ -436,7 +436,7 @@ function PipelineSection({ wid }: { wid: string }) {
               style={{
                 flex: 1, padding: "5px 8px",
                 background: "var(--surface-2)", border: "1px solid var(--border-strong)",
-                borderRadius: 6, color: "var(--text-primary)", fontSize: 13, outline: "none",
+                borderRadius: 6, color: "var(--text)", fontSize: 13, outline: "none",
               }}
             />
 
@@ -445,7 +445,7 @@ function PipelineSection({ wid }: { wid: string }) {
               <span style={{
                 fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 4, flexShrink: 0,
                 background: stage.is_won ? "rgba(48,209,88,0.15)" : "rgba(232,0,29,0.15)",
-                color: stage.is_won ? "var(--green)" : "var(--brand)",
+                color: stage.is_won ? "var(--success)" : "var(--primary)",
               }}>
                 {stage.is_won ? "Ganado" : "Perdido"}
               </span>
@@ -458,7 +458,7 @@ function PipelineSection({ wid }: { wid: string }) {
               style={{
                 width: 24, height: 24, borderRadius: 5, display: "flex",
                 alignItems: "center", justifyContent: "center",
-                color: "var(--text-tertiary)", flexShrink: 0,
+                color: "var(--text-dim)", flexShrink: 0,
               }}
             >
               <X size={13} />
@@ -472,7 +472,7 @@ function PipelineSection({ wid }: { wid: string }) {
             marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
             padding: "8px 12px", background: "var(--surface)",
             border: "1px dashed var(--border)", borderRadius: 8,
-            fontSize: 13, color: "var(--text-secondary)",
+            fontSize: 13, color: "var(--text-muted)",
           }}
         >
           <Plus size={13} />
@@ -551,9 +551,9 @@ function CustomerTypesSection({ wid }: { wid: string }) {
           }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 1, flexShrink: 0 }}>
               <button onClick={() => handleMove(idx, -1)} disabled={idx === 0}
-                style={{ fontSize: 11, padding: "2px 5px", color: idx === 0 ? "var(--text-tertiary)" : "var(--text-secondary)", borderRadius: 3 }}>↑</button>
+                style={{ fontSize: 11, padding: "2px 5px", color: idx === 0 ? "var(--text-dim)" : "var(--text-muted)", borderRadius: 3 }}>↑</button>
               <button onClick={() => handleMove(idx, 1)} disabled={idx === types.length - 1}
-                style={{ fontSize: 11, padding: "2px 5px", color: idx === types.length - 1 ? "var(--text-tertiary)" : "var(--text-secondary)", borderRadius: 3 }}>↓</button>
+                style={{ fontSize: 11, padding: "2px 5px", color: idx === types.length - 1 ? "var(--text-dim)" : "var(--text-muted)", borderRadius: 3 }}>↓</button>
             </div>
 
             <div style={{ position: "relative", flexShrink: 0 }}>
@@ -573,20 +573,20 @@ function CustomerTypesSection({ wid }: { wid: string }) {
             </div>
 
             <input value={t.name} onChange={(e) => update(types.map((x) => x.id === t.id ? { ...x, name: e.target.value } : x))}
-              style={{ flex: 1, padding: "5px 8px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 6, color: "var(--text-primary)", fontSize: 13, outline: "none" }}
+              style={{ flex: 1, padding: "5px 8px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 6, color: "var(--text)", fontSize: 13, outline: "none" }}
             />
             <input value={t.description ?? ""} onChange={(e) => update(types.map((x) => x.id === t.id ? { ...x, description: e.target.value || null } : x))}
               placeholder="Descripción (opcional)"
-              style={{ flex: 1, padding: "5px 8px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 6, color: "var(--text-secondary)", fontSize: 12, outline: "none" }}
+              style={{ flex: 1, padding: "5px 8px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 6, color: "var(--text-muted)", fontSize: 12, outline: "none" }}
             />
 
-            <button onClick={() => handleDelete(t.id)} style={{ width: 24, height: 24, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-tertiary)", flexShrink: 0 }}>
+            <button onClick={() => handleDelete(t.id)} style={{ width: 24, height: 24, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", flexShrink: 0 }}>
               <X size={13} />
             </button>
           </div>
         ))}
 
-        <button onClick={handleAdd} style={{ marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 12px", background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: 8, fontSize: 13, color: "var(--text-secondary)" }}>
+        <button onClick={handleAdd} style={{ marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 12px", background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: 8, fontSize: 13, color: "var(--text-muted)" }}>
           <Plus size={13} />
           Agregar tipo
         </button>
@@ -696,21 +696,21 @@ function CatalogSection({ wid }: { wid: string }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 6, maxWidth: 400 }}>
           {cats.map((cat, idx) => (
             <div key={cat.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }}>
-              <span style={{ fontSize: 11, color: "var(--text-tertiary)", width: 20, textAlign: "right", flexShrink: 0 }}>{idx + 1}</span>
+              <span style={{ fontSize: 11, color: "var(--text-dim)", width: 20, textAlign: "right", flexShrink: 0 }}>{idx + 1}</span>
               <input
                 value={cat.name}
                 onChange={(e) => update(cats.map((c) => c.id === cat.id ? { ...c, name: e.target.value } : c))}
-                style={{ flex: 1, padding: "5px 8px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 6, color: "var(--text-primary)", fontSize: 13, outline: "none" }}
+                style={{ flex: 1, padding: "5px 8px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 6, color: "var(--text)", fontSize: 13, outline: "none" }}
               />
               <button onClick={() => update(cats.filter((c) => c.id !== cat.id).map((c, i) => ({ ...c, sort_order: i })))}
-                style={{ width: 24, height: 24, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-tertiary)", flexShrink: 0 }}>
+                style={{ width: 24, height: 24, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", flexShrink: 0 }}>
                 <X size={13} />
               </button>
             </div>
           ))}
           <button
             onClick={() => update([...cats, { id: crypto.randomUUID(), workspace_id: wid, name: "Nueva categoría", sort_order: cats.length }])}
-            style={{ marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 12px", background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: 8, fontSize: 13, color: "var(--text-secondary)" }}
+            style={{ marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 12px", background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: 8, fontSize: 13, color: "var(--text-muted)" }}
           >
             <Plus size={13} />
             Agregar categoría
@@ -750,7 +750,7 @@ function CatalogSection({ wid }: { wid: string }) {
                 value={t.field_label}
                 onChange={(e) => updateTemplate(templates.map((x) => x.id === t.id ? { ...x, field_label: e.target.value, field_key: e.target.value.toLowerCase().replace(/\s+/g, "_") } : x))}
                 placeholder="Etiqueta del campo"
-                style={{ padding: "7px 10px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 6, color: "var(--text-primary)", fontSize: 13, outline: "none" }}
+                style={{ padding: "7px 10px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 6, color: "var(--text)", fontSize: 13, outline: "none" }}
               />
               {/* Type */}
               <Select
@@ -768,15 +768,15 @@ function CatalogSection({ wid }: { wid: string }) {
                   }}
                   placeholder="op1, op2..."
                   title="Opciones separadas por coma"
-                  style={{ padding: "7px 10px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 6, color: "var(--text-primary)", fontSize: 11, outline: "none" }}
+                  style={{ padding: "7px 10px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 6, color: "var(--text)", fontSize: 11, outline: "none" }}
                 />
               ) : (
-                <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--text-secondary)", cursor: "pointer" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--text-muted)", cursor: "pointer" }}>
                   <input
                     type="checkbox"
                     checked={t.required === 1}
                     onChange={(e) => updateTemplate(templates.map((x) => x.id === t.id ? { ...x, required: e.target.checked ? 1 : 0 } : x))}
-                    style={{ accentColor: "var(--brand)" }}
+                    style={{ accentColor: "var(--primary)" }}
                   />
                   Requerido
                 </label>
@@ -784,7 +784,7 @@ function CatalogSection({ wid }: { wid: string }) {
               {/* Delete */}
               <button
                 onClick={() => updateTemplate(templates.filter((x) => x.id !== t.id))}
-                style={{ width: 24, height: 24, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-tertiary)" }}
+                style={{ width: 24, height: 24, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)" }}
               >
                 <X size={13} />
               </button>
@@ -792,7 +792,7 @@ function CatalogSection({ wid }: { wid: string }) {
           ))}
           <button
             onClick={addTemplate}
-            style={{ marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 12px", background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: 8, fontSize: 13, color: "var(--text-secondary)" }}
+            style={{ marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 12px", background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: 8, fontSize: 13, color: "var(--text-muted)" }}
           >
             <Plus size={13} />
             Agregar campo
@@ -854,15 +854,15 @@ function DataSection({ wid }: { wid: string }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 480 }}>
         {/* Export */}
         <div style={{ padding: "16px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4 }}>Exportar todo como JSON</p>
-          <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 12 }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>Exportar todo como JSON</p>
+          <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
             Incluye clientes, pipeline, ventas, tareas y catálogo
           </p>
           <button
             onClick={handleExport}
             disabled={exporting}
             style={{
-              padding: "8px 16px", background: "var(--brand)", borderRadius: 8,
+              padding: "8px 16px", background: "var(--primary)", borderRadius: 8,
               fontSize: 13, fontWeight: 600, color: "#fff", opacity: exporting ? 0.6 : 1,
             }}
           >
@@ -872,13 +872,13 @@ function DataSection({ wid }: { wid: string }) {
 
         {/* DB path */}
         <div style={{ padding: "16px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4 }}>Ubicación de la base de datos</p>
-          <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 12 }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>Ubicación de la base de datos</p>
+          <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
             Archivo SQLite local donde se guardan todos tus datos
           </p>
           <button
             onClick={handleShowPath}
-            style={{ padding: "8px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, color: "var(--text-secondary)" }}
+            style={{ padding: "8px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, color: "var(--text-muted)" }}
           >
             Ver ubicación
           </button>
@@ -887,14 +887,14 @@ function DataSection({ wid }: { wid: string }) {
         {/* Clear test data */}
         {import.meta.env.DEV && (
           <div style={{ padding: "16px", background: "rgba(232,0,29,0.05)", border: "1px solid rgba(232,0,29,0.2)", borderRadius: 10 }}>
-            <p style={{ fontSize: 14, fontWeight: 600, color: "var(--brand)", marginBottom: 4 }}>Limpiar datos de prueba</p>
-            <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 12 }}>
+            <p style={{ fontSize: 14, fontWeight: 600, color: "var(--primary)", marginBottom: 4 }}>Limpiar datos de prueba</p>
+            <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
               Elimina registros con IDs: cust-, pipe-, task-, sale-, cat- · Solo visible en dev
             </p>
             <button
               onClick={handleClear}
               disabled={clearing}
-              style={{ padding: "8px 16px", background: "var(--brand)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#fff", opacity: clearing ? 0.6 : 1 }}
+              style={{ padding: "8px 16px", background: "var(--primary)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#fff", opacity: clearing ? 0.6 : 1 }}
             >
               {clearing ? "Limpiando..." : "Limpiar datos de prueba"}
             </button>
@@ -924,45 +924,71 @@ export default function SettingsScreen() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      {/* Header */}
-      <div style={{ padding: "20px 24px 0", flexShrink: 0 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>
-          Ajustes
-        </h1>
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", gap: "var(--space-5)" }}>
+      <h1 style={{
+        margin: 0,
+        fontSize: "var(--text-2xl)",
+        fontWeight: 700,
+        color: "var(--text)",
+        letterSpacing: "-0.5px",
+      }}>
+        Ajustes
+      </h1>
 
       {/* Two-column layout */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden", marginTop: 16 }}>
+      <div style={{
+        display: "flex",
+        flex: 1,
+        overflow: "hidden",
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-xl)",
+      }}>
         {/* Left nav */}
         <nav style={{
-          width: 180, flexShrink: 0,
+          width: 200, flexShrink: 0,
           borderRight: "1px solid var(--border)",
-          padding: "8px 12px",
+          padding: "var(--space-3)",
           display: "flex", flexDirection: "column", gap: 2,
           overflowY: "auto",
         }}>
-          {SECTIONS.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => setActiveSection(s.id)}
-              style={{
-                width: "100%", textAlign: "left",
-                padding: "8px 10px", borderRadius: 7,
-                fontSize: 13,
-                fontWeight: activeSection === s.id ? 600 : 400,
-                color: activeSection === s.id ? "#fff" : "var(--text-secondary)",
-                background: activeSection === s.id ? "var(--brand)" : "transparent",
-                transition: "background 0.1s, color 0.1s",
-              }}
-            >
-              {s.label}
-            </button>
-          ))}
+          {SECTIONS.map((s) => {
+            const active = activeSection === s.id;
+            return (
+              <button
+                key={s.id}
+                onClick={() => setActiveSection(s.id)}
+                style={{
+                  width: "100%", textAlign: "left",
+                  padding: "var(--space-2) var(--space-3)",
+                  borderRadius: "var(--radius-md)",
+                  fontSize: "var(--text-sm)",
+                  fontWeight: active ? 600 : 500,
+                  color: active ? "var(--primary)" : "var(--text-muted)",
+                  background: active ? "var(--primary-bg)" : "transparent",
+                  transition: "background 100ms, color 100ms",
+                  position: "relative",
+                }}
+              >
+                {active && (
+                  <span style={{
+                    position: "absolute",
+                    left: -3,
+                    top: 6,
+                    bottom: 6,
+                    width: 3,
+                    background: "var(--primary)",
+                    borderRadius: "var(--radius-full)",
+                  }} />
+                )}
+                {s.label}
+              </button>
+            );
+          })}
         </nav>
 
         {/* Right content */}
-        <div style={{ flex: 1, overflow: "auto", padding: "24px 32px" }}>
+        <div style={{ flex: 1, overflow: "auto", padding: "var(--space-6) var(--space-8)" }}>
           {renderSection()}
         </div>
       </div>

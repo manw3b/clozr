@@ -70,7 +70,7 @@ export default function AddImeisModal({ item, onSuccess, onCancel }: Props) {
     background: "var(--surface-2)",
     border: "1px solid var(--border-strong)",
     borderRadius: 8,
-    color: "var(--text-primary)",
+    color: "var(--text)",
     fontSize: 13,
     outline: "none",
     boxSizing: "border-box",
@@ -80,7 +80,7 @@ export default function AddImeisModal({ item, onSuccess, onCancel }: Props) {
     <div>
       {/* Textarea */}
       <div style={{ marginBottom: 12 }}>
-        <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>
+        <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>
           Pegá los IMEIs (uno por línea)
         </label>
         <textarea
@@ -99,22 +99,22 @@ export default function AddImeisModal({ item, onSuccess, onCancel }: Props) {
           background: newImeis.length > 0 ? "rgba(48,209,88,0.1)" : "rgba(255,255,255,0.04)",
           border: `1px solid ${newImeis.length > 0 ? "rgba(48,209,88,0.2)" : "var(--border)"}`,
         }}>
-          <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-            <span style={{ fontWeight: 600, color: newImeis.length > 0 ? "var(--green)" : "var(--text-tertiary)" }}>
+          <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            <span style={{ fontWeight: 600, color: newImeis.length > 0 ? "var(--success)" : "var(--text-dim)" }}>
               {newImeis.length} IMEI{newImeis.length !== 1 ? "s" : ""} nuevo{newImeis.length !== 1 ? "s" : ""}
             </span>
             {duplicates.length > 0 && (
-              <span style={{ color: "var(--amber)", marginLeft: 10 }}>
+              <span style={{ color: "var(--warning)", marginLeft: 10 }}>
                 · {duplicates.length} duplicado{duplicates.length !== 1 ? "s" : ""}
               </span>
             )}
             {validImeis.length !== rawText.split("\n").filter((l) => l.trim()).length && (
-              <span style={{ color: "var(--text-tertiary)", marginLeft: 10 }}>
+              <span style={{ color: "var(--text-dim)", marginLeft: 10 }}>
                 · {rawText.split("\n").filter((l) => l.trim()).length - validImeis.length} inválido{rawText.split("\n").filter((l) => l.trim()).length - validImeis.length !== 1 ? "s" : ""}
               </span>
             )}
           </p>
-          <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>
+          <p style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>
             Los IMEIs válidos son exactamente 15 dígitos numéricos
           </p>
         </div>
@@ -123,7 +123,7 @@ export default function AddImeisModal({ item, onSuccess, onCancel }: Props) {
       {/* Current IMEIs */}
       {currentImeis.length > 0 && (
         <div style={{ marginBottom: 14 }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>
             IMEIs actuales ({currentImeis.length})
           </p>
           <div style={{
@@ -139,13 +139,13 @@ export default function AddImeisModal({ item, onSuccess, onCancel }: Props) {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <code style={{ fontSize: 12, color: "var(--text-primary)", fontFamily: "monospace" }}>
+                  <code style={{ fontSize: 12, color: "var(--text)", fontFamily: "monospace" }}>
                     {imei.imei}
                   </code>
                   {imei.sold_at ? (
                     <span style={{
                       fontSize: 10, padding: "1px 6px",
-                      background: "rgba(99,99,102,0.2)", color: "var(--text-tertiary)",
+                      background: "rgba(99,99,102,0.2)", color: "var(--text-dim)",
                       borderRadius: 10, fontWeight: 600,
                     }}>
                       Vendido
@@ -153,7 +153,7 @@ export default function AddImeisModal({ item, onSuccess, onCancel }: Props) {
                   ) : (
                     <span style={{
                       fontSize: 10, padding: "1px 6px",
-                      background: "rgba(48,209,88,0.15)", color: "var(--green)",
+                      background: "rgba(48,209,88,0.15)", color: "var(--success)",
                       borderRadius: 10, fontWeight: 600,
                     }}>
                       Disponible
@@ -164,7 +164,7 @@ export default function AddImeisModal({ item, onSuccess, onCancel }: Props) {
                   <button
                     onClick={() => handleDelete(imei.id)}
                     disabled={deletingId === imei.id}
-                    style={{ color: "var(--text-tertiary)", display: "flex", alignItems: "center", opacity: deletingId === imei.id ? 0.5 : 1 }}
+                    style={{ color: "var(--text-dim)", display: "flex", alignItems: "center", opacity: deletingId === imei.id ? 0.5 : 1 }}
                   >
                     <X size={14} />
                   </button>
@@ -179,7 +179,7 @@ export default function AddImeisModal({ item, onSuccess, onCancel }: Props) {
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
         <button
           onClick={onCancel}
-          style={{ padding: "8px 16px", background: "var(--surface-2)", borderRadius: 8, fontSize: 13, color: "var(--text-secondary)" }}
+          style={{ padding: "8px 16px", background: "var(--surface-2)", borderRadius: 8, fontSize: 13, color: "var(--text-muted)" }}
         >
           Cerrar
         </button>
@@ -187,7 +187,7 @@ export default function AddImeisModal({ item, onSuccess, onCancel }: Props) {
           onClick={handleAdd}
           disabled={newImeis.length === 0 || isSubmitting}
           style={{
-            padding: "8px 18px", background: "var(--brand)", borderRadius: 8,
+            padding: "8px 18px", background: "var(--primary)", borderRadius: 8,
             fontSize: 13, fontWeight: 600, color: "#fff",
             opacity: newImeis.length === 0 || isSubmitting ? 0.5 : 1,
           }}

@@ -63,7 +63,7 @@ export default function CatalogScreen() {
         padding: "20px 24px 0",
         flexShrink: 0,
       }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", letterSpacing: -0.5 }}>
           Catálogo
         </h1>
         <button
@@ -73,7 +73,7 @@ export default function CatalogScreen() {
             alignItems: "center",
             gap: 6,
             padding: "8px 14px",
-            background: "var(--brand)",
+            background: "var(--primary)",
             borderRadius: 8,
             fontSize: 13,
             fontWeight: 600,
@@ -100,8 +100,8 @@ export default function CatalogScreen() {
               padding: "8px 16px",
               fontSize: 13,
               fontWeight: activeTab === tab.id ? 600 : 400,
-              color: activeTab === tab.id ? "var(--text-primary)" : "var(--text-secondary)",
-              borderBottom: `2px solid ${activeTab === tab.id ? "var(--brand)" : "transparent"}`,
+              color: activeTab === tab.id ? "var(--text)" : "var(--text-muted)",
+              borderBottom: `2px solid ${activeTab === tab.id ? "var(--primary)" : "transparent"}`,
               marginBottom: -1,
               transition: "color 0.1s",
             }}

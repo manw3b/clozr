@@ -1,0 +1,272 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Plus, Trash2, Mail, Phone } from "lucide-react";
+import { PageHeader } from "../../components/PageHeader";
+import { Button } from "../../components/Button";
+import { Avatar } from "../../components/Avatar";
+import { Badge } from "../../components/Badge";
+import { EmptyState } from "../../components/EmptyState";
+import { DataTable, type ColumnDef } from "../../components/data-table";
+import { Modal, ModalField } from "../../components/Modal";
+import { Input, Select } from "../../components/Input";
+import { teamDb } from "../../lib/db/team";
+import { useWorkspaceStore } from "../../store/workspaceStore";
+import { useUIStore } from "../../store/uiStore";
+import { color, space, text, weight } from "../../tokens";
+import type { WorkspaceMember, MemberRole } from "../../lib/db/types";
+
+const ROLE_LABEL: Record<MemberRole, string> = {
+  owner: "Propietario",
+  admin: "Admin",
+  vendedor: "Vendedor",
+  viewer: "Solo lectura",
+};
+
+const ROLE_TONE: Record<MemberRole, "primary" | "info" | "neutral"> = {
+  owner: "primary",
+  admin: "info",
+  vendedor: "neutral",
+  viewer: "neutral",
+};
+
+export function Equipo() {
+  const { activeWorkspace } = useWorkspaceStore();
+  const { showToast } = useUIStore();
+  const wid = activeWorkspace?.id ?? "";
+  const qc = useQueryClient();
+  const [openForm, setOpenForm] = useState(false);
+
+  const { data: members = [] } = useQuery({
+    queryKey: ["team", wid],
+    queryFn: () => teamDb.getMembers(wid),
+    enabled: !!wid,
+  });
+
+  const removeMut = useMutation({
+    mutationFn: (userId: string) => teamDb.removeMember(wid, userId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["team"] });
+      showToast("Miembro eliminado", "success");
+    },
+  });
+
+  const updateRoleMut = useMutation({
+    mutationFn: ({ userId, role }: { userId: string; role: Exclude<MemberRole, "owner"> }) =>
+      teamDb.updateRole(wid, userId, role),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["team"] });
+      showToast("Rol actualizado", "success");
+    },
+  });
+
+  const columns: ColumnDef<WorkspaceMember>[] = [
+    {
+      id: "name",
+      header: "Miembro",
+      sortable: true,
+      width: "minmax(220px, 1.5fr)",
+      cell: (m) => (
+        <div style={{ display: "flex", alignItems: "center", gap: space[3] }}>
+          <Avatar name={m.name} size={32} bg={m.avatar_color ?? undefined} />
+          <div>
+            <div style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text }}>
+              {m.name}
+            </div>
+            {m.role_description && (
+              <div style={{ fontSize: text.xs, color: color.textMuted }}>{m.role_description}</div>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "role",
+      header: "Rol",
+      sortable: true,
+      width: "120px",
+      cell: (m) => <Badge tone={ROLE_TONE[m.role]}>{ROLE_LABEL[m.role]}</Badge>,
+    },
+    {
+      id: "email",
+      header: "Email",
+      width: "minmax(200px, 1fr)",
+      cell: (m) =>
+        m.email ? (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: space[2], color: color.textMuted, fontSize: text.sm }}>
+            <Mail size={13} /> {m.email}
+          </span>
+        ) : (
+          <span style={{ color: color.textDim }}>—</span>
+        ),
+    },
+    {
+      id: "phone",
+      header: "Teléfono",
+      width: "150px",
+      cell: (m) =>
+        m.phone ? (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: space[2], color: color.textMuted, fontSize: text.sm }}>
+            <Phone size={13} /> {m.phone}
+          </span>
+        ) : (
+          <span style={{ color: color.textDim }}>—</span>
+        ),
+    },
+    {
+      id: "actions",
+      header: "",
+      width: "200px",
+      cell: (m) =>
+        m.role === "owner" ? (
+          <span style={{ fontSize: text.xs, color: color.textDim }}>—</span>
+        ) : (
+          <div style={{ display: "flex", gap: space[2] }}>
+            <Select
+              size="sm"
+              value={m.role}
+              onChange={(e) =>
+                updateRoleMut.mutate({
+                  userId: m.user_id,
+                  role: e.target.value as Exclude<MemberRole, "owner">,
+                })
+              }
+            >
+              <option value="admin">Admin</option>
+              <option value="vendedor">Vendedor</option>
+              <option value="viewer">Solo lectura</option>
+            </Select>
+            <Button
+              variant="ghost"
+              size="sm"
+              iconLeft={<Trash2 size={13} />}
+              onClick={() => {
+                if (window.confirm(`¿Eliminar a ${m.name} del equipo?`)) {
+                  removeMut.mutate(m.user_id);
+                }
+              }}
+            />
+          </div>
+        ),
+    },
+  ];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: space[5], height: "100%" }}>
+      <PageHeader
+        title="Equipo"
+        subtitle={`${members.length} ${members.length === 1 ? "miembro" : "miembros"}`}
+        actions={
+          <Button variant="primary" iconLeft={<Plus size={16} />} onClick={() => setOpenForm(true)}>
+            Invitar miembro
+          </Button>
+        }
+      />
+
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <DataTable<WorkspaceMember>
+          rows={members}
+          columns={columns}
+          getRowId={(m) => m.user_id}
+          density="normal"
+          empty={
+            <EmptyState
+              title="Sin miembros"
+              description="Invitá compañeros para que vean y operen este negocio."
+              action={{ label: "Invitar miembro", onClick: () => setOpenForm(true), iconLeft: <Plus size={14} /> }}
+            />
+          }
+        />
+      </div>
+
+      <AddMemberModal open={openForm} onClose={() => setOpenForm(false)} workspaceId={wid} />
+    </div>
+  );
+}
+
+function AddMemberModal({
+  open,
+  onClose,
+  workspaceId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  workspaceId: string;
+}) {
+  const qc = useQueryClient();
+  const { showToast } = useUIStore();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [role, setRole] = useState<Exclude<MemberRole, "owner">>("vendedor");
+  const [roleDesc, setRoleDesc] = useState("");
+
+  const mut = useMutation({
+    mutationFn: () =>
+      teamDb.addMember(
+        workspaceId,
+        {
+          name,
+          email,
+          phone: phone || null,
+          role_description: roleDesc || null,
+        },
+        role,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["team"] });
+      showToast("Miembro agregado", "success");
+      setName("");
+      setEmail("");
+      setPhone("");
+      setRoleDesc("");
+      setRole("vendedor");
+      onClose();
+    },
+  });
+
+  const canSubmit = name.trim().length >= 2 && email.trim().includes("@");
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Invitar miembro"
+      maxWidth={520}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => mut.mutate()}
+            disabled={!canSubmit}
+            loading={mut.isPending}
+          >
+            Agregar
+          </Button>
+        </>
+      }
+    >
+      <ModalField label="Nombre" required>
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Carlos" autoFocus />
+      </ModalField>
+      <ModalField label="Email" required>
+        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="carlos@ejemplo.com" />
+      </ModalField>
+      <ModalField label="Teléfono">
+        <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+54 9 11 …" />
+      </ModalField>
+      <ModalField label="Rol" required>
+        <Select value={role} onChange={(e) => setRole(e.target.value as Exclude<MemberRole, "owner">)}>
+          <option value="vendedor">Vendedor</option>
+          <option value="admin">Admin</option>
+          <option value="viewer">Solo lectura</option>
+        </Select>
+      </ModalField>
+      <ModalField label="Descripción del rol">
+        <Input value={roleDesc} onChange={(e) => setRoleDesc(e.target.value)} placeholder="Ej: Ventas zona norte" />
+      </ModalField>
+    </Modal>
+  );
+}

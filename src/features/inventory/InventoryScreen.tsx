@@ -48,9 +48,9 @@ function ProductImg({ item, size = 40 }: { item: CatalogItemWithImeis; size?: nu
 function SummaryCard({ label, value, color, sub }: { label: string; value: number | string; color?: string; sub?: string }) {
   return (
     <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, flex: 1 }}>
-      <p style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>{label}</p>
-      <p style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5, color: color ?? "var(--text-primary)" }}>{value}</p>
-      {sub && <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{sub}</p>}
+      <p style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)", marginBottom: 6 }}>{label}</p>
+      <p style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5, color: color ?? "var(--text)" }}>{value}</p>
+      {sub && <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{sub}</p>}
     </div>
   );
 }
@@ -96,8 +96,8 @@ function PriceCell({ item, wid, onSaved }: { item: CatalogItemWithImeis; wid: st
         onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") cancel(); }}
         style={{
           width: 90, padding: "4px 8px", background: "var(--surface-2)",
-          border: "1.5px solid var(--brand)", borderRadius: 6,
-          color: "var(--text-primary)", fontSize: 13, outline: "none",
+          border: "1.5px solid var(--primary)", borderRadius: 6,
+          color: "var(--text)", fontSize: 13, outline: "none",
         }}
       />
     );
@@ -109,7 +109,7 @@ function PriceCell({ item, wid, onSaved }: { item: CatalogItemWithImeis; wid: st
       title="Doble click para editar"
       style={{
         fontSize: 13, fontWeight: 600,
-        color: status === "saved" ? "var(--green, #22c55e)" : status === "error" ? "var(--red, #ef4444)" : item.price ? "var(--text-primary)" : "var(--text-secondary)",
+        color: status === "saved" ? "var(--green, #22c55e)" : status === "error" ? "var(--red, #ef4444)" : item.price ? "var(--text)" : "var(--text-muted)",
         cursor: "text",
         padding: "3px 6px",
         borderRadius: 4,
@@ -154,8 +154,8 @@ function ProductPanel({
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>Detalle</p>
-        <button onClick={onClose} style={{ color: "var(--text-secondary)", cursor: "pointer", background: "none", fontSize: 18, lineHeight: 1 }}>×</button>
+        <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>Detalle</p>
+        <button onClick={onClose} style={{ color: "var(--text-muted)", cursor: "pointer", background: "none", fontSize: 18, lineHeight: 1 }}>×</button>
       </div>
 
       <div style={{ flex: 1, overflow: "auto", padding: "20px" }}>
@@ -165,14 +165,14 @@ function ProductPanel({
             ? <img src={url} alt={item.name} onError={() => setImgErr(true)} style={{ width: 120, height: 120, objectFit: "contain" }} />
             : <div style={{ width: 120, height: 120, borderRadius: 12, background: "var(--surface-2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 56 }}>{categoryEmoji(item.category)}</div>
           }
-          <p style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", textAlign: "center" }}>{item.name}</p>
-          {item.conditionDetails?.color && <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>{item.conditionDetails.color}{item.conditionDetails.storage ? ` · ${item.conditionDetails.storage}` : ""}</p>}
+          <p style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", textAlign: "center" }}>{item.name}</p>
+          {item.conditionDetails?.color && <p style={{ fontSize: 12, color: "var(--text-muted)" }}>{item.conditionDetails.color}{item.conditionDetails.storage ? ` · ${item.conditionDetails.storage}` : ""}</p>}
         </div>
 
         {/* Price */}
         <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid var(--border)" }}>
-          <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>Precio</span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>
+          <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Precio</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>
             {item.price !== null ? `${item.currency ?? "ARS"} ${item.price.toLocaleString()}` : "—"}
           </span>
         </div>
@@ -180,14 +180,14 @@ function ProductPanel({
         {/* Units */}
         <div style={{ padding: "14px 0", borderBottom: "1px solid var(--border)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Unidades disponibles</p>
-            <span style={{ fontSize: 13, fontWeight: 700, color: unitCount > 0 ? "var(--green, #22c55e)" : "var(--text-secondary)" }}>{unitCount}</span>
+            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>Unidades disponibles</p>
+            <span style={{ fontSize: 13, fontWeight: 700, color: unitCount > 0 ? "var(--green, #22c55e)" : "var(--text-muted)" }}>{unitCount}</span>
           </div>
           <button
             onClick={onLoadUnits}
             style={{
               width: "100%", padding: "9px", background: "var(--surface-2)", border: "1px solid var(--border)",
-              borderRadius: 8, fontSize: 13, fontWeight: 600, color: "var(--brand)", cursor: "pointer",
+              borderRadius: 8, fontSize: 13, fontWeight: 600, color: "var(--primary)", cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
             }}
           >
@@ -198,12 +198,12 @@ function ProductPanel({
         {/* Sale history */}
         {sales.length > 0 && (
           <div style={{ paddingTop: 14 }}>
-            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", marginBottom: 8 }}>
               Ventas recientes
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {sales.map((s) => (
-                <div key={s.sale_id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text-secondary)" }}>
+                <div key={s.sale_id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text-muted)" }}>
                   <span>{s.customer_name ?? "—"}</span>
                   <span>{s.sale_date?.slice(0, 10)}</span>
                 </div>
@@ -215,10 +215,10 @@ function ProductPanel({
 
       {/* Actions */}
       <div style={{ padding: "14px 20px", borderTop: "1px solid var(--border)", display: "flex", gap: 8 }}>
-        <button onClick={onEdit} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", cursor: "pointer" }}>
+        <button onClick={onEdit} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "var(--text-muted)", cursor: "pointer" }}>
           <Pencil size={12} /> Editar
         </button>
-        <button onClick={onDelete} style={{ padding: "8px 10px", background: "none", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-secondary)", cursor: "pointer" }}>
+        <button onClick={onDelete} style={{ padding: "8px 10px", background: "none", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-muted)", cursor: "pointer" }}>
           <Trash2 size={13} />
         </button>
       </div>
@@ -312,9 +312,9 @@ export default function InventoryScreen() {
       onClick={() => setProductFilter(val)}
       style={{
         height: 32, padding: "7px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 600,
-        background: productFilter === val ? "var(--brand)" : "transparent",
-        color: productFilter === val ? "#fff" : "var(--text-secondary)",
-        border: productFilter === val ? "1px solid var(--brand)" : "1px solid var(--border)",
+        background: productFilter === val ? "var(--primary)" : "transparent",
+        color: productFilter === val ? "#fff" : "var(--text-muted)",
+        border: productFilter === val ? "1px solid var(--primary)" : "1px solid var(--border)",
         cursor: "pointer", transition: "background 0.12s ease",
       }}
     >
@@ -326,9 +326,9 @@ export default function InventoryScreen() {
     padding: "8px 20px",
     fontSize: 13.5,
     fontWeight: active ? 600 : 400,
-    color: active ? "var(--text-primary)" : "var(--text-secondary)",
+    color: active ? "var(--text)" : "var(--text-muted)",
     background: "none",
-    borderBottom: active ? "2px solid var(--brand)" : "2px solid transparent",
+    borderBottom: active ? "2px solid var(--primary)" : "2px solid transparent",
     cursor: "pointer",
     transition: "background 0.12s ease",
     whiteSpace: "nowrap",
@@ -343,15 +343,15 @@ export default function InventoryScreen() {
       <div style={{ padding: "24px 28px 0", borderBottom: "1px solid var(--border)", background: "var(--surface)", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Archive size={20} color="var(--brand)" />
-            <h1 style={{ fontSize: 25, fontWeight: 700, letterSpacing: -0.5, color: "var(--text-primary)" }}>Inventario</h1>
+            <Archive size={20} color="var(--primary)" />
+            <h1 style={{ fontSize: 25, fontWeight: 700, letterSpacing: -0.5, color: "var(--text)" }}>Inventario</h1>
           </div>
           {tab === "products" && (
             <button
               onClick={() => setShowAddModal(true)}
               style={{
                 display: "flex", alignItems: "center", gap: 6,
-                height: 34, padding: "7px 14px", background: "var(--brand)", borderRadius: 8,
+                height: 34, padding: "7px 14px", background: "var(--primary)", borderRadius: 8,
                 fontSize: 12.5, fontWeight: 600, color: "#fff", cursor: "pointer",
                 transition: "background 0.12s ease",
               }}
@@ -363,7 +363,7 @@ export default function InventoryScreen() {
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={() => { setUnitsPreSelection(undefined); setUnitsModelFilter(undefined); setUnitsMode("load"); }}
-                style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "7px 14px", background: "var(--brand)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff", cursor: "pointer", transition: "background 0.12s ease" }}
+                style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "7px 14px", background: "var(--primary)", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: "#fff", cursor: "pointer", transition: "background 0.12s ease" }}
               >
                 <Plus size={14} /> Cargar mercadería
               </button>
@@ -406,12 +406,12 @@ export default function InventoryScreen() {
               {/* Filters */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "20px 28px" }}>
                 <div style={{ position: "relative", flex: 1 }}>
-                  <Search size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
+                  <Search size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
                   <input
                     value={productSearch}
                     onChange={(e) => setProductSearch(e.target.value)}
                     placeholder="Buscar producto..."
-                    style={{ width: "100%", height: 34, padding: "7px 12px 7px 30px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-primary)", fontSize: 13.5, outline: "none", boxSizing: "border-box" }}
+                    style={{ width: "100%", height: 34, padding: "7px 12px 7px 30px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13.5, outline: "none", boxSizing: "border-box" }}
                   />
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
@@ -425,12 +425,12 @@ export default function InventoryScreen() {
               {/* Table */}
               {filteredProducts.length === 0 ? (
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, padding: 40 }}>
-                  <Package size={40} color="var(--text-secondary)" />
-                  <p style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>
+                  <Package size={40} color="var(--text-muted)" />
+                  <p style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>
                     {productSearch || productFilter !== "all" ? "Sin resultados" : "Inventario vacío"}
                   </p>
                   {!productSearch && productFilter === "all" && (
-                    <button onClick={() => setShowAddModal(true)} style={{ padding: "9px 18px", background: "var(--brand)", color: "#fff", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    <button onClick={() => setShowAddModal(true)} style={{ padding: "9px 18px", background: "var(--primary)", color: "#fff", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                       Agregar producto
                     </button>
                   )}
@@ -441,7 +441,7 @@ export default function InventoryScreen() {
                     <thead>
                       <tr style={{ borderBottom: "1px solid var(--border)" }}>
                         {["", "Nombre", "Variante", "Precio", "Unidades", ""].map((h, i) => (
-                          <th key={i} style={{ padding: "10px 16px", textAlign: "left", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", background: "var(--surface)", position: "sticky", top: 0, zIndex: 1 }}>{h}</th>
+                          <th key={i} style={{ padding: "10px 16px", textAlign: "left", fontSize: 13, fontWeight: 600, color: "var(--text-muted)", background: "var(--surface)", position: "sticky", top: 0, zIndex: 1 }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -461,10 +461,10 @@ export default function InventoryScreen() {
                               <ProductImg item={item} size={40} />
                             </td>
                             <td style={{ padding: "10px 16px" }}>
-                              <p style={{ fontWeight: 600, color: "var(--text-primary)" }}>{item.name}</p>
-                              {item.category && <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>{item.category}</p>}
+                              <p style={{ fontWeight: 600, color: "var(--text)" }}>{item.name}</p>
+                              {item.category && <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{item.category}</p>}
                             </td>
-                            <td style={{ padding: "10px 16px", color: "var(--text-secondary)" }}>
+                            <td style={{ padding: "10px 16px", color: "var(--text-muted)" }}>
                               {item.conditionDetails?.color && (
                                 <span>{item.conditionDetails.color}{item.conditionDetails.storage ? ` · ${item.conditionDetails.storage}` : ""}</span>
                               )}
@@ -476,12 +476,12 @@ export default function InventoryScreen() {
                               {item.track_stock ? (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleLoadUnitsForProduct(item); }}
-                                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 12, fontSize: 12, fontWeight: 600, background: units > 0 ? "rgba(34,197,94,0.15)" : "rgba(148,163,184,0.15)", color: units > 0 ? "var(--green, #22c55e)" : "var(--text-secondary)", cursor: "pointer" }}
+                                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 12, fontSize: 12, fontWeight: 600, background: units > 0 ? "rgba(34,197,94,0.15)" : "rgba(148,163,184,0.15)", color: units > 0 ? "var(--green, #22c55e)" : "var(--text-muted)", cursor: "pointer" }}
                                 >
                                   {units} <ChevronRight size={10} />
                                 </button>
                               ) : (
-                                <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Sin control</span>
+                                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Sin control</span>
                               )}
                             </td>
                             <td style={{ padding: "10px 16px" }}>
@@ -489,7 +489,7 @@ export default function InventoryScreen() {
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setEditingProduct(item); }}
                                   title="Editar"
-                                  style={{ padding: "5px", color: "var(--text-secondary)", background: "none", cursor: "pointer", borderRadius: 4 }}
+                                  style={{ padding: "5px", color: "var(--text-muted)", background: "none", cursor: "pointer", borderRadius: 4 }}
                                   onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--surface-2)")}
                                   onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "none")}
                                 >
@@ -498,13 +498,13 @@ export default function InventoryScreen() {
                                 {confirmDelete === item.id ? (
                                   <div style={{ display: "flex", gap: 4 }}>
                                     <button onClick={(e) => { e.stopPropagation(); handleDeleteProduct(item.id); }} style={{ padding: "4px 8px", background: "rgba(239,68,68,0.12)", color: "var(--red, #ef4444)", borderRadius: 5, fontSize: 10, fontWeight: 600, cursor: "pointer" }}>Sí</button>
-                                    <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(null); }} style={{ padding: "4px 8px", background: "var(--surface-2)", color: "var(--text-secondary)", borderRadius: 5, fontSize: 10, cursor: "pointer" }}>No</button>
+                                    <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(null); }} style={{ padding: "4px 8px", background: "var(--surface-2)", color: "var(--text-muted)", borderRadius: 5, fontSize: 10, cursor: "pointer" }}>No</button>
                                   </div>
                                 ) : (
                                   <button
                                     onClick={(e) => { e.stopPropagation(); setConfirmDelete(item.id); }}
                                     title="Eliminar"
-                                    style={{ padding: "5px", color: "var(--text-secondary)", background: "none", cursor: "pointer", borderRadius: 4 }}
+                                    style={{ padding: "5px", color: "var(--text-muted)", background: "none", cursor: "pointer", borderRadius: 4 }}
                                     onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--surface-2)")}
                                     onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "none")}
                                   >

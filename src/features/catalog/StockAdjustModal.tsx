@@ -43,7 +43,7 @@ export default function StockAdjustModal({ item, onSuccess, onCancel }: Props) {
     background: "var(--surface-2)",
     border: "1px solid var(--border-strong)",
     borderRadius: 8,
-    color: "var(--text-primary)",
+    color: "var(--text)",
     fontSize: 13,
     outline: "none",
     boxSizing: "border-box",
@@ -53,19 +53,19 @@ export default function StockAdjustModal({ item, onSuccess, onCancel }: Props) {
     <div>
       {/* Product info */}
       <div style={{ padding: "12px 14px", background: "var(--surface-2)", borderRadius: 8, marginBottom: 16 }}>
-        <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4 }}>
+        <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>
           {item.name}
         </p>
-        <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-          Stock actual: <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{item.stock}</span>
+        <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
+          Stock actual: <span style={{ fontWeight: 600, color: "var(--text)" }}>{item.stock}</span>
         </p>
       </div>
 
       {/* Type selector */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
         {[
-          { value: "entrada" as const, label: "+ Entrada", color: "var(--green)" },
-          { value: "salida" as const, label: "- Salida", color: "var(--brand)" },
+          { value: "entrada" as const, label: "+ Entrada", color: "var(--success)" },
+          { value: "salida" as const, label: "- Salida", color: "var(--primary)" },
         ].map((opt) => (
           <button
             key={opt.value}
@@ -77,7 +77,7 @@ export default function StockAdjustModal({ item, onSuccess, onCancel }: Props) {
               fontWeight: 600,
               border: `2px solid ${type === opt.value ? opt.color : "var(--border)"}`,
               background: type === opt.value ? `${opt.color}18` : "var(--surface-2)",
-              color: type === opt.value ? opt.color : "var(--text-secondary)",
+              color: type === opt.value ? opt.color : "var(--text-muted)",
               transition: "all 0.15s",
             }}
           >
@@ -89,7 +89,7 @@ export default function StockAdjustModal({ item, onSuccess, onCancel }: Props) {
       <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
         {/* Quantity */}
         <div>
-          <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>
+          <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>
             Cantidad
           </label>
           <input
@@ -105,7 +105,7 @@ export default function StockAdjustModal({ item, onSuccess, onCancel }: Props) {
 
         {/* Reason */}
         <div>
-          <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>
+          <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>
             Motivo (opcional)
           </label>
           <input
@@ -123,9 +123,9 @@ export default function StockAdjustModal({ item, onSuccess, onCancel }: Props) {
           padding: "10px 14px", borderRadius: 8, marginBottom: 16,
           background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)",
         }}>
-          <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+          <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
             Stock resultante:{" "}
-            <span style={{ fontWeight: 700, fontSize: 15, color: preview === 0 ? "var(--brand)" : "var(--text-primary)" }}>
+            <span style={{ fontWeight: 700, fontSize: 15, color: preview === 0 ? "var(--primary)" : "var(--text)" }}>
               {preview}
             </span>
           </p>
@@ -136,7 +136,7 @@ export default function StockAdjustModal({ item, onSuccess, onCancel }: Props) {
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
         <button
           onClick={onCancel}
-          style={{ padding: "8px 16px", background: "var(--surface-2)", borderRadius: 8, fontSize: 13, color: "var(--text-secondary)" }}
+          style={{ padding: "8px 16px", background: "var(--surface-2)", borderRadius: 8, fontSize: 13, color: "var(--text-muted)" }}
         >
           Cancelar
         </button>
@@ -144,7 +144,7 @@ export default function StockAdjustModal({ item, onSuccess, onCancel }: Props) {
           onClick={handleConfirm}
           disabled={!qty || isSubmitting}
           style={{
-            padding: "8px 18px", background: "var(--brand)", borderRadius: 8,
+            padding: "8px 18px", background: "var(--primary)", borderRadius: 8,
             fontSize: 13, fontWeight: 600, color: "#fff",
             opacity: !qty || isSubmitting ? 0.5 : 1,
           }}

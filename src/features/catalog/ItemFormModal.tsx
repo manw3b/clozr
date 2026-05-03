@@ -74,7 +74,7 @@ function CustomField({
     background: "var(--surface-2)",
     border: "1px solid var(--border-strong)",
     borderRadius: 8,
-    color: "var(--text-primary)",
+    color: "var(--text)",
     fontSize: 13,
     outline: "none",
     boxSizing: "border-box",
@@ -128,9 +128,9 @@ function CustomField({
 }
 
 function BatteryBar({ percent }: { percent: number }) {
-  const color = percent > 80 ? "var(--green)" : percent > 60 ? "var(--amber)" : "var(--brand)";
+  const color = percent > 80 ? "var(--success)" : percent > 60 ? "var(--warning)" : "var(--primary)";
   return (
-    <div style={{ height: 6, background: "var(--surface-3)", borderRadius: 3, overflow: "hidden", marginTop: 4 }}>
+    <div style={{ height: 6, background: "var(--surface-2)", borderRadius: 3, overflow: "hidden", marginTop: 4 }}>
       <div style={{ height: "100%", width: `${percent}%`, background: color, borderRadius: 3, transition: "width 0.2s" }} />
     </div>
   );
@@ -309,7 +309,7 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
     background: "var(--surface-2)",
     border: "1px solid var(--border-strong)",
     borderRadius: 8,
-    color: "var(--text-primary)",
+    color: "var(--text)",
     fontSize: 13,
     outline: "none",
     boxSizing: "border-box",
@@ -318,7 +318,7 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
   const labelStyle: React.CSSProperties = {
     fontSize: 12,
     fontWeight: 500,
-    color: "var(--text-secondary)",
+    color: "var(--text-muted)",
     marginBottom: 6,
     display: "block",
   };
@@ -330,8 +330,8 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
     fontSize: 12,
     fontWeight: 600,
     border: active ? `2px solid ${color}` : "2px solid transparent",
-    background: active ? `${color}22` : "var(--surface-3)",
-    color: active ? color : "var(--text-secondary)",
+    background: active ? `${color}22` : "var(--surface-2)",
+    color: active ? color : "var(--text-muted)",
     transition: "all 0.15s",
     cursor: "pointer",
   });
@@ -346,19 +346,19 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
         {!isEdit && (
           <div ref={tplRef} style={{ position: "relative" }}>
             {selectedTpl ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--blue-bg)", border: "1px solid var(--blue)", borderRadius: 8 }}>
-                <span style={{ fontSize: 12, color: "var(--blue)" }}>📱</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--info-bg)", border: "1px solid var(--info)", borderRadius: 8 }}>
+                <span style={{ fontSize: 12, color: "var(--info)" }}>📱</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: "var(--blue)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selectedTpl.name}</p>
-                  <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: "var(--info)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selectedTpl.name}</p>
+                  <p style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 1 }}>
                     {[selectedTpl.year, selectedTpl.screen_size, selectedTpl.storage].filter(Boolean).join(" · ")}
                   </p>
                 </div>
-                <button onClick={clearTemplate} style={{ color: "var(--text-tertiary)", display: "flex" }}><X size={14} /></button>
+                <button onClick={clearTemplate} style={{ color: "var(--text-dim)", display: "flex" }}><X size={14} /></button>
               </div>
             ) : (
               <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                <Search size={14} color="var(--text-tertiary)" style={{ position: "absolute", left: 10, pointerEvents: "none" }} />
+                <Search size={14} color="var(--text-dim)" style={{ position: "absolute", left: 10, pointerEvents: "none" }} />
                 <input
                   value={tplQuery}
                   onChange={(e) => { setTplQuery(e.target.value); setShowTplResults(true); }}
@@ -382,7 +382,7 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
                       onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
                       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                     >
-                      <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", background: "var(--surface-3)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", background: "var(--surface-2)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                         {imgUrl ? (
                           <img src={imgUrl} alt="" width={40} height={40} style={{ objectFit: "contain" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
                         ) : (
@@ -390,12 +390,12 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
                         )}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tpl.name}</p>
+                        <p style={{ fontSize: 13, fontWeight: 500, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tpl.name}</p>
                         <div style={{ display: "flex", gap: 5, marginTop: 3, flexWrap: "wrap" }}>
-                          {tpl.year && <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 3, background: "var(--surface-3)", color: "var(--text-tertiary)" }}>{tpl.year}</span>}
-                          {tpl.storage && <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 3, background: "var(--surface-3)", color: "var(--text-tertiary)" }}>{tpl.storage}</span>}
-                          {tpl.screen_size && <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 3, background: "var(--surface-3)", color: "var(--text-tertiary)" }}>{tpl.screen_size}</span>}
-                          <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 3, background: "var(--blue-bg)", color: "var(--blue)" }}>{tpl.category}</span>
+                          {tpl.year && <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 3, background: "var(--surface-2)", color: "var(--text-dim)" }}>{tpl.year}</span>}
+                          {tpl.storage && <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 3, background: "var(--surface-2)", color: "var(--text-dim)" }}>{tpl.storage}</span>}
+                          {tpl.screen_size && <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 3, background: "var(--surface-2)", color: "var(--text-dim)" }}>{tpl.screen_size}</span>}
+                          <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 3, background: "var(--info-bg)", color: "var(--info)" }}>{tpl.category}</span>
                         </div>
                       </div>
                     </button>
@@ -406,7 +406,7 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
 
             {showTplResults && tplQuery.length >= 2 && tplResults.length === 0 && (
               <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 20, background: "var(--surface)", border: "1px solid var(--border-strong)", borderRadius: 8, padding: "10px 14px" }}>
-                <p style={{ fontSize: 12, color: "var(--text-tertiary)" }}>No encontrado — completá los campos manualmente</p>
+                <p style={{ fontSize: 12, color: "var(--text-dim)" }}>No encontrado — completá los campos manualmente</p>
               </div>
             )}
           </div>
@@ -460,7 +460,7 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
                     key={c}
                     type="button"
                     onMouseDown={() => { setCategory(c); setShowCatSuggestions(false); }}
-                    style={{ width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "var(--text-primary)", borderBottom: "1px solid var(--border)" }}
+                    style={{ width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "var(--text)", borderBottom: "1px solid var(--border)" }}
                   >
                     {c}
                   </button>
@@ -490,7 +490,7 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
                     key={s}
                     type="button"
                     onMouseDown={() => { setSubcategory(s); setShowSubSuggestions(false); }}
-                    style={{ width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "var(--text-primary)", borderBottom: "1px solid var(--border)" }}
+                    style={{ width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "var(--text)", borderBottom: "1px solid var(--border)" }}
                   >
                     {s}
                   </button>
@@ -521,13 +521,13 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
 
         {/* Condition section */}
         <div style={{ borderTop: "1px solid var(--border)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
             Condición
           </p>
           <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" onClick={() => setCondition("new")} style={condBtnStyle(condition === "new", "var(--green)")}>Nuevo</button>
-            <button type="button" onClick={() => setCondition("used")} style={condBtnStyle(condition === "used", "var(--amber)")}>Usado</button>
-            <button type="button" onClick={() => setCondition("refurbished")} style={condBtnStyle(condition === "refurbished", "var(--blue)")}>Reacondicionado</button>
+            <button type="button" onClick={() => setCondition("new")} style={condBtnStyle(condition === "new", "var(--success)")}>Nuevo</button>
+            <button type="button" onClick={() => setCondition("used")} style={condBtnStyle(condition === "used", "var(--warning)")}>Usado</button>
+            <button type="button" onClick={() => setCondition("refurbished")} style={condBtnStyle(condition === "refurbished", "var(--info)")}>Reacondicionado</button>
           </div>
 
           {condition !== "new" && (
@@ -552,8 +552,8 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
                       style={{
                         width: 22, height: 22, borderRadius: 5,
                         background: sw.hex,
-                        border: condColor === sw.label ? "2px solid var(--text-primary)" : "2px solid transparent",
-                        outline: condColor === sw.label ? "2px solid var(--text-tertiary)" : "none",
+                        border: condColor === sw.label ? "2px solid var(--text)" : "2px solid transparent",
+                        outline: condColor === sw.label ? "2px solid var(--text-dim)" : "none",
                         cursor: "pointer",
                       }}
                     />
@@ -613,9 +613,9 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
                         borderRadius: 7,
                         fontSize: 13,
                         fontWeight: 700,
-                        border: condGrade === g.value ? "2px solid var(--text-primary)" : "2px solid transparent",
-                        background: condGrade === g.value ? "var(--surface-3)" : "var(--surface-2)",
-                        color: condGrade === g.value ? "var(--text-primary)" : "var(--text-tertiary)",
+                        border: condGrade === g.value ? "2px solid var(--text)" : "2px solid transparent",
+                        background: condGrade === g.value ? "var(--surface-2)" : "var(--surface-2)",
+                        color: condGrade === g.value ? "var(--text)" : "var(--text-dim)",
                         cursor: "pointer",
                         transition: "all 0.15s",
                       }}
@@ -625,7 +625,7 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
                   ))}
                 </div>
                 {condGrade && (
-                  <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 6 }}>
+                  <p style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 6 }}>
                     {GRADES.find((g) => g.value === condGrade)?.desc}
                   </p>
                 )}
@@ -660,8 +660,8 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
         {/* Track stock toggle */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: "var(--surface-2)", borderRadius: 8 }}>
           <div>
-            <p style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>Controla stock</p>
-            <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>
+            <p style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>Controla stock</p>
+            <p style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>
               Lleva un conteo de unidades disponibles
             </p>
           </div>
@@ -670,7 +670,7 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
             onClick={() => setTrackStock((v) => !v)}
             style={{
               width: 42, height: 24, borderRadius: 12,
-              background: trackStock ? "var(--brand)" : "var(--surface-3)",
+              background: trackStock ? "var(--primary)" : "var(--surface-2)",
               position: "relative", transition: "background 0.2s", flexShrink: 0,
             }}
           >
@@ -699,7 +699,7 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
         {/* Dynamic custom fields */}
         {fieldTemplates.length > 0 && (
           <div style={{ borderTop: "1px solid var(--border)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
               Campos de {category}
             </p>
             {fieldTemplates.map((template) => (
@@ -707,7 +707,7 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
                 <label style={labelStyle}>
                   {template.field_label}
                   {template.required === 1 && (
-                    <span style={{ color: "var(--brand)", marginLeft: 2 }}>*</span>
+                    <span style={{ color: "var(--primary)", marginLeft: 2 }}>*</span>
                   )}
                 </label>
                 <CustomField
@@ -723,7 +723,7 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
         )}
 
         {error && (
-          <p style={{ fontSize: 12, color: "var(--brand)", padding: "8px 12px", background: "rgba(232,0,29,0.1)", borderRadius: 6 }}>
+          <p style={{ fontSize: 12, color: "var(--primary)", padding: "8px 12px", background: "rgba(232,0,29,0.1)", borderRadius: 6 }}>
             {error}
           </p>
         )}
@@ -734,7 +734,7 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
         <button
           type="button"
           onClick={onCancel}
-          style={{ padding: "8px 16px", background: "var(--surface-2)", borderRadius: 8, fontSize: 13, color: "var(--text-secondary)" }}
+          style={{ padding: "8px 16px", background: "var(--surface-2)", borderRadius: 8, fontSize: 13, color: "var(--text-muted)" }}
         >
           Cancelar
         </button>
@@ -743,7 +743,7 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: Props) {
           onClick={handleSubmit}
           disabled={isSubmitting || !name.trim()}
           style={{
-            padding: "8px 18px", background: "var(--brand)", borderRadius: 8,
+            padding: "8px 18px", background: "var(--primary)", borderRadius: 8,
             fontSize: 13, fontWeight: 600, color: "#fff",
             opacity: isSubmitting || !name.trim() ? 0.5 : 1,
           }}

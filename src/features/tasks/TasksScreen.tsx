@@ -50,8 +50,8 @@ function TaskItem({
           width: 20,
           height: 20,
           borderRadius: 5,
-          border: `2px solid ${done ? "var(--brand)" : "var(--border-strong)"}`,
-          background: done ? "var(--brand)" : "transparent",
+          border: `2px solid ${done ? "var(--primary)" : "var(--border-strong)"}`,
+          background: done ? "var(--primary)" : "transparent",
           flexShrink: 0,
           display: "flex",
           alignItems: "center",
@@ -70,7 +70,7 @@ function TaskItem({
         <p style={{
           fontSize: 13.5,
           fontWeight: 500,
-          color: done ? "var(--text-tertiary)" : "var(--text-primary)",
+          color: done ? "var(--text-dim)" : "var(--text)",
           textDecoration: done ? "line-through" : "none",
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -83,8 +83,8 @@ function TaskItem({
           <span style={{
             fontSize: 10,
             fontWeight: 600,
-            color: "var(--text-tertiary)",
-            background: "var(--surface-3)",
+            color: "var(--text-dim)",
+            background: "var(--surface-2)",
             padding: "1px 6px",
             borderRadius: 4,
           }}>
@@ -93,12 +93,12 @@ function TaskItem({
             : "Puntual"}
           </span>
           {task.due_at && task.type === "puntual" && (
-            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+            <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
               {formatDate(task.due_at)}
             </span>
           )}
           {done && task.completed_at && (
-            <span style={{ fontSize: 11, color: "var(--green)" }}>
+            <span style={{ fontSize: 11, color: "var(--success)" }}>
               ✓ {formatDate(task.completed_at)}
             </span>
           )}
@@ -112,7 +112,7 @@ function TaskItem({
           width: 28,
           height: 28,
           borderRadius: 6,
-          color: "var(--text-tertiary)",
+          color: "var(--text-dim)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -120,11 +120,11 @@ function TaskItem({
           transition: "opacity 0.1s",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.color = "var(--brand-light)";
-          e.currentTarget.style.background = "var(--red-bg)";
+          e.currentTarget.style.color = "var(--primary-hover)";
+          e.currentTarget.style.background = "var(--danger-bg)";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.color = "var(--text-tertiary)";
+          e.currentTarget.style.color = "var(--text-dim)";
           e.currentTarget.style.background = "transparent";
         }}
       >
@@ -206,11 +206,11 @@ export default function TasksScreen() {
         {/* Header */}
         <div style={{ padding: "24px 28px 0", flexShrink: 0 }}>
           <div style={{ marginBottom: 20 }}>
-            <h1 style={{ fontSize: 25, fontWeight: 700, color: "var(--text-primary)", letterSpacing: -0.5 }}>
+            <h1 style={{ fontSize: 25, fontWeight: 700, color: "var(--text)", letterSpacing: -0.5 }}>
               Tareas
             </h1>
             {pendingCount > 0 && (
-              <p style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 4 }}>
+              <p style={{ fontSize: 12.5, color: "var(--text-dim)", marginTop: 4 }}>
                 {pendingCount} pendiente{pendingCount !== 1 ? "s" : ""}
               </p>
             )}
@@ -226,8 +226,8 @@ export default function TasksScreen() {
                   padding: "8px 14px",
                   fontSize: 13.5,
                   fontWeight: filterStatus === f.value ? 600 : 400,
-                  color: filterStatus === f.value ? "var(--brand)" : "var(--text-secondary)",
-                  borderBottom: filterStatus === f.value ? "2px solid var(--brand)" : "2px solid transparent",
+                  color: filterStatus === f.value ? "var(--primary)" : "var(--text-muted)",
+                  borderBottom: filterStatus === f.value ? "2px solid var(--primary)" : "2px solid transparent",
                   marginBottom: -1,
                   transition: "background 0.12s ease",
                   whiteSpace: "nowrap",
@@ -245,7 +245,7 @@ export default function TasksScreen() {
                   padding: "6px 12px",
                   fontSize: 12.5,
                   fontWeight: filterType === t ? 600 : 400,
-                  color: filterType === t ? "var(--text-primary)" : "var(--text-tertiary)",
+                  color: filterType === t ? "var(--text)" : "var(--text-dim)",
                   marginBottom: 4,
                   borderRadius: 8,
                   background: filterType === t ? "var(--surface-2)" : "transparent",
@@ -262,9 +262,9 @@ export default function TasksScreen() {
         {/* List */}
         <div style={{ flex: 1, overflow: "auto", padding: "8px 12px 24px" }}>
           {isLoading ? (
-            <p style={{ padding: "12px", color: "var(--text-tertiary)", fontSize: 13 }}>Cargando...</p>
+            <p style={{ padding: "12px", color: "var(--text-dim)", fontSize: 13 }}>Cargando...</p>
           ) : filtered.length === 0 ? (
-            <p style={{ padding: "48px 12px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
+            <p style={{ padding: "48px 12px", textAlign: "center", color: "var(--text-dim)", fontSize: 14 }}>
               {filterStatus === "pendientes" ? "Sin tareas pendientes" : "Sin tareas"}
             </p>
           ) : (
@@ -291,7 +291,7 @@ export default function TasksScreen() {
         <h2 style={{
           fontSize: 13,
           fontWeight: 600,
-          color: "var(--text-secondary)",
+          color: "var(--text-muted)",
           marginBottom: 24,
         }}>
           Nueva tarea

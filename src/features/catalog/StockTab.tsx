@@ -62,10 +62,10 @@ export default function StockTab({ onAdjust }: Props) {
   });
 
   const stockStatus = (item: StockViewItem) => {
-    if (item.track_stock === 0) return { label: "Sin control", color: "var(--text-tertiary)", bg: "rgba(99,99,102,0.15)" };
-    if (item.stock === 0) return { label: "Sin stock", color: "var(--brand)", bg: "rgba(232,0,29,0.12)" };
-    if (item.stock <= item.stock_min) return { label: "Bajo", color: "var(--amber)", bg: "rgba(255,214,10,0.12)" };
-    return { label: "OK", color: "var(--green)", bg: "rgba(48,209,88,0.12)" };
+    if (item.track_stock === 0) return { label: "Sin control", color: "var(--text-dim)", bg: "rgba(99,99,102,0.15)" };
+    if (item.stock === 0) return { label: "Sin stock", color: "var(--primary)", bg: "rgba(232,0,29,0.12)" };
+    if (item.stock <= item.stock_min) return { label: "Bajo", color: "var(--warning)", bg: "rgba(255,214,10,0.12)" };
+    return { label: "OK", color: "var(--success)", bg: "rgba(48,209,88,0.12)" };
   };
 
   const TH: React.CSSProperties = {
@@ -73,7 +73,7 @@ export default function StockTab({ onAdjust }: Props) {
     textAlign: "left",
     fontSize: 11,
     fontWeight: 600,
-    color: "var(--text-tertiary)",
+    color: "var(--text-dim)",
     textTransform: "uppercase",
     letterSpacing: "0.5px",
     whiteSpace: "nowrap",
@@ -86,7 +86,7 @@ export default function StockTab({ onAdjust }: Props) {
   const TD: React.CSSProperties = {
     padding: "11px 14px",
     fontSize: 13,
-    color: "var(--text-primary)",
+    color: "var(--text)",
     borderBottom: "1px solid var(--border)",
     verticalAlign: "middle",
   };
@@ -102,9 +102,9 @@ export default function StockTab({ onAdjust }: Props) {
             style={{
               padding: "5px 12px", borderRadius: 6, fontSize: 12,
               fontWeight: filter === f.value ? 600 : 400,
-              background: filter === f.value ? "var(--brand)" : "var(--surface)",
-              color: filter === f.value ? "#fff" : "var(--text-secondary)",
-              border: `1px solid ${filter === f.value ? "var(--brand)" : "var(--border)"}`,
+              background: filter === f.value ? "var(--primary)" : "var(--surface)",
+              color: filter === f.value ? "#fff" : "var(--text-muted)",
+              border: `1px solid ${filter === f.value ? "var(--primary)" : "var(--border)"}`,
               transition: "all 0.12s",
             }}
           >
@@ -114,9 +114,9 @@ export default function StockTab({ onAdjust }: Props) {
       </div>
 
       {isLoading ? (
-        <div style={{ padding: 24, color: "var(--text-tertiary)", fontSize: 13 }}>Cargando...</div>
+        <div style={{ padding: 24, color: "var(--text-dim)", fontSize: 13 }}>Cargando...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-tertiary)", fontSize: 14 }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-dim)", fontSize: 14 }}>
           No hay items en esta categoría
         </div>
       ) : (
@@ -139,19 +139,19 @@ export default function StockTab({ onAdjust }: Props) {
                     <td style={TD}>
                       <p style={{ fontWeight: 500 }}>{item.name}</p>
                       {item.subcategory && (
-                        <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>{item.subcategory}</p>
+                        <p style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 1 }}>{item.subcategory}</p>
                       )}
                     </td>
-                    <td style={{ ...TD, color: "var(--text-secondary)" }}>
+                    <td style={{ ...TD, color: "var(--text-muted)" }}>
                       {item.category ?? "—"}
                     </td>
                     <td style={{ ...TD, fontWeight: 600 }}>
                       {item.track_stock === 1 ? (
-                        <span style={{ color: item.stock === 0 ? "var(--brand)" : "var(--text-primary)" }}>
+                        <span style={{ color: item.stock === 0 ? "var(--primary)" : "var(--text)" }}>
                           {item.total_imeis > 0 ? item.available_imeis : item.stock}
                         </span>
                       ) : (
-                        <span style={{ color: "var(--text-tertiary)" }}>—</span>
+                        <span style={{ color: "var(--text-dim)" }}>—</span>
                       )}
                     </td>
                     <td style={TD}>
@@ -169,21 +169,21 @@ export default function StockTab({ onAdjust }: Props) {
                             autoFocus
                             style={{
                               width: 64, padding: "4px 8px",
-                              background: "var(--surface-2)", border: "1px solid var(--brand)",
-                              borderRadius: 6, color: "var(--text-primary)", fontSize: 13, outline: "none",
+                              background: "var(--surface-2)", border: "1px solid var(--primary)",
+                              borderRadius: 6, color: "var(--text)", fontSize: 13, outline: "none",
                             }}
                           />
                         ) : (
                           <span
                             onClick={() => { setEditingMinId(item.id); setEditMinValue(String(item.stock_min)); }}
                             title="Click para editar"
-                            style={{ cursor: "pointer", color: "var(--text-secondary)" }}
+                            style={{ cursor: "pointer", color: "var(--text-muted)" }}
                           >
                             {item.stock_min}
                           </span>
                         )
                       ) : (
-                        <span style={{ color: "var(--text-tertiary)" }}>—</span>
+                        <span style={{ color: "var(--text-dim)" }}>—</span>
                       )}
                     </td>
                     <td style={TD}>
@@ -195,7 +195,7 @@ export default function StockTab({ onAdjust }: Props) {
                         {status.label}
                       </span>
                     </td>
-                    <td style={{ ...TD, color: "var(--text-tertiary)", fontSize: 12 }}>
+                    <td style={{ ...TD, color: "var(--text-dim)", fontSize: 12 }}>
                       {item.last_sale_date ? formatDate(item.last_sale_date) : "—"}
                     </td>
                     <td style={TD}>
@@ -206,7 +206,7 @@ export default function StockTab({ onAdjust }: Props) {
                           style={{
                             padding: "5px 10px", borderRadius: 6,
                             background: "var(--surface-2)", border: "1px solid var(--border)",
-                            fontSize: 12, color: "var(--text-secondary)", fontWeight: 500,
+                            fontSize: 12, color: "var(--text-muted)", fontWeight: 500,
                             whiteSpace: "nowrap",
                           }}
                         >

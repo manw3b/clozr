@@ -35,7 +35,7 @@ function ProductThumbnail({ imagePath, category }: { imagePath: string | null | 
       ) : category ? (
         <span style={{ fontSize: 18 }}>{categoryEmoji(category)}</span>
       ) : (
-        <Package size={16} color="var(--text-tertiary)" />
+        <Package size={16} color="var(--text-dim)" />
       )}
     </div>
   );
@@ -45,21 +45,21 @@ function ConditionBadge({ item }: { item: CatalogItemWithImeis }) {
   const condition = item.condition ?? "new";
   if (condition === "new") {
     return (
-      <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 4, background: "rgba(48,209,88,0.15)", color: "var(--green)" }}>
+      <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 4, background: "rgba(48,209,88,0.15)", color: "var(--success)" }}>
         Nuevo
       </span>
     );
   }
   if (condition === "refurbished") {
     return (
-      <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 4, background: "rgba(10,132,255,0.15)", color: "var(--blue)" }}>
+      <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 4, background: "rgba(10,132,255,0.15)", color: "var(--info)" }}>
         Reacond.
       </span>
     );
   }
   const grade = item.conditionDetails?.grade;
   return (
-    <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 4, background: "rgba(255,214,10,0.15)", color: "var(--amber)" }}>
+    <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 4, background: "rgba(255,214,10,0.15)", color: "var(--warning)" }}>
       {grade ? `Usado - Grado ${grade}` : "Usado"}
     </span>
   );
@@ -125,7 +125,7 @@ export default function ProductsTab({ onEdit, onAddImeis, onAdjust }: Props) {
     textAlign: "left",
     fontSize: 11,
     fontWeight: 600,
-    color: "var(--text-tertiary)",
+    color: "var(--text-dim)",
     textTransform: "uppercase",
     letterSpacing: "0.5px",
     whiteSpace: "nowrap",
@@ -137,8 +137,8 @@ export default function ProductsTab({ onEdit, onAddImeis, onAdjust }: Props) {
 
   const summaryCards = [
     { label: "Total items", value: String(summary?.total_items ?? 0) },
-    { label: "Con stock", value: String(summary?.in_stock ?? 0), color: "var(--green)" },
-    { label: "Sin stock", value: String(summary?.out_of_stock ?? 0), color: (summary?.out_of_stock ?? 0) > 0 ? "var(--brand)" : undefined },
+    { label: "Con stock", value: String(summary?.in_stock ?? 0), color: "var(--success)" },
+    { label: "Sin stock", value: String(summary?.out_of_stock ?? 0), color: (summary?.out_of_stock ?? 0) > 0 ? "var(--primary)" : undefined },
     { label: "Valor inventario", value: formatCurrency(summary?.total_value ?? 0) },
   ];
 
@@ -148,10 +148,10 @@ export default function ProductsTab({ onEdit, onAddImeis, onAdjust }: Props) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
         {summaryCards.map((card) => (
           <div key={card.label} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
-            <p style={{ fontSize: 11, color: "var(--text-tertiary)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>
+            <p style={{ fontSize: 11, color: "var(--text-dim)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>
               {card.label}
             </p>
-            <p style={{ fontSize: 20, fontWeight: 700, color: card.color ?? "var(--text-primary)", letterSpacing: -0.5 }}>
+            <p style={{ fontSize: 20, fontWeight: 700, color: card.color ?? "var(--text)", letterSpacing: -0.5 }}>
               {card.value}
             </p>
           </div>
@@ -160,9 +160,9 @@ export default function ProductsTab({ onEdit, onAddImeis, onAdjust }: Props) {
 
       {/* Table */}
       {isLoading ? (
-        <div style={{ padding: 24, color: "var(--text-tertiary)", fontSize: 13 }}>Cargando...</div>
+        <div style={{ padding: 24, color: "var(--text-dim)", fontSize: 13 }}>Cargando...</div>
       ) : items.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-tertiary)", fontSize: 14 }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-dim)", fontSize: 14 }}>
           No hay productos en el catálogo
         </div>
       ) : (
@@ -236,7 +236,7 @@ function ProductRow({
   const TD: React.CSSProperties = {
     padding: "11px 14px",
     fontSize: 13,
-    color: "var(--text-primary)",
+    color: "var(--text)",
     borderBottom: "1px solid var(--border)",
     verticalAlign: "middle",
   };
@@ -256,7 +256,7 @@ function ProductRow({
       <td style={TD}>
         <p style={{ fontWeight: 500 }}>{item.name}</p>
         {item.subcategory && (
-          <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>{item.subcategory}</p>
+          <p style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 1 }}>{item.subcategory}</p>
         )}
       </td>
 
@@ -266,17 +266,17 @@ function ProductRow({
       </td>
 
       {/* Category */}
-      <td style={{ ...TD, color: "var(--text-secondary)" }}>
-        {item.category ?? <span style={{ color: "var(--text-tertiary)" }}>—</span>}
+      <td style={{ ...TD, color: "var(--text-muted)" }}>
+        {item.category ?? <span style={{ color: "var(--text-dim)" }}>—</span>}
       </td>
 
       {/* Price */}
-      <td style={{ ...TD, fontWeight: item.price !== null ? 600 : 400, color: item.price !== null ? "var(--text-primary)" : "var(--text-tertiary)" }}>
+      <td style={{ ...TD, fontWeight: item.price !== null ? 600 : 400, color: item.price !== null ? "var(--text)" : "var(--text-dim)" }}>
         {item.price !== null ? formatCurrency(item.price, item.currency) : "—"}
       </td>
 
       {/* Currency */}
-      <td style={{ ...TD, color: "var(--text-tertiary)" }}>{item.currency}</td>
+      <td style={{ ...TD, color: "var(--text-dim)" }}>{item.currency}</td>
 
       {/* Stock */}
       <td style={TD}>
@@ -292,8 +292,8 @@ function ProductRow({
                 autoFocus
                 style={{
                   width: 64, padding: "4px 8px",
-                  background: "var(--surface-2)", border: "1px solid var(--brand)",
-                  borderRadius: 6, color: "var(--text-primary)", fontSize: 13, outline: "none",
+                  background: "var(--surface-2)", border: "1px solid var(--primary)",
+                  borderRadius: 6, color: "var(--text)", fontSize: 13, outline: "none",
                 }}
               />
             ) : (
@@ -304,7 +304,7 @@ function ProductRow({
                   display: "inline-flex", alignItems: "center", gap: 6,
                   padding: "3px 9px",
                   background: noStock ? "rgba(232,0,29,0.15)" : "rgba(48,209,88,0.15)",
-                  color: noStock ? "var(--brand)" : "var(--green)",
+                  color: noStock ? "var(--primary)" : "var(--success)",
                   borderRadius: 20, fontSize: 11, fontWeight: 600,
                   cursor: "pointer",
                 }}
@@ -315,7 +315,7 @@ function ProductRow({
             )}
           </div>
         ) : (
-          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>
+          <span style={{ fontSize: 12, color: "var(--text-dim)" }}>—</span>
         )}
       </td>
 
@@ -325,7 +325,7 @@ function ProductRow({
           onClick={onToggleTrack}
           style={{
             width: 36, height: 20, borderRadius: 10,
-            background: item.track_stock === 1 ? "var(--brand)" : "var(--surface-3)",
+            background: item.track_stock === 1 ? "var(--primary)" : "var(--surface-2)",
             position: "relative", transition: "background 0.2s",
           }}
         >
@@ -371,8 +371,8 @@ function ActionBtn({
       style={{
         width: 28, height: 28, borderRadius: 6,
         display: "flex", alignItems: "center", justifyContent: "center",
-        background: h ? (danger ? "rgba(232,0,29,0.15)" : "var(--surface-3)") : "transparent",
-        color: danger ? "var(--brand)" : "var(--text-tertiary)",
+        background: h ? (danger ? "rgba(232,0,29,0.15)" : "var(--surface-2)") : "transparent",
+        color: danger ? "var(--primary)" : "var(--text-dim)",
         fontSize: 12, fontWeight: 700,
         transition: "background 0.1s",
       }}

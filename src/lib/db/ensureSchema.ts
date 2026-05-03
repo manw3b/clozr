@@ -11,7 +11,12 @@ import { dbExecute } from "./index";
  * Es idempotente: se puede correr en cada arranque sin efectos secundarios.
  */
 export async function ensurePricingSchema(): Promise<void> {
-  // ─── 022: sales.payment_method ──────────────────────────
+  // ─── sales: columnas potencialmente faltantes en DBs viejas ──
+  // (algunas se crearon en 001, otras en 011/022/025; defensivo igual)
+  await safe(() => dbExecute(`ALTER TABLE sales ADD COLUMN customer_name TEXT`));
+  await safe(() => dbExecute(`ALTER TABLE sales ADD COLUMN seller_id TEXT`));
+  await safe(() => dbExecute(`ALTER TABLE sales ADD COLUMN seller_name TEXT`));
+  await safe(() => dbExecute(`ALTER TABLE sales ADD COLUMN business_id TEXT`));
   await safe(() => dbExecute(`ALTER TABLE sales ADD COLUMN payment_method TEXT`));
 
   // ─── 023: payment_methods ───────────────────────────────

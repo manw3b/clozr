@@ -11,6 +11,8 @@ export type ScreenId =
   | "stock"
   | "stock-list"
   | "cash"
+  | "deudas"
+  | "reportes"
   | "team"
   | "settings";
 

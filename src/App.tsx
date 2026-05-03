@@ -22,6 +22,8 @@ import { Caja } from "./pages/caja/Caja";
 // Migrated to new design system
 import { Tareas } from "./pages/tareas/Tareas";
 import { Equipo } from "./pages/equipo/Equipo";
+import { Deudas } from "./pages/deudas/Deudas";
+import { Reportes } from "./pages/reportes/Reportes";
 
 // Legacy screens (skin pass applied; will be fully migrated later)
 import OnboardingScreen from "./features/onboarding/OnboardingScreen";
@@ -29,6 +31,7 @@ import InventoryScreen from "./features/inventory/InventoryScreen";
 import SettingsScreen from "./features/settings/SettingsScreen";
 
 import Toaster from "./components/Toaster";
+import { CommandPalette } from "./components/CommandPalette";
 import { checkForUpdate, downloadAndInstall, type UpdateStatus } from "./lib/updater";
 import logoIsotipo from "./assets/logo-isotipo.svg";
 
@@ -151,6 +154,8 @@ export default function App() {
       case "pipeline": return <Pipeline />;
       case "sales": return <Ventas />;
       case "tasks": return <Tareas />;
+      case "deudas": return <Deudas />;
+      case "reportes": return <Reportes />;
       case "inventory":
       case "catalog":
       case "stock":
@@ -168,7 +173,8 @@ export default function App() {
         onNavigate={(id) => setActiveScreen(id as ScreenId)}
         workspace={{ name: activeBusiness?.name ?? activeWorkspace.name, emoji: activeBusiness?.emoji ?? activeWorkspace.emoji }}
         user={{ name: userName ?? "Usuario", email: "" }}
-        onSearchClick={() => { /* TODO Fase 4: Cmd+K modal */ }}
+        onSearchClick={() => { window.dispatchEvent(new CustomEvent("clozr:open-cmdk")); }}
+        onNotificationClick={(screen) => setActiveScreen(screen as ScreenId)}
         onNewAction={(action) => {
           switch (action) {
             case "cliente":
@@ -194,6 +200,7 @@ export default function App() {
       >
         {renderScreen(activeScreen)}
       </AppShell>
+      <CommandPalette />
       <Toaster />
     </>
   );

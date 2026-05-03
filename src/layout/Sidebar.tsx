@@ -8,6 +8,8 @@ import {
   CheckSquare,
   Settings,
   UsersRound,
+  Receipt,
+  BarChart3,
   ChevronLeft,
   type LucideIcon,
 } from 'lucide-react';
@@ -35,8 +37,15 @@ const SECTIONS: { title?: string; items: SidebarItem[] }[] = [
     title: 'Operaciones',
     items: [
       { id: 'cash', label: 'Caja', icon: Wallet },
+      { id: 'deudas', label: 'Deudas', icon: Receipt },
       { id: 'inventory', label: 'Inventario', icon: Package },
       { id: 'tasks', label: 'Tareas', icon: CheckSquare },
+    ],
+  },
+  {
+    title: 'Análisis',
+    items: [
+      { id: 'reportes', label: 'Reportes', icon: BarChart3 },
     ],
   },
   {

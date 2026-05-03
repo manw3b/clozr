@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { Sidebar } from './Sidebar';
-import { Topbar, type NewAction } from './Topbar';
+import { Topbar, type NewAction, type NotifNavigate } from './Topbar';
 import { color } from '../tokens';
 
 interface AppShellProps {
@@ -10,6 +10,7 @@ interface AppShellProps {
   user: { name: string; email: string };
   onSearchClick?: () => void;
   onNewAction?: (action: NewAction) => void;
+  onNotificationClick?: (screen: NotifNavigate) => void;
   children: ReactNode;
   /** Right drawer opcional. Cuando se pasa, se renderiza al costado derecho. */
   drawer?: ReactNode;
@@ -27,6 +28,7 @@ export function AppShell({
   user,
   onSearchClick = () => {},
   onNewAction = () => {},
+  onNotificationClick = () => {},
   children,
   drawer,
 }: AppShellProps) {
@@ -58,7 +60,12 @@ export function AppShell({
           minWidth: 0,
         }}
       >
-        <Topbar workspace={workspace} onSearchClick={onSearchClick} onNewAction={onNewAction} />
+        <Topbar
+          workspace={workspace}
+          onSearchClick={onSearchClick}
+          onNewAction={onNewAction}
+          onNotificationClick={onNotificationClick}
+        />
 
         <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
           <main

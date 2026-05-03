@@ -18,6 +18,7 @@ import { useEffect } from "react";
 import type { CatalogItemWithImeis } from "../../lib/db/types";
 import { ProductDetailDrawer } from "./components/ProductDetailDrawer";
 import { AddProductSimpleModal } from "./components/AddProductSimpleModal";
+import { VisualProductPicker } from "./components/VisualProductPicker";
 import { NewSaleModal } from "../ventas/components/NewSaleModal";
 import { useCreateSale } from "../ventas/useSalesData";
 
@@ -30,7 +31,8 @@ export function Inventario() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<StockFilter>("todos");
   const [selected, setSelected] = useState<CatalogItemWithImeis | null>(null);
-  const [addOpen, setAddOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
   const [saleOpen, setSaleOpen] = useState(false);
   const createSaleMut = useCreateSale();
 
@@ -74,7 +76,7 @@ export function Inventario() {
             <Button
               variant="secondary"
               iconLeft={<Plus size={14} />}
-              onClick={() => setAddOpen(true)}
+              onClick={() => setPickerOpen(true)}
             >
               Agregar producto
             </Button>
@@ -124,7 +126,7 @@ export function Inventario() {
             description={search.trim() ? "Probá otro término" : "Cargá productos para empezar."}
             action={
               !search.trim()
-                ? { label: "Agregar producto", onClick: () => setAddOpen(true), iconLeft: <Plus size={14} /> }
+                ? { label: "Agregar producto", onClick: () => setPickerOpen(true), iconLeft: <Plus size={14} /> }
                 : undefined
             }
           />
@@ -152,12 +154,26 @@ export function Inventario() {
         }}
       />
 
-      <AddProductSimpleModal
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
+      <VisualProductPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
         wid={wid}
         onCreated={(item) => {
-          setAddOpen(false);
+          setPickerOpen(false);
+          setSelected(item);
+        }}
+        onSwitchToManual={() => {
+          setPickerOpen(false);
+          setManualOpen(true);
+        }}
+      />
+
+      <AddProductSimpleModal
+        open={manualOpen}
+        onClose={() => setManualOpen(false)}
+        wid={wid}
+        onCreated={(item) => {
+          setManualOpen(false);
           setSelected(item);
         }}
       />

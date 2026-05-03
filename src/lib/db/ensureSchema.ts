@@ -40,6 +40,8 @@ export async function ensurePricingSchema(): Promise<void> {
 
   // ─── 024: catalog_items.cost_usd + catalog_prices ───────
   await safe(() => dbExecute(`ALTER TABLE catalog_items ADD COLUMN cost_usd REAL DEFAULT 0`));
+  // updated_at faltante en el schema original (1.0) — necesario para setCatalogCost
+  await safe(() => dbExecute(`ALTER TABLE catalog_items ADD COLUMN updated_at TEXT`));
   await safe(() =>
     dbExecute(
       `CREATE TABLE IF NOT EXISTS catalog_prices (

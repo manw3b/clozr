@@ -16,6 +16,7 @@ import {
 } from "../../../lib/db/quickStock";
 import { catalogDb } from "../../../lib/db/catalog";
 import { pricingDb } from "../../../lib/db/pricing";
+import { ensurePricingSchema } from "../../../lib/db/ensureSchema";
 import { useUIStore } from "../../../store/uiStore";
 import { getTemplateImageUrl, categoryEmoji } from "../../../lib/templates/productImageMap";
 import { color, radius, space, text, weight } from "../../../tokens";
@@ -101,6 +102,7 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
   const createMut = useMutation({
     mutationFn: async () => {
       if (!picked.category || !picked.model) throw new Error("Faltan datos");
+      await ensurePricingSchema();
       const item = await catalogDb.create(wid, {
         name: finalName,
         category: picked.category.name,

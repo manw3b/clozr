@@ -5,6 +5,7 @@ import { Button } from "../../../components/Button";
 import { Input, Select } from "../../../components/Input";
 import { catalogDb } from "../../../lib/db/catalog";
 import { pricingDb } from "../../../lib/db/pricing";
+import { ensurePricingSchema } from "../../../lib/db/ensureSchema";
 import { useUIStore } from "../../../store/uiStore";
 import { space } from "../../../tokens";
 import type { CatalogItemWithImeis } from "../../../lib/db/types";
@@ -45,6 +46,7 @@ export function AddProductSimpleModal({ open, onClose, wid, onCreated }: Props) 
 
   const mut = useMutation({
     mutationFn: async () => {
+      await ensurePricingSchema();
       const item = await catalogDb.create(wid, {
         name: name.trim(),
         category,

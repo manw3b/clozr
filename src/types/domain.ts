@@ -84,7 +84,9 @@ export type FollowUpReason =
   | 'lead-tibio'
   | 'sin-respuesta'
   | 'recordatorio'
-  | 'cobro-pendiente';
+  | 'cobro-pendiente'
+  | 'post-venta'
+  | 'cliente-inactivo';
 
 export interface FollowUp {
   id: string;

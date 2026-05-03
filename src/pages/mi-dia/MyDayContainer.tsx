@@ -156,12 +156,15 @@ export function MyDayContainer() {
       onNewSale={() => setNewSaleOpen(true)}
       onToggleTask={(id) => toggleTaskMut.mutate(id)}
       onMarkPaid={(id) => markPaidMut.mutate(id)}
-      onWhatsApp={(clientId) => {
+      onWhatsApp={(clientId, opts) => {
         const customer = customersQ.data?.find((c) => c.id === clientId);
         if (customer?.phone) {
           const num = customer.phone.replace(/\D/g, "");
           const final = num.startsWith("54") ? num : `54${num}`;
-          window.open(`https://wa.me/${final}`, "_blank");
+          const url = opts?.message
+            ? `https://wa.me/${final}?text=${encodeURIComponent(opts.message)}`
+            : `https://wa.me/${final}`;
+          window.open(url, "_blank");
           recordContactMut.mutate({ customerId: clientId, kind: "whatsapp" });
         }
       }}

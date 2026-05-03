@@ -335,6 +335,8 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
   await safe(() => dbExecute(`ALTER TABLE cash_movements ADD COLUMN reference_type TEXT`));
   await safe(() => dbExecute(`ALTER TABLE followups ADD COLUMN customer_name TEXT`));
   await safe(() => dbExecute(`ALTER TABLE followups ADD COLUMN customer_id TEXT`));
+  // Tipo de followup: 'manual' | 'auto-postsale' | 'auto-inactive' | 'cobro-pendiente'
+  await safe(() => dbExecute(`ALTER TABLE followups ADD COLUMN kind TEXT DEFAULT 'manual'`));
 
   // ════════════════════════════════════════════════════════════
   // 013 — exchange rate + workspace.daily_goal

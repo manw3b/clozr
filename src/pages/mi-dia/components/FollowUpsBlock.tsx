@@ -14,12 +14,14 @@ interface FollowUpsBlockProps {
   onViewAll: () => void;
 }
 
-const reasonLabels: Record<FollowUpReason, { label: string; tone: 'warning' | 'danger' | 'info' | 'primary' }> = {
+const reasonLabels: Record<FollowUpReason, { label: string; tone: 'warning' | 'danger' | 'info' | 'primary' | 'success' }> = {
   'cotizacion-enviada': { label: 'Cotización enviada', tone: 'info' },
   'lead-tibio': { label: 'Lead tibio', tone: 'warning' },
   'sin-respuesta': { label: 'Sin respuesta', tone: 'danger' },
   recordatorio: { label: 'Recordatorio', tone: 'primary' },
   'cobro-pendiente': { label: 'Cobro pendiente', tone: 'danger' },
+  'post-venta': { label: 'Post-venta', tone: 'success' },
+  'cliente-inactivo': { label: 'Cliente inactivo', tone: 'warning' },
 };
 
 export function FollowUpsBlock({ followUps, onWhatsApp, onCall, onViewAll }: FollowUpsBlockProps) {

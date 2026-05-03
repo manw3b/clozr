@@ -7,13 +7,14 @@ import { CollectionsBlock } from './components/CollectionsBlock';
 import { InactiveClientsBlock } from './components/InactiveClientsBlock';
 import { space } from '../../tokens';
 import type { MyDayData, Task } from '../../types/domain';
+import { buildFollowupWhatsAppMessage } from '../../lib/followupTemplates';
 
 interface MyDayProps {
   data: MyDayData;
   /** Handlers — en producción, estos disparan acciones que llaman a TanStack Query mutations */
   onToggleTask?: (id: string) => void;
   onTaskClick?: (task: Task) => void;
-  onWhatsApp?: (clientId: string) => void;
+  onWhatsApp?: (clientId: string, opts?: { message?: string }) => void;
   onCall?: (clientId: string) => void;
   onMarkPaid?: (collectionId: string) => void;
   onSaleClick?: (saleId: string) => void;
@@ -92,7 +93,7 @@ export function MyDay({
 
           <FollowUpsBlock
             followUps={data.followUps}
-            onWhatsApp={(f) => onWhatsApp(f.clientId)}
+            onWhatsApp={(f) => onWhatsApp(f.clientId, { message: buildFollowupWhatsAppMessage(f) })}
             onCall={(f) => onCall(f.clientId)}
             onViewAll={() => onNavigate('pipeline')}
           />

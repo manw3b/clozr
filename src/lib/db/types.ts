@@ -33,6 +33,8 @@ export interface CashMovement {
   created_at: string;
 }
 
+export type FollowupKind = "manual" | "auto-postsale" | "auto-inactive" | "cobro-pendiente";
+
 export interface Followup {
   id: string;
   workspace_id: string;
@@ -44,6 +46,7 @@ export interface Followup {
   completed: number;
   completed_at: string | null;
   created_at: string;
+  kind?: FollowupKind | null;
 }
 
 export interface CashSummary {
@@ -67,6 +70,7 @@ export interface CreateFollowupInput {
   customer_name?: string | null;
   text: string;
   due_date: string;
+  kind?: FollowupKind;
 }
 
 export interface UrgentPipelineItem {

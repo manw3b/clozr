@@ -4,6 +4,7 @@ import { useBusinessStore } from "../../store/businessStore";
 import { useAuthStore } from "../../store/authStore";
 import { salesDb } from "../../lib/db/sales";
 import { ensurePricingSchema } from "../../lib/db/ensureSchema";
+import { followupsDb } from "../../lib/db/followups";
 import { dbSaleRowToDomain } from "../../lib/mappers";
 import { qk, invalidate } from "../../lib/queryKeys";
 
@@ -105,7 +106,29 @@ export function useCreateSale() {
           },
         ],
       });
+
+      // Auto-followup post-venta a 30 días — solo si hay cliente identificado
+      if (input.clientId && input.clientName && activeBusiness?.id) {
+        const productDescription =
+          input.items[0]?.productDescription ?? "Producto";
+        try {
+          await followupsDb.createPostSaleFollowup(
+            wid,
+            activeBusiness.id,
+            input.clientId,
+            input.clientName,
+            productDescription,
+            30,
+          );
+        } catch {
+          /* el seguimiento es bonus, no falla la venta */
+        }
+      }
     },
-    onSuccess: () => invalidate.afterSaleChange(qc),
+    onSuccess: () => {
+      invalidate.afterSaleChange(qc);
+      // Invalidar followups también
+      qc.invalidateQueries({ queryKey: ["followups"] });
+    },
   });
 }

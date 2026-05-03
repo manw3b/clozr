@@ -84,11 +84,17 @@ export function dbTaskToDomain(t: DbTask): Task {
 export function dbFollowupToDomain(f: DbFollowup): FollowUp {
   const today = new Date().toISOString().slice(0, 10);
   const isOverdue = f.due_date < today;
+  // Reason desde el kind del DB; si no hay kind, deriva del estado
+  let reason: FollowUp["reason"];
+  if (f.kind === "auto-postsale") reason = "post-venta";
+  else if (f.kind === "auto-inactive") reason = "cliente-inactivo";
+  else if (f.kind === "cobro-pendiente") reason = "cobro-pendiente";
+  else reason = isOverdue ? "sin-respuesta" : "recordatorio";
   return {
     id: f.id,
     clientId: f.customer_id ?? "",
     clientName: f.customer_name ?? f.text.slice(0, 32),
-    reason: isOverdue ? "sin-respuesta" : "recordatorio",
+    reason,
     dueAt: f.due_date,
     notes: f.text,
   };

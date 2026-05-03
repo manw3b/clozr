@@ -11,6 +11,7 @@ import { productTemplatesDb } from "./lib/db/productTemplates";
 import { seedAppleCatalog, seedWatchAndMac, refreshIphoneCatalog } from "./lib/db/quickStock";
 import { applyImagesToTemplates } from "./lib/templates/applyImages";
 import { paymentMethodsDb } from "./lib/db/paymentMethods";
+import { followupsDb } from "./lib/db/followups";
 import { ensurePricingSchema } from "./lib/db/ensureSchema";
 
 // New design system pages
@@ -127,6 +128,18 @@ export default function App() {
       .then(() => paymentMethodsDb.seedDefaults(activeWorkspace.id))
       .catch(() => {});
   }, [activeWorkspace?.id, loadBusinesses, loadRate]);
+
+  // Scan de clientes inactivos: corre 1 vez al cargar workspace+business.
+  // Crea followups auto-inactive (idempotente: skip si ya hay uno pendiente
+  // por cliente).
+  useEffect(() => {
+    if (!activeWorkspace || !activeBusiness) return;
+    const wid = activeWorkspace.id;
+    const bid = activeBusiness.id;
+    followupsDb.scanInactiveCustomers(wid, bid, 60).catch(() => {});
+    // Solo dispara cuando cambian los IDs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorkspace?.id, activeBusiness?.id]);
 
   useEffect(() => {
     productTemplatesDb.seedBuiltinTemplates()

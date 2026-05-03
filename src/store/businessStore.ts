@@ -24,9 +24,30 @@ export const useBusinessStore = create<BusinessState>()(
       loadBusinesses: async (workspaceId: string) => {
         set({ isLoading: true });
         try {
-          const businesses = await businessesDb.getAll(workspaceId);
+          let businesses = await businessesDb.getAll(workspaceId);
+
+          // Auto-seed: si el workspace no tiene ningún negocio (DB nueva sin
+          // migración 011 aplicada), creamos uno default con el nombre del
+          // workspace. Así el dropdown nunca queda vacío.
+          if (businesses.length === 0) {
+            try {
+              const { workspaceDb } = await import("../lib/db/workspace");
+              const ws = await workspaceDb.getById(workspaceId);
+              const seeded = await businessesDb.create(workspaceId, {
+                name: ws?.name ?? "Mi negocio",
+                emoji: ws?.emoji ?? "🏪",
+              });
+              businesses = [seeded];
+            } catch {
+              const seeded = await businessesDb.create(workspaceId, {
+                name: "Mi negocio",
+                emoji: "🏪",
+              });
+              businesses = [seeded];
+            }
+          }
+
           const current = get().activeBusiness;
-          // keep active if it belongs to this workspace, else pick first
           const active =
             businesses.find((b) => b.id === current?.id) ?? businesses[0] ?? null;
           set({ businesses, activeBusiness: active, isLoading: false });

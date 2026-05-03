@@ -1,23 +1,21 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Plus, X } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { settingsDb } from "../../lib/db/settings";
-import { catalogFieldsDb } from "../../lib/db/catalog_fields";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import Select from "../../components/ui/Select";
 import ImageUpload from "../../components/ui/ImageUpload";
+import { ExchangeRateChip } from "../../components/ExchangeRateChip";
 import { PaymentMethodsSection } from "./PaymentMethodsSection";
 import { CatalogPricingSection } from "./CatalogPricingSection";
-import type {
-  PipelineStage, CustomerTypeRow, CatalogCategoryRow,
-  CatalogFieldTemplate, CatalogFieldType,
-} from "../../lib/db/types";
+import { FeaturedModelsSection } from "./FeaturedModelsSection";
+import type { PipelineStage, CustomerTypeRow } from "../../lib/db/types";
 
 // ── Shared ────────────────────────────────────────────────────────
 
-type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "payment-methods" | "catalog" | "catalog-pricing" | "data";
+type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "data";
 
 const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "general", label: "General" },
@@ -25,8 +23,8 @@ const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "pipeline", label: "Pipeline" },
   { id: "customer-types", label: "Tipos de cliente" },
   { id: "payment-methods", label: "Métodos de pago" },
-  { id: "catalog", label: "Catálogo" },
   { id: "catalog-pricing", label: "Precios del catálogo" },
+  { id: "catalog-featured", label: "Productos destacados" },
   { id: "data", label: "Datos y backup" },
 ];
 
@@ -240,6 +238,11 @@ function GeneralSection({ wid }: { wid: string }) {
 
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <SaveBtn onSave={handleSave} saving={saving} />
+        </div>
+
+        {/* Cotización USD → ARS */}
+        <div style={{ marginTop: 16 }}>
+          <ExchangeRateChip variant="full" />
         </div>
       </div>
     </div>
@@ -599,213 +602,6 @@ function CustomerTypesSection({ wid }: { wid: string }) {
   );
 }
 
-// ── Catalog categories section ─────────────────────────────────────
-
-const FIELD_TYPE_OPTIONS: Array<{ value: CatalogFieldType; label: string }> = [
-  { value: "text", label: "Texto" },
-  { value: "number", label: "Número" },
-  { value: "imei", label: "IMEI" },
-  { value: "select", label: "Selección" },
-  { value: "date", label: "Fecha" },
-];
-
-function CatalogSection({ wid }: { wid: string }) {
-  const { showToast } = useUIStore();
-  const queryClient = useQueryClient();
-  const [saving, setSaving] = useState(false);
-
-  const { data: dbCats = [] } = useQuery({
-    queryKey: ["catalog-categories", wid],
-    queryFn: () => settingsDb.getCatalogCategories(wid),
-    enabled: !!wid,
-  });
-
-  const [cats, setCats] = useState<CatalogCategoryRow[]>([]);
-  const [isDirty, setIsDirty] = useState(false);
-
-  useEffect(() => { setCats(dbCats); setIsDirty(false); }, [dbCats]);
-
-  const update = useCallback((updated: CatalogCategoryRow[]) => { setCats(updated); setIsDirty(true); }, []);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await settingsDb.saveCatalogCategories(wid, cats);
-      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === "catalog-categories" });
-      setIsDirty(false);
-      showToast("Categorías guardadas", "success");
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : "Error al guardar");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Custom field templates
-  const { data: allTemplates = [] } = useQuery({
-    queryKey: ["catalog-field-templates", wid],
-    queryFn: () => catalogFieldsDb.getTemplates(wid),
-    enabled: !!wid,
-  });
-
-  const [templates, setTemplates] = useState<CatalogFieldTemplate[]>([]);
-  const [templatesDirty, setTemplatesDirty] = useState(false);
-  const [savingTemplates, setSavingTemplates] = useState(false);
-
-  useEffect(() => { setTemplates(allTemplates); setTemplatesDirty(false); }, [allTemplates]);
-
-  const updateTemplate = useCallback((updated: CatalogFieldTemplate[]) => {
-    setTemplates(updated); setTemplatesDirty(true);
-  }, []);
-
-  const handleSaveTemplates = async () => {
-    setSavingTemplates(true);
-    try {
-      await catalogFieldsDb.saveTemplates(wid, templates);
-      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === "catalog-field-templates" });
-      setTemplatesDirty(false);
-      showToast("Campos guardados", "success");
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : "Error al guardar");
-    } finally {
-      setSavingTemplates(false);
-    }
-  };
-
-  const addTemplate = () => {
-    updateTemplate([
-      ...templates,
-      {
-        id: crypto.randomUUID(),
-        workspace_id: wid,
-        category: cats[0]?.name ?? null,
-        field_key: `campo_${templates.length + 1}`,
-        field_label: "Nuevo campo",
-        field_type: "text",
-        options_json: null,
-        required: 0,
-        sort_order: templates.length,
-      },
-    ]);
-  };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-      {/* Categories */}
-      <div>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
-          <SectionHeader title="Categorías de catálogo" description="Categorías predefinidas para tus productos" />
-          {isDirty && <SaveBtn onSave={handleSave} saving={saving} label="Guardar cambios" />}
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, maxWidth: 400 }}>
-          {cats.map((cat, idx) => (
-            <div key={cat.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }}>
-              <span style={{ fontSize: 11, color: "var(--text-dim)", width: 20, textAlign: "right", flexShrink: 0 }}>{idx + 1}</span>
-              <input
-                value={cat.name}
-                onChange={(e) => update(cats.map((c) => c.id === cat.id ? { ...c, name: e.target.value } : c))}
-                style={{ flex: 1, padding: "5px 8px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 6, color: "var(--text)", fontSize: 13, outline: "none" }}
-              />
-              <button onClick={() => update(cats.filter((c) => c.id !== cat.id).map((c, i) => ({ ...c, sort_order: i })))}
-                style={{ width: 24, height: 24, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", flexShrink: 0 }}>
-                <X size={13} />
-              </button>
-            </div>
-          ))}
-          <button
-            onClick={() => update([...cats, { id: crypto.randomUUID(), workspace_id: wid, name: "Nueva categoría", sort_order: cats.length }])}
-            style={{ marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 12px", background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: 8, fontSize: 13, color: "var(--text-muted)" }}
-          >
-            <Plus size={13} />
-            Agregar categoría
-          </button>
-        </div>
-      </div>
-
-      {/* Custom field templates */}
-      <div>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
-          <SectionHeader
-            title="Campos por categoría"
-            description="Campos personalizados que aparecen al crear productos según su categoría"
-          />
-          {templatesDirty && (
-            <SaveBtn onSave={handleSaveTemplates} saving={savingTemplates} label="Guardar campos" />
-          )}
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 680 }}>
-          {templates.map((t) => (
-            <div
-              key={t.id}
-              style={{ display: "grid", gridTemplateColumns: "140px 1fr 110px 90px auto", gap: 8, alignItems: "center", padding: "10px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }}
-            >
-              {/* Category */}
-              <Select
-                value={t.category ?? ""}
-                onChange={(v) => updateTemplate(templates.map((x) => x.id === t.id ? { ...x, category: v || null } : x))}
-                options={[
-                  { value: "", label: "Todas" },
-                  ...cats.map((c) => ({ value: c.name, label: c.name })),
-                ]}
-              />
-              {/* Label */}
-              <input
-                value={t.field_label}
-                onChange={(e) => updateTemplate(templates.map((x) => x.id === t.id ? { ...x, field_label: e.target.value, field_key: e.target.value.toLowerCase().replace(/\s+/g, "_") } : x))}
-                placeholder="Etiqueta del campo"
-                style={{ padding: "7px 10px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 6, color: "var(--text)", fontSize: 13, outline: "none" }}
-              />
-              {/* Type */}
-              <Select
-                value={t.field_type}
-                onChange={(v) => updateTemplate(templates.map((x) => x.id === t.id ? { ...x, field_type: v as CatalogFieldType } : x))}
-                options={FIELD_TYPE_OPTIONS}
-              />
-              {/* Options (for select type) */}
-              {t.field_type === "select" ? (
-                <input
-                  value={t.options_json ? JSON.parse(t.options_json).join(", ") : ""}
-                  onChange={(e) => {
-                    const opts = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
-                    updateTemplate(templates.map((x) => x.id === t.id ? { ...x, options_json: JSON.stringify(opts) } : x));
-                  }}
-                  placeholder="op1, op2..."
-                  title="Opciones separadas por coma"
-                  style={{ padding: "7px 10px", background: "var(--surface-2)", border: "1px solid var(--border-strong)", borderRadius: 6, color: "var(--text)", fontSize: 11, outline: "none" }}
-                />
-              ) : (
-                <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--text-muted)", cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={t.required === 1}
-                    onChange={(e) => updateTemplate(templates.map((x) => x.id === t.id ? { ...x, required: e.target.checked ? 1 : 0 } : x))}
-                    style={{ accentColor: "var(--primary)" }}
-                  />
-                  Requerido
-                </label>
-              )}
-              {/* Delete */}
-              <button
-                onClick={() => updateTemplate(templates.filter((x) => x.id !== t.id))}
-                style={{ width: 24, height: 24, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)" }}
-              >
-                <X size={13} />
-              </button>
-            </div>
-          ))}
-          <button
-            onClick={addTemplate}
-            style={{ marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 12px", background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: 8, fontSize: 13, color: "var(--text-muted)" }}
-          >
-            <Plus size={13} />
-            Agregar campo
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Data section ──────────────────────────────────────────────────
 
@@ -922,9 +718,9 @@ export default function SettingsScreen() {
       case "profile": return <ProfileSection />;
       case "pipeline": return <PipelineSection wid={wid} />;
       case "customer-types": return <CustomerTypesSection wid={wid} />;
-      case "catalog": return <CatalogSection wid={wid} />;
       case "payment-methods": return <PaymentMethodsSection wid={wid} />;
       case "catalog-pricing": return <CatalogPricingSection wid={wid} />;
+      case "catalog-featured": return <FeaturedModelsSection wid={wid} />;
       case "data": return <DataSection wid={wid} />;
     }
   };

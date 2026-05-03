@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, ArrowLeft, Check, Pencil } from "lucide-react";
+import { ChevronRight, ArrowLeft, Check, Pencil, Star } from "lucide-react";
 import { Modal } from "../../../components/Modal";
 import { Button } from "../../../components/Button";
 import { Input } from "../../../components/Input";
+import { Stepper } from "../../../components/Stepper";
 import {
   getCategories,
   getFamilies,
@@ -11,6 +12,7 @@ import {
   getColorsForModel,
   getStorageForColor,
   resolveVariant,
+  getCategoryFamilyTree,
   type ProductCategory,
   type ProductFamily,
   type ProductModel,
@@ -18,9 +20,10 @@ import {
 import { catalogDb } from "../../../lib/db/catalog";
 import { pricingDb } from "../../../lib/db/pricing";
 import { settingsDb } from "../../../lib/db/settings";
+import { featuredModelsDb } from "../../../lib/db/featuredModels";
 import { ensurePricingSchema } from "../../../lib/db/ensureSchema";
 import { useUIStore } from "../../../store/uiStore";
-import { getTemplateImageUrl, categoryEmoji } from "../../../lib/templates/productImageMap";
+import { getTemplateImageUrl, categoryEmoji, resolveColorImage } from "../../../lib/templates/productImageMap";
 import { color, radius, space, text, weight } from "../../../tokens";
 import type { CatalogItemWithImeis } from "../../../lib/db/types";
 
@@ -87,6 +90,13 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
     });
   }, [quantity]);
 
+  // Tree de categoría → familia con representative model image
+  const treeQ = useQuery({
+    queryKey: ["picker-tree", wid],
+    queryFn: () => getCategoryFamilyTree(wid),
+    enabled: open && !!wid,
+  });
+
   const categoriesQ = useQuery({
     queryKey: ["picker-categories"],
     queryFn: getCategories,
@@ -98,6 +108,14 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
     queryFn: () => (picked.category ? getFamilies(picked.category.id) : Promise.resolve([])),
     enabled: open && !!picked.category,
   });
+
+  // Set de modelos destacados del workspace
+  const featuredQ = useQuery({
+    queryKey: ["featured-models", wid],
+    queryFn: () => featuredModelsDb.getAll(wid),
+    enabled: open && !!wid,
+  });
+  const featuredMap = featuredQ.data ?? new Map<string, string | null>();
 
   const modelsQ = useQuery({
     queryKey: ["picker-models", picked.family?.id],
@@ -132,7 +150,27 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
     mutationFn: async () => {
       if (!picked.category || !picked.model) throw new Error("Faltan datos");
       await ensurePricingSchema();
-      const finalImage = picked.variantImage ?? picked.model.image_path ?? undefined;
+      // Resolución color-aware: variant.image_path > color-specific file
+      // (convención NombreModelo_Color.jpg) > model.image_path
+      const colorAwareUrl = resolveColorImage(
+        picked.category.name,
+        picked.model.name,
+        picked.color,
+        picked.variantImage ?? picked.model.image_path,
+      );
+      // Para guardar en DB necesitamos el path tipo /src/assets/products/...
+      // si resolveColorImage devolvió una URL hashed por Vite, lo que hizo es
+      // confirmar que existe; persistimos el path lógico que el helper sabe
+      // re-resolver al render. Construimos el path lógico:
+      const folder = inferAssetFolder(picked.category.name, picked.model.name);
+      const safeModel = picked.model.name.replace(/\s+/g, "_");
+      const safeColor = (picked.color ?? "").replace(/\s+/g, "_");
+      const colorAwarePath =
+        colorAwareUrl && folder && picked.color
+          ? `/src/assets/products/${folder}/${safeModel}_${safeColor}.jpg`
+          : null;
+      const finalImage = colorAwarePath ?? picked.variantImage ?? picked.model.image_path ?? undefined;
+
       const item = await catalogDb.create(wid, {
         name: finalName,
         category: picked.category.name,
@@ -171,6 +209,7 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
       qc.invalidateQueries({ queryKey: ["inventario"] });
       qc.invalidateQueries({ queryKey: ["catalog"] });
       qc.invalidateQueries({ queryKey: ["catalog-item-imeis", item.id] });
+      qc.invalidateQueries({ queryKey: ["picker-tree", wid] });
       const msg = addedImeis > 0
         ? `Producto creado · ${addedImeis} ${addedImeis === 1 ? "unidad cargada" : "unidades cargadas"}`
         : "Producto creado";
@@ -209,9 +248,22 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
     setPicked((p) => ({ category: p.category, family: p.family, model: m }));
     setStep("color");
   };
-  const pickColor = (color_: string, color_hex: string | null) => {
-    setPicked((p) => ({ ...p, color: color_, colorHex: color_hex, storage: undefined }));
-    setStep("storage");
+  const pickColor = async (color_: string, color_hex: string | null) => {
+    // Solo selecciona, no avanza. La preview de arriba se actualiza al color.
+    setPicked((p) => ({ ...p, color: color_, colorHex: color_hex, storage: undefined, variantImage: null }));
+    // Pre-cargamos el variantImage del color para que el preview se actualice
+    if (picked.model) {
+      try {
+        const v = await resolveVariant(picked.model.id, color_, null);
+        setPicked((p) => ({ ...p, variantImage: v?.image_path ?? null }));
+      } catch {
+        /* ignore */
+      }
+    }
+  };
+
+  const advanceFromColor = () => {
+    if (picked.color) setStep("storage");
   };
   const pickStorage = async (s: string | null) => {
     setPicked((p) => ({ ...p, storage: s }));
@@ -238,10 +290,21 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
   if (!open) return null;
 
   // ─── Render por step ───────────────────────────────────────
+  // Sucio si pasaste del primer paso o cargaste algún dato
+  const isDirty = () =>
+    step !== "category" ||
+    !!picked.category ||
+    !!costUsd.trim() ||
+    quantity > 1 ||
+    imeis.some((i) => i.trim()) ||
+    Object.values(prices).some((v) => v.trim());
+
   return (
     <Modal
       open={open}
       onClose={onClose}
+      isDirty={isDirty}
+      confirmCloseText="¿Cerrar y descartar el producto?"
       title="Agregar producto"
       subtitle={subtitleForStep(step)}
       maxWidth={780}
@@ -265,7 +328,18 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
                 Atrás
               </Button>
             )}
-            {step === "confirm" ? (
+            {step === "color" ? (
+              <>
+                <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+                <Button
+                  variant="primary"
+                  onClick={advanceFromColor}
+                  disabled={!picked.color}
+                >
+                  Siguiente →
+                </Button>
+              </>
+            ) : step === "confirm" ? (
               <Button
                 variant="primary"
                 iconLeft={<Check size={14} />}
@@ -292,8 +366,9 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
 
       {step === "category" && (
         <CategoryGrid
-          categories={categoriesQ.data ?? []}
-          loading={categoriesQ.isLoading}
+          tree={treeQ.data ?? []}
+          fallbackCategories={categoriesQ.data ?? []}
+          loading={categoriesQ.isLoading || treeQ.isLoading}
           onPick={pickCategory}
         />
       )}
@@ -301,6 +376,7 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
       {step === "family" && (
         <FamilyGrid
           families={familiesQ.data ?? []}
+          treeForCategory={treeQ.data?.find((c) => c.category.id === picked.category?.id)}
           loading={familiesQ.isLoading}
           onPick={pickFamily}
         />
@@ -310,6 +386,8 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
         <ModelGrid
           models={modelsQ.data ?? []}
           loading={modelsQ.isLoading}
+          featuredMap={featuredMap}
+          category={picked.category?.name}
           onPick={pickModel}
         />
       )}
@@ -319,6 +397,9 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
           model={picked.model}
           colors={colorsQ.data ?? []}
           loading={colorsQ.isLoading}
+          selectedColor={picked.color ?? null}
+          variantImage={picked.variantImage ?? null}
+          category={picked.category?.name}
           onPick={pickColor}
         />
       )}
@@ -336,6 +417,8 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
           name={finalName}
           model={picked.model}
           colorHex={picked.colorHex ?? null}
+          color={picked.color ?? null}
+          category={picked.category?.name}
           variantImage={picked.variantImage ?? null}
           costUsd={costUsd}
           onCostChange={setCostUsd}
@@ -462,50 +545,126 @@ function PickCard({
 }
 
 function CategoryGrid({
-  categories,
+  tree,
+  fallbackCategories,
   loading,
   onPick,
 }: {
-  categories: ProductCategory[];
+  tree: import("../../../lib/db/quickStock").CategoryWithRep[];
+  fallbackCategories: ProductCategory[];
   loading: boolean;
   onPick: (c: ProductCategory) => void;
 }) {
   if (loading) return <Loading />;
-  if (categories.length === 0) return <Empty msg="No hay categorías. Probá 'Cargar manualmente'." />;
+  const items =
+    tree.length > 0
+      ? tree.map((t) => ({
+          category: t.category,
+          repImage: t.repImage,
+          repModelName: t.repModelName,
+          repColor: t.repColor,
+        }))
+      : fallbackCategories.map((c) => ({
+          category: c,
+          repImage: null,
+          repModelName: null,
+          repColor: null,
+        }));
+  if (items.length === 0) return <Empty msg="No hay categorías. Probá 'Cargar manualmente'." />;
   return (
-    <div style={gridStyle(150)}>
-      {categories.map((c) => (
-        <PickCard key={c.id} onClick={() => onPick(c)} height={130}>
-          <span style={{ fontSize: 36 }}>{c.emoji ?? categoryEmoji(c.name)}</span>
-          <span style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text }}>
-            {c.name}
-          </span>
-        </PickCard>
-      ))}
+    <div style={gridStyle(160)}>
+      {items.map(({ category: c, repImage, repModelName, repColor }) => {
+        // Si hay color featured, intentamos resolver con la variante color-aware
+        const img = repColor && repModelName
+          ? resolveColorImage(c.name, repModelName, repColor, repImage)
+          : getTemplateImageUrl(repImage);
+        return (
+          <PickCard key={c.id} onClick={() => onPick(c)} height={170}>
+            <div
+              style={{
+                flex: 1,
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: color.surface2,
+                borderRadius: radius.sm,
+              }}
+            >
+              {img ? (
+                <img src={img} alt={c.name} style={{ maxWidth: "80%", maxHeight: 90, objectFit: "contain" }} />
+              ) : (
+                <span style={{ fontSize: 36 }}>{c.emoji ?? categoryEmoji(c.name)}</span>
+              )}
+            </div>
+            <span style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text }}>
+              {c.name}
+            </span>
+          </PickCard>
+        );
+      })}
     </div>
   );
 }
 
 function FamilyGrid({
   families,
+  treeForCategory,
   loading,
   onPick,
 }: {
   families: ProductFamily[];
+  treeForCategory: import("../../../lib/db/quickStock").CategoryWithRep | undefined;
   loading: boolean;
   onPick: (f: ProductFamily) => void;
 }) {
   if (loading) return <Loading />;
   if (families.length === 0) return <Empty msg="Sin líneas para esta categoría." />;
+  const repByFamily = new Map<
+    string,
+    { image: string | null; modelName: string | null; color: string | null }
+  >();
+  for (const fe of treeForCategory?.families ?? []) {
+    repByFamily.set(fe.family.id, {
+      image: fe.repImage,
+      modelName: fe.repModelName,
+      color: fe.repColor,
+    });
+  }
+  const categoryName = treeForCategory?.category.name;
   return (
-    <div style={gridStyle(160)}>
-      {families.map((f) => (
-        <PickCard key={f.id} onClick={() => onPick(f)} height={90}>
-          <span style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text }}>
-            {f.name}
-          </span>
-        </PickCard>
-      ))}
+    <div style={gridStyle(170)}>
+      {families.map((f) => {
+        const rep = repByFamily.get(f.id);
+        const img =
+          rep?.color && rep?.modelName
+            ? resolveColorImage(categoryName, rep.modelName, rep.color, rep.image ?? null)
+            : getTemplateImageUrl(rep?.image ?? null);
+        return (
+          <PickCard key={f.id} onClick={() => onPick(f)} height={170}>
+            <div
+              style={{
+                flex: 1,
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: color.surface2,
+                borderRadius: radius.sm,
+              }}
+            >
+              {img ? (
+                <img src={img} alt={f.name} style={{ maxWidth: "80%", maxHeight: 90, objectFit: "contain" }} />
+              ) : (
+                <span style={{ fontSize: 28, color: color.textDim }}>📦</span>
+              )}
+            </div>
+            <span style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text }}>
+              {f.name}
+            </span>
+          </PickCard>
+        );
+      })}
     </div>
   );
 }
@@ -513,19 +672,27 @@ function FamilyGrid({
 function ModelGrid({
   models,
   loading,
+  featuredMap,
+  category,
   onPick,
 }: {
   models: ProductModel[];
   loading: boolean;
+  featuredMap: Map<string, string | null>;
+  category?: string;
   onPick: (m: ProductModel) => void;
 }) {
   if (loading) return <Loading />;
   if (models.length === 0) return <Empty msg="Sin modelos." />;
   return (
     <div style={gridStyle(180)}>
-      {models.map((m, idx) => {
-        const img = getTemplateImageUrl(m.image_path);
-        const featured = idx === 0; // primero por sort_order = más reciente/tendencia
+      {models.map((m) => {
+        const featured = featuredMap.has(m.id);
+        const featuredColor = featuredMap.get(m.id) ?? null;
+        // Si está destacado con un color elegido, usamos esa variante
+        const img = featured && featuredColor
+          ? resolveColorImage(category, m.name, featuredColor, m.image_path)
+          : getTemplateImageUrl(m.image_path);
         return (
           <PickCard key={m.id} onClick={() => onPick(m)} height={196} featured={featured}>
             {featured && (
@@ -543,9 +710,13 @@ function ModelGrid({
                   padding: "2px 6px",
                   letterSpacing: "0.4px",
                   textTransform: "uppercase",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 3,
                 }}
               >
-                Tendencia
+                <Star size={10} fill={color.primary} stroke={color.primary} />
+                Destacado
               </span>
             )}
             <div
@@ -579,27 +750,41 @@ function ColorGrid({
   model,
   colors,
   loading,
+  selectedColor,
+  variantImage,
+  category,
   onPick,
 }: {
   model: ProductModel;
   colors: { color: string; color_hex: string | null }[];
   loading: boolean;
+  selectedColor: string | null;
+  variantImage: string | null;
+  category?: string;
   onPick: (c: string, hex: string | null) => void;
 }) {
   if (loading) return <Loading />;
   if (colors.length === 0) {
-    // Si no hay colores, salteamos el paso (raro pero defensivo)
     return <Empty msg="Sin colores definidos." />;
   }
-  const img = getTemplateImageUrl(model.image_path);
+  // Preview: variant > color-aware filename > model.image_path
+  const previewUrl = selectedColor
+    ? resolveColorImage(category, model.name, selectedColor, variantImage ?? model.image_path)
+    : getTemplateImageUrl(model.image_path);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: space[4] }}>
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        {img && <img src={img} alt={model.name} style={{ maxHeight: 140, objectFit: "contain" }} />}
+      <div style={{ display: "flex", justifyContent: "center", minHeight: 150 }}>
+        {previewUrl ? (
+          <img src={previewUrl} alt={model.name} style={{ maxHeight: 150, objectFit: "contain" }} />
+        ) : (
+          <span style={{ fontSize: 64 }}>📦</span>
+        )}
       </div>
       <div style={gridStyle(140)}>
-        {colors.map((c) => (
-          <PickCard key={c.color} onClick={() => onPick(c.color, c.color_hex)} height={110}>
+        {colors.map((c) => {
+          const selected = selectedColor === c.color;
+          return (
+          <PickCard key={c.color} onClick={() => onPick(c.color, c.color_hex)} height={110} featured={selected}>
             <div
               style={{
                 width: 38,
@@ -613,7 +798,8 @@ function ColorGrid({
               {c.color}
             </span>
           </PickCard>
-        ))}
+        );
+        })}
       </div>
     </div>
   );
@@ -656,6 +842,8 @@ function ConfirmPanel({
   name,
   model,
   colorHex,
+  color: pickedColor,
+  category,
   variantImage,
   costUsd,
   onCostChange,
@@ -672,6 +860,8 @@ function ConfirmPanel({
   name: string;
   model: ProductModel;
   colorHex: string | null;
+  color: string | null;
+  category?: string;
   variantImage: string | null;
   costUsd: string;
   onCostChange: (v: string) => void;
@@ -685,7 +875,10 @@ function ConfirmPanel({
   pricesOpen: boolean;
   onTogglePrices: () => void;
 }) {
-  const img = getTemplateImageUrl(variantImage) ?? getTemplateImageUrl(model.image_path);
+  // Color-aware: variant > color file > model
+  const img = pickedColor
+    ? resolveColorImage(category, model.name, pickedColor, variantImage ?? model.image_path)
+    : getTemplateImageUrl(variantImage) ?? getTemplateImageUrl(model.image_path);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: space[4] }}>
       {/* Hero: producto seleccionado */}
@@ -739,7 +932,7 @@ function ConfirmPanel({
       </div>
 
       {/* Costo + Cantidad */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: space[3] }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: space[3], alignItems: "end" }}>
         <div>
           <label style={SectionLabel}>Costo (USD) — opcional</label>
           <Input
@@ -752,13 +945,7 @@ function ConfirmPanel({
         </div>
         <div>
           <label style={SectionLabel}>Cantidad</label>
-          <Input
-            type="number"
-            min="1"
-            step="1"
-            value={String(quantity)}
-            onChange={(e) => onQuantityChange(Math.max(1, parseInt(e.target.value, 10) || 1))}
-          />
+          <Stepper value={quantity} onChange={onQuantityChange} min={1} max={500} width={140} />
         </div>
       </div>
 
@@ -853,6 +1040,17 @@ const SectionLabel: React.CSSProperties = {
   display: "block",
   marginBottom: space[2],
 };
+
+function inferAssetFolder(category: string | undefined, modelName: string): string | null {
+  const c = (category ?? "").toLowerCase();
+  const m = modelName.toLowerCase();
+  if (c === "iphone" || m.includes("iphone")) return "iphones";
+  if (c === "ipad" || m.includes("ipad")) return "ipads";
+  if (c.includes("watch") || m.includes("watch")) return "watch";
+  if (c === "mac" || m.includes("mac")) return "mac";
+  if (c.includes("airpod") || m.includes("airpod")) return "airpods";
+  return null;
+}
 
 function Loading() {
   return (

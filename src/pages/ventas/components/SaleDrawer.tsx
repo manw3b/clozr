@@ -111,7 +111,7 @@ export function SaleDrawer({
             fontVariantNumeric: 'tabular-nums',
           }}
         >
-          {formatMoney(sale.amount)}
+          {formatMoney(sale.amount, sale.currency as 'USD' | 'ARS')}
         </div>
         <div style={{ marginTop: space[2], display: 'inline-flex' }}>
           <StatusBadge status={sale.status} />

@@ -54,6 +54,10 @@ export const invalidate = {
     qc.invalidateQueries({ queryKey: qk.miDia() });
     qc.invalidateQueries({ queryKey: qk.cashAll() });
     qc.invalidateQueries({ queryKey: qk.clientsAll() });
+    // Inventario: las ventas con IMEI/auto-FIFO descuentan stock
+    qc.invalidateQueries({ queryKey: ["inventario"] });
+    qc.invalidateQueries({ queryKey: ["catalog"] });
+    qc.invalidateQueries({ queryKey: ["catalog-item-imeis"] });
   },
   /** Después de crear / editar / eliminar un cliente. */
   afterClientChange: (qc: import("@tanstack/react-query").QueryClient) => {

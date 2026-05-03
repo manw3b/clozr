@@ -55,7 +55,7 @@ export function Inventario() {
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
-      const units = (p.available_imeis ?? 0) + (p.track_stock ? p.stock ?? 0 : 0);
+      const units = p.track_stock ? (p.available_imeis ?? 0) : (p.stock ?? 0);
       if (filter === "disponibles" && units === 0) return false;
       if (filter === "agotados" && units > 0) return false;
       if (search.trim()) {
@@ -150,11 +150,6 @@ export function Inventario() {
       <ProductDetailDrawer
         item={selected}
         onClose={() => setSelected(null)}
-        onSellUnit={(catalogItem, imei) => {
-          setSelected(null);
-          setSalePreset({ catalogItem, imei: imei ?? null });
-          setSaleOpen(true);
-        }}
       />
 
       <VisualProductPicker
@@ -188,14 +183,10 @@ export function Inventario() {
           setSalePreset(null);
         }}
         preset={salePreset}
-        onSubmit={(data) => {
-          createSaleMut.mutate(data, {
-            onSuccess: () => {
-              showToast(data.outOfStock ? "Venta fuera de stock registrada" : "Venta registrada", "success");
-              setSaleOpen(false);
-              setSalePreset(null);
-            },
-          });
+        onSubmit={async (data) => {
+          await createSaleMut.mutateAsync(data);
+          showToast(data.outOfStock ? "Venta fuera de stock registrada" : "Venta registrada", "success");
+          setSalePreset(null);
         }}
       />
     </div>
@@ -203,8 +194,10 @@ export function Inventario() {
 }
 
 function ProductCard({ item, onClick }: { item: CatalogItemWithImeis; onClick: () => void }) {
-  const units = (item.available_imeis ?? 0) + (item.track_stock ? item.stock ?? 0 : 0);
-  const total = (item.total_imeis ?? 0) + (item.track_stock ? item.stock ?? 0 : 0);
+  // track_stock=1 → IMEIs son la fuente de verdad; el campo stock es solo cache.
+  // track_stock=0 → no hay IMEIs, usar stock genérico.
+  const units = item.track_stock ? (item.available_imeis ?? 0) : (item.stock ?? 0);
+  const total = item.track_stock ? (item.total_imeis ?? 0) : (item.stock ?? 0);
   const sold = total - units;
   const [imgUrl, setImgUrl] = useState<string | null>(null);
 

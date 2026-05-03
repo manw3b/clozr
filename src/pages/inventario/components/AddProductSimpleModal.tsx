@@ -75,6 +75,8 @@ export function AddProductSimpleModal({ open, onClose, wid, onCreated }: Props) 
     },
   });
 
+  const isDirty = () => name.trim().length > 0 || costUsd.trim().length > 0;
+
   return (
     <Modal
       open={open}
@@ -82,6 +84,8 @@ export function AddProductSimpleModal({ open, onClose, wid, onCreated }: Props) 
         reset();
         onClose();
       }}
+      isDirty={isDirty}
+      confirmCloseText="¿Cerrar y descartar el producto?"
       title="Agregar producto"
       subtitle="Cargá los datos básicos. Las unidades (IMEIs) se cargan después."
       maxWidth={520}

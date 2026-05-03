@@ -75,10 +75,31 @@ export function ClientFormModal({ open, onClose, client }: ClientFormModalProps)
 
   const canSubmit = name.trim().length >= 2;
 
+  const isDirty = () => {
+    if (!client) {
+      return (
+        name.trim().length > 0 ||
+        phone.trim().length > 0 ||
+        email.trim().length > 0 ||
+        notes.trim().length > 0 ||
+        type !== "final"
+      );
+    }
+    return (
+      name !== (client.name ?? "") ||
+      phone !== (client.phone ?? "") ||
+      email !== (client.email ?? "") ||
+      type !== (client.type ?? "final") ||
+      notes !== (client.notes ?? "")
+    );
+  };
+
   return (
     <Modal
       open={open}
       onClose={onClose}
+      isDirty={isDirty}
+      confirmCloseText="¿Cerrar y descartar los cambios?"
       title={editing ? 'Editar cliente' : 'Nuevo cliente'}
       maxWidth={520}
       footer={

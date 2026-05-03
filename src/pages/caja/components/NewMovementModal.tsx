@@ -66,6 +66,9 @@ export function NewMovementModal({ open, onClose, onSubmit }: NewMovementModalPr
   const canSubmit = Number(amount) > 0 && description.trim().length > 0;
   const categories = kind === 'income' ? incomeCategories : expenseCategories;
 
+  const isDirty = () =>
+    amount.trim().length > 0 || description.trim().length > 0;
+
   return (
     <Modal
       open={open}
@@ -73,6 +76,8 @@ export function NewMovementModal({ open, onClose, onSubmit }: NewMovementModalPr
         reset();
         onClose();
       }}
+      isDirty={isDirty}
+      confirmCloseText="¿Cerrar y descartar el movimiento?"
       title="Registrar movimiento"
       subtitle="Ingreso o egreso de caja"
       maxWidth={520}

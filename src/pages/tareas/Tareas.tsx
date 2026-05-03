@@ -250,10 +250,15 @@ function NewTaskModal({ open, onClose }: { open: boolean; onClose: () => void })
 
   const canSubmit = title.trim().length >= 2;
 
+  const isDirty = () =>
+    title.trim().length > 0 || dueAt.trim().length > 0 || type !== "puntual";
+
   return (
     <Modal
       open={open}
       onClose={onClose}
+      isDirty={isDirty}
+      confirmCloseText="¿Cerrar y descartar la tarea?"
       title="Nueva tarea"
       maxWidth={480}
       footer={

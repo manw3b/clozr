@@ -117,13 +117,9 @@ export function Ventas() {
     markPaidMut.mutate(saleId);
   }
 
-  function handleNewSale(data: import('./useSalesData').NewSalePayload) {
-    createSaleMut.mutate(data, {
-      onSuccess: () => {
-        showToast(data.outOfStock ? 'Venta fuera de stock registrada' : 'Venta registrada', 'success');
-        setNewSaleOpen(false);
-      },
-    });
+  async function handleNewSale(data: import('./useSalesData').NewSalePayload) {
+    await createSaleMut.mutateAsync(data);
+    showToast(data.outOfStock ? 'Venta fuera de stock registrada' : 'Venta registrada', 'success');
   }
 
   return (
@@ -333,7 +329,7 @@ const columns: ColumnDef<Sale>[] = [
     cell: (s) => (
       <div style={{ textAlign: 'right' }}>
         <div style={{ fontSize: text.sm, fontWeight: weight.bold, color: color.text, fontVariantNumeric: 'tabular-nums' }}>
-          {formatMoney(s.amount)}
+          {formatMoney(s.amount, s.currency as 'USD' | 'ARS')}
         </div>
         {s.status === 'partial' && s.pending && (
           <div style={{ fontSize: 10, color: color.warning, fontWeight: weight.semibold, marginTop: 1 }}>

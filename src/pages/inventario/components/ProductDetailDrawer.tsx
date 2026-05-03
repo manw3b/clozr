@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Package, Plus, Trash2, ShoppingCart, Pencil } from "lucide-react";
+import { Package, Plus, Trash2, Pencil, MoreHorizontal, Layers, X, Check } from "lucide-react";
 import { Drawer } from "../../../components/Drawer";
 import { Button } from "../../../components/Button";
 import { Input } from "../../../components/Input";
@@ -18,11 +18,13 @@ interface Props {
   item: CatalogItemWithImeis | null;
   onClose: () => void;
   onEdit?: (item: CatalogItemWithImeis) => void;
-  /** Si se pasa imei, vende esa unidad específica; sin imei, sale modal genérica con el producto. */
-  onSellUnit?: (item: CatalogItemWithImeis, imei?: string | null) => void;
+  /** Cargar otra variante (mismo modelo, otro color/storage). Abre el picker pre-cargado. */
+  onLoadAnotherVariant?: (item: CatalogItemWithImeis) => void;
+  /** Editar precios (abre modal de Ajustes → Precios pre-cargado o navega) */
+  onEditPrices?: (item: CatalogItemWithImeis) => void;
 }
 
-export function ProductDetailDrawer({ item, onClose, onEdit, onSellUnit }: Props) {
+export function ProductDetailDrawer({ item, onClose, onEdit, onLoadAnotherVariant, onEditPrices }: Props) {
   const open = !!item;
   const qc = useQueryClient();
   const { showToast } = useUIStore();
@@ -86,6 +88,27 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onSellUnit }: Props
     },
   });
 
+  const updateImeiMut = useMutation({
+    mutationFn: ({ id, value }: { id: string; value: string }) =>
+      catalogDb.updateImei(id, value),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["catalog-item-imeis", item?.id] });
+      showToast("IMEI actualizado", "success");
+    },
+  });
+
+  const deleteProductMut = useMutation({
+    mutationFn: () => (item ? catalogDb.softDelete(wid, item.id) : Promise.resolve()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["inventario"] });
+      qc.invalidateQueries({ queryKey: ["catalog"] });
+      showToast("Producto eliminado", "success");
+      onClose();
+    },
+  });
+
+  const [menuOpen, setMenuOpen] = useState(false);
+
   if (!item) return null;
 
   const imeis = imeisQ.data ?? [];
@@ -101,34 +124,86 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onSellUnit }: Props
       subtitle={item.category ?? undefined}
       width="520px"
       headerActions={
-        onEdit && (
+        <div style={{ display: "flex", gap: space[1], position: "relative" }}>
+          {onEdit && (
+            <button
+              onClick={() => onEdit(item)}
+              aria-label="Editar"
+              title="Editar producto"
+              style={iconBtnStyle}
+            >
+              <Pencil size={14} />
+            </button>
+          )}
           <button
-            onClick={() => onEdit(item)}
-            aria-label="Editar"
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: radius.sm,
-              color: color.textMuted,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="Más opciones"
+            style={iconBtnStyle}
           >
-            <Pencil size={14} />
+            <MoreHorizontal size={14} />
           </button>
-        )
+          {menuOpen && (
+            <div
+              style={{
+                position: "absolute",
+                top: 32,
+                right: 0,
+                minWidth: 200,
+                background: color.surface,
+                border: `1px solid ${color.borderStrong}`,
+                borderRadius: radius.md,
+                boxShadow: "var(--shadow-lg)",
+                padding: 4,
+                zIndex: 60,
+              }}
+              onMouseLeave={() => setMenuOpen(false)}
+            >
+              {onEditPrices && (
+                <MenuItem
+                  label="Editar precios"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onEditPrices(item);
+                  }}
+                />
+              )}
+              <MenuItem
+                label="Eliminar producto"
+                danger
+                onClick={() => {
+                  setMenuOpen(false);
+                  if (window.confirm(`¿Eliminar "${item.name}"? Las ventas pasadas no se ven afectadas.`)) {
+                    deleteProductMut.mutate();
+                  }
+                }}
+              />
+            </div>
+          )}
+        </div>
       }
       footer={
-        <div style={{ display: "flex", gap: space[2], justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", gap: space[2], justifyContent: "space-between", width: "100%" }}>
           <Button variant="ghost" onClick={onClose}>
             Cerrar
           </Button>
-          {onSellUnit && available.length > 0 && (
-            <Button variant="primary" iconLeft={<ShoppingCart size={14} />} onClick={() => onSellUnit(item)}>
-              Vender unidad
+          <div style={{ display: "flex", gap: space[2] }}>
+            {onLoadAnotherVariant && (
+              <Button
+                variant="secondary"
+                iconLeft={<Layers size={14} />}
+                onClick={() => onLoadAnotherVariant(item)}
+              >
+                Otra variante
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              iconLeft={<Plus size={14} />}
+              onClick={() => setAdding(true)}
+            >
+              Cargar más unidades
             </Button>
-          )}
+          </div>
         </div>
       }
     >
@@ -252,65 +327,16 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onSellUnit }: Props
           ) : (
             <div style={{ background: color.surface2, border: `1px solid ${color.border}`, borderRadius: radius.md, overflow: "hidden" }}>
               {imeis.map((u) => (
-                <div
+                <ImeiRow
                   key={u.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: space[3],
-                    padding: `${space[2]} ${space[3]}`,
-                    borderBottom: `1px solid ${color.border}`,
+                  imeiId={u.id}
+                  imei={u.imei}
+                  sold={!!u.sold_at}
+                  onDelete={() => {
+                    if (confirm(`¿Eliminar la unidad ${u.imei}?`)) deleteImeiMut.mutate(u.id);
                   }}
-                >
-                  <div style={{ flex: 1, fontSize: text.sm, fontFamily: "monospace", color: color.text }}>
-                    {u.imei}
-                  </div>
-                  {u.sold_at ? (
-                    <Badge tone="neutral">vendida</Badge>
-                  ) : (
-                    <Badge tone="success">disponible</Badge>
-                  )}
-                  {!u.sold_at && onSellUnit && (
-                    <button
-                      onClick={() => onSellUnit(item, u.imei)}
-                      title="Vender esta unidad"
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        padding: "4px 10px",
-                        borderRadius: radius.sm,
-                        background: color.primary,
-                        color: "#fff",
-                        fontSize: 11,
-                        fontWeight: weight.semibold,
-                        border: "none",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <ShoppingCart size={11} /> Vender
-                    </button>
-                  )}
-                  {!u.sold_at && (
-                    <button
-                      onClick={() => {
-                        if (confirm(`¿Eliminar la unidad ${u.imei}?`)) deleteImeiMut.mutate(u.id);
-                      }}
-                      aria-label="Eliminar"
-                      style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: radius.sm,
-                        color: color.textMuted,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  )}
-                </div>
+                  onSaveEdit={(value) => updateImeiMut.mutate({ id: u.id, value })}
+                />
               ))}
             </div>
           )}
@@ -388,6 +414,175 @@ function SectionHeader({
         )}
       </div>
       {action}
+    </div>
+  );
+}
+
+const iconBtnStyle: React.CSSProperties = {
+  width: 28,
+  height: 28,
+  borderRadius: radius.sm,
+  color: color.textMuted,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "transparent",
+  border: "none",
+  cursor: "pointer",
+};
+
+function MenuItem({
+  label,
+  onClick,
+  danger = false,
+}: {
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: "block",
+        width: "100%",
+        textAlign: "left",
+        padding: `${space[2]} ${space[3]}`,
+        borderRadius: radius.sm,
+        background: hover ? (danger ? color.dangerBg : color.surfaceHover) : "transparent",
+        color: danger ? color.danger : color.text,
+        fontSize: text.sm,
+        border: "none",
+        cursor: "pointer",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function ImeiRow({
+  imeiId,
+  imei,
+  sold,
+  onDelete,
+  onSaveEdit,
+}: {
+  imeiId: string;
+  imei: string;
+  sold: boolean;
+  onDelete: () => void;
+  onSaveEdit: (newValue: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(imei);
+
+  const commit = () => {
+    const v = draft.trim();
+    if (v && v !== imei) onSaveEdit(v);
+    setEditing(false);
+  };
+
+  void imeiId;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: space[3],
+        padding: `${space[2]} ${space[3]}`,
+        borderBottom: `1px solid ${color.border}`,
+      }}
+    >
+      {editing ? (
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") {
+              setDraft(imei);
+              setEditing(false);
+            }
+          }}
+          style={{
+            flex: 1,
+            background: color.surface,
+            border: `1px solid ${color.primary}`,
+            borderRadius: radius.sm,
+            padding: "4px 8px",
+            fontSize: text.sm,
+            fontFamily: "monospace",
+            color: color.text,
+          }}
+        />
+      ) : (
+        <button
+          onClick={() => !sold && setEditing(true)}
+          disabled={sold}
+          style={{
+            flex: 1,
+            fontSize: text.sm,
+            fontFamily: "monospace",
+            color: color.text,
+            background: "transparent",
+            border: "none",
+            textAlign: "left",
+            cursor: sold ? "default" : "text",
+            padding: 0,
+          }}
+        >
+          {imei}
+        </button>
+      )}
+      {sold ? (
+        <Badge tone="neutral">vendida</Badge>
+      ) : (
+        <Badge tone="success">disponible</Badge>
+      )}
+      {!sold && !editing && (
+        <button
+          onClick={() => setEditing(true)}
+          aria-label="Editar IMEI"
+          title="Editar IMEI"
+          style={iconBtnStyle}
+        >
+          <Pencil size={12} />
+        </button>
+      )}
+      {editing && (
+        <>
+          <button onClick={commit} aria-label="Guardar" style={iconBtnStyle}>
+            <Check size={12} color={color.success} />
+          </button>
+          <button
+            onClick={() => {
+              setDraft(imei);
+              setEditing(false);
+            }}
+            aria-label="Cancelar"
+            style={iconBtnStyle}
+          >
+            <X size={12} />
+          </button>
+        </>
+      )}
+      {!sold && !editing && (
+        <button
+          onClick={onDelete}
+          aria-label="Eliminar"
+          title="Eliminar unidad"
+          style={iconBtnStyle}
+        >
+          <Trash2 size={12} />
+        </button>
+      )}
     </div>
   );
 }

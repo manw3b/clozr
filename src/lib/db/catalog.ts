@@ -1,4 +1,4 @@
-import { dbSelect, dbExecute, getDb } from "./index";
+import { dbSelect, dbExecute } from "./index";
 import type {
   CatalogItem,
   CatalogImei,
@@ -231,26 +231,26 @@ export async function addImeis(
   imeis: string[],
 ): Promise<{ added: number }> {
   if (imeis.length === 0) return { added: 0 };
-  const db = await getDb();
+  // Sin BEGIN/COMMIT manuales: tauri-plugin-sql ya envuelve cada execute en su
+  // propia tx. BEGIN crudo + INSERTs + COMMIT genera "database is locked" o
+  // "cannot commit - no transaction is active" porque el pool reabre conexión
+  // entre statements.
   let added = 0;
   try {
-    await db.execute("BEGIN", []);
     for (const imei of imeis) {
-      const result = await db.execute(
+      const result = await dbExecute(
         "INSERT OR IGNORE INTO catalog_imei (id, catalog_item_id, imei) VALUES (?, ?, ?)",
         [crypto.randomUUID(), catalogItemId, imei],
       );
       added += result.rowsAffected;
     }
-    await db.execute(
+    await dbExecute(
       `UPDATE catalog_items
        SET stock = (SELECT COUNT(*) FROM catalog_imei WHERE catalog_item_id = ? AND sold_at IS NULL)
        WHERE id = ?`,
       [catalogItemId, catalogItemId],
     );
-    await db.execute("COMMIT", []);
   } catch (e) {
-    await db.execute("ROLLBACK", []).catch(() => {});
     throw new Error(`Error al agregar IMEIs: ${e instanceof Error ? e.message : String(e)}`);
   }
   return { added };
@@ -265,21 +265,27 @@ export async function deleteImei(imeiId: string): Promise<void> {
   if (!row) throw new Error("IMEI no encontrado");
   if (row.sold_at) throw new Error("No se puede eliminar un IMEI que ya fue vendido");
 
-  const db = await getDb();
   try {
-    await db.execute("BEGIN", []);
-    await db.execute("DELETE FROM catalog_imei WHERE id = ?", [imeiId]);
-    await db.execute(
+    await dbExecute("DELETE FROM catalog_imei WHERE id = ?", [imeiId]);
+    await dbExecute(
       `UPDATE catalog_items
        SET stock = (SELECT COUNT(*) FROM catalog_imei WHERE catalog_item_id = ? AND sold_at IS NULL)
        WHERE id = ?`,
       [row.catalog_item_id, row.catalog_item_id],
     );
-    await db.execute("COMMIT", []);
   } catch (e) {
-    await db.execute("ROLLBACK", []).catch(() => {});
     throw new Error(`Error al eliminar IMEI: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
+
+export async function updateImei(imeiId: string, newImei: string): Promise<void> {
+  const trimmed = newImei.trim();
+  if (trimmed.length < 4) throw new Error("IMEI demasiado corto");
+  const rows = await dbSelect<CatalogImei>("SELECT * FROM catalog_imei WHERE id = ?", [imeiId]);
+  const row = rows[0];
+  if (!row) throw new Error("IMEI no encontrado");
+  if (row.sold_at) throw new Error("No se puede editar un IMEI que ya fue vendido");
+  await dbExecute("UPDATE catalog_imei SET imei = ? WHERE id = ?", [trimmed, imeiId]);
 }
 
 export async function getWithUnitCount(workspaceId: string): Promise<CatalogItemWithImeis[]> {
@@ -337,4 +343,5 @@ export const catalogDb = {
   getImeisForItem,
   addImeis,
   deleteImei,
+  updateImei,
 };

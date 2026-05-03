@@ -345,10 +345,26 @@ function PaymentMethodFormModal({
 
   const canSubmit = form.name.trim().length >= 2;
 
+  const isDirty = () => {
+    if (!method) {
+      // Crear: cualquier dato distinto al default
+      return form.name.trim().length > 0 || form.modifier_pct.trim() !== "0";
+    }
+    // Editar: comparar contra original
+    return (
+      form.name !== method.name ||
+      parseFloat(form.modifier_pct || "0") !== method.modifier_pct ||
+      form.currency !== method.currency ||
+      form.kind !== method.kind
+    );
+  };
+
   return (
     <Modal
       open={open}
       onClose={onClose}
+      isDirty={isDirty}
+      confirmCloseText="¿Cerrar y descartar los cambios?"
       title={editing ? "Editar método de pago" : "Nuevo método de pago"}
       maxWidth={520}
       footer={

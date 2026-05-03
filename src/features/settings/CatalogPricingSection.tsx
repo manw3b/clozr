@@ -189,10 +189,29 @@ function PricingModal({
     },
   });
 
+  // Sucio si cost o prices difieren de los originales
+  const isDirty = () => {
+    if (!item) return false;
+    const originalCost = item.cost_usd ? String(item.cost_usd) : "";
+    if (cost !== originalCost) return true;
+    const originalMap: Record<string, string> = {};
+    for (const p of existingQ.data ?? []) {
+      originalMap[p.customer_type_id] = String(p.price_usd);
+    }
+    for (const t of types) {
+      const draft = prices[t.id] ?? "";
+      const orig = originalMap[t.id] ?? "";
+      if (draft !== orig) return true;
+    }
+    return false;
+  };
+
   return (
     <Modal
       open={open}
       onClose={onClose}
+      isDirty={isDirty}
+      confirmCloseText="¿Cerrar y descartar los cambios de precio?"
       title={item?.name ?? ""}
       subtitle="Precios en USD. Se convierten a ARS con la cotización vigente."
       maxWidth={560}

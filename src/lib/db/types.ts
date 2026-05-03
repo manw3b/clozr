@@ -395,6 +395,9 @@ export interface CreateSaleInput {
   business_id?: string | null;
   /** Migration 025: marca como venta fuera de stock (queda pendiente de regularizar). */
   out_of_stock_sale?: boolean;
+  /** Cotización USD→ARS al momento de la venta. Usada para convertir payments
+   * en ARS a USD para sales.total_paid y balance (todos en USD). */
+  usd_to_ars?: number;
   items: Array<{
     catalog_item_id?: string | null;
     description: string;

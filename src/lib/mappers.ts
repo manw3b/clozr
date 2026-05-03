@@ -127,8 +127,11 @@ export function dbSaleRowToDomain(s: DbSaleRow): Sale {
     number: `V-${s.id.slice(0, 6).toUpperCase()}`,
     clientId: s.customer_id ?? "",
     clientName: s.customer_name ?? "Sin cliente",
+    // Nuevo modelo: sales.total siempre en USD (fuente de verdad).
+    // Las ventas antiguas pre-refactor pueden mostrar el símbolo USD aunque
+    // se hayan registrado en ARS — aceptable transitoriamente.
     amount: s.total,
-    currency: "ARS",
+    currency: "USD",
     status: saleStatus(s.is_paid, s.total_paid),
     paid: s.total_paid,
     pending: s.balance,

@@ -187,13 +187,9 @@ export function MyDayContainer() {
     <NewSaleModal
       open={newSaleOpen}
       onClose={() => setNewSaleOpen(false)}
-      onSubmit={(data) => {
-        createSaleMut.mutate(data, {
-          onSuccess: () => {
-            showToast(data.outOfStock ? "Venta fuera de stock registrada" : "Venta registrada", "success");
-            setNewSaleOpen(false);
-          },
-        });
+      onSubmit={async (data) => {
+        await createSaleMut.mutateAsync(data);
+        showToast(data.outOfStock ? "Venta fuera de stock registrada" : "Venta registrada", "success");
       }}
     />
     </>

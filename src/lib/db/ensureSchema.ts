@@ -561,6 +561,20 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
   await safe(() => dbExecute(`ALTER TABLE sales ADD COLUMN regularized_at TEXT`));
   await safe(() => dbExecute(`ALTER TABLE sales ADD COLUMN regularized_by TEXT`));
   await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_sales_pending_regularization ON sales (workspace_id, out_of_stock_sale, regularized_at)`));
+
+  // ════════════════════════════════════════════════════════════
+  // 026 — workspace_featured_models (productos destacados por workspace)
+  // ════════════════════════════════════════════════════════════
+  await safe(() => dbExecute(`
+    CREATE TABLE IF NOT EXISTS workspace_featured_models (
+      workspace_id TEXT NOT NULL,
+      model_id     TEXT NOT NULL,
+      created_at   TEXT NOT NULL,
+      PRIMARY KEY (workspace_id, model_id)
+    )`));
+  // Columna color: el owner puede elegir qué variante destacar (NULL = default)
+  await safe(() => dbExecute(`ALTER TABLE workspace_featured_models ADD COLUMN color TEXT`));
+  await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_featured_models_ws ON workspace_featured_models (workspace_id)`));
 }
 
 async function safe(fn: () => Promise<unknown>) {

@@ -508,6 +508,525 @@ export async function seedAppleCatalog(): Promise<void> {
   );
 }
 
+/**
+ * Refresca el catálogo de iPhone: borra todos los modelos+variantes y los
+ * re-inserta desde la fuente de verdad de abajo. Idempotente — corre en cada
+ * boot. Mantiene los `model_id` estables, así workspace_featured_models y
+ * cualquier referencia se preserva.
+ */
+type IphoneSeed = {
+  id: string;
+  familyId: string;
+  name: string;
+  sortOrder: number;
+  fileBase: string; // "iPhone_17_Pro_Max" → arma /src/assets/products/iphones/iPhone_17_Pro_Max_<Color>.jpg
+  defaultColor: string; // file color suffix para image_path del modelo
+  storages: string[];
+  colors: Array<{ code: string; name: string; hex: string; file: string }>;
+};
+
+const IPHONE_SEED: IphoneSeed[] = [
+  // ─── iPhone 17 family ───────────────────────────────────────────────
+  {
+    id: "mod-17promax", familyId: "fam-17", name: "iPhone 17 Pro Max", sortOrder: 0,
+    fileBase: "iPhone_17_Pro_Max", defaultColor: "Cosmic_Orange",
+    storages: ["256GB", "512GB", "1TB", "2TB"],
+    colors: [
+      { code: "co", name: "Cosmic Orange", hex: "#D4621A", file: "Cosmic_Orange" },
+      { code: "db", name: "Deep Blue", hex: "#1B3A6B", file: "Deep_Blue" },
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+    ],
+  },
+  {
+    id: "mod-17pro", familyId: "fam-17", name: "iPhone 17 Pro", sortOrder: 1,
+    fileBase: "iPhone_17_Pro", defaultColor: "Cosmic_Orange",
+    storages: ["256GB", "512GB", "1TB"],
+    colors: [
+      { code: "co", name: "Cosmic Orange", hex: "#D4621A", file: "Cosmic_Orange" },
+      { code: "db", name: "Deep Blue", hex: "#1B3A6B", file: "Deep_Blue" },
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+    ],
+  },
+  {
+    id: "mod-air", familyId: "fam-17", name: "iPhone Air", sortOrder: 2,
+    fileBase: "iPhone_Air", defaultColor: "Sky_Blue",
+    storages: ["256GB", "512GB", "1TB"],
+    colors: [
+      { code: "sb", name: "Space Black", hex: "#1C1C1E", file: "Space_Black" },
+      { code: "cw", name: "Cloud White", hex: "#F5F5F0", file: "Cloud_White" },
+      { code: "lg", name: "Light Gold", hex: "#E8D5A3", file: "Light_Gold" },
+      { code: "sky", name: "Sky Blue", hex: "#8BBCD4", file: "Sky_Blue" },
+    ],
+  },
+  {
+    id: "mod-17", familyId: "fam-17", name: "iPhone 17", sortOrder: 3,
+    fileBase: "iPhone_17", defaultColor: "Mist_Blue",
+    storages: ["256GB", "512GB"],
+    colors: [
+      { code: "blk", name: "Black", hex: "#1C1C1E", file: "Black" },
+      { code: "wht", name: "White", hex: "#F5F5F0", file: "White" },
+      { code: "mb", name: "Mist Blue", hex: "#A8C4D4", file: "Mist_Blue" },
+      { code: "sg", name: "Sage", hex: "#8FAF8C", file: "Sage" },
+      { code: "lv", name: "Lavender", hex: "#C4B8D4", file: "Lavender" },
+    ],
+  },
+  {
+    id: "mod-17e", familyId: "fam-17", name: "iPhone 17e", sortOrder: 4,
+    fileBase: "iPhone_17e", defaultColor: "Black",
+    storages: ["128GB", "256GB"],
+    colors: [
+      { code: "blk", name: "Black", hex: "#1C1C1E", file: "Black" },
+      { code: "wht", name: "White", hex: "#F5F5F0", file: "White" },
+      { code: "pnk", name: "Pink", hex: "#F2A7B0", file: "Pink" },
+    ],
+  },
+
+  // ─── iPhone 16 family ───────────────────────────────────────────────
+  {
+    id: "mod-16promax", familyId: "fam-16", name: "iPhone 16 Pro Max", sortOrder: 0,
+    fileBase: "iPhone_16_Pro_Max", defaultColor: "Black_Titanium",
+    storages: ["256GB", "512GB", "1TB"],
+    colors: [
+      { code: "bt", name: "Black Titanium", hex: "#2C2C2C", file: "Black_Titanium" },
+      { code: "nt", name: "Natural Titanium", hex: "#C5B9A8", file: "Natural_Titanium" },
+      { code: "wt", name: "White Titanium", hex: "#E8E3DC", file: "White_Titanium" },
+      { code: "dt", name: "Desert Titanium", hex: "#D4B896", file: "Desert_Titanium" },
+    ],
+  },
+  {
+    id: "mod-16pro", familyId: "fam-16", name: "iPhone 16 Pro", sortOrder: 1,
+    fileBase: "iPhone_16_Pro", defaultColor: "Black_Titanium",
+    storages: ["128GB", "256GB", "512GB", "1TB"],
+    colors: [
+      { code: "bt", name: "Black Titanium", hex: "#2C2C2C", file: "Black_Titanium" },
+      { code: "nt", name: "Natural Titanium", hex: "#C5B9A8", file: "Natural_Titanium" },
+      { code: "wt", name: "White Titanium", hex: "#E8E3DC", file: "White_Titanium" },
+      { code: "dt", name: "Desert Titanium", hex: "#D4B896", file: "Desert_Titanium" },
+    ],
+  },
+  {
+    id: "mod-16plus", familyId: "fam-16", name: "iPhone 16 Plus", sortOrder: 2,
+    fileBase: "iPhone_16_Plus", defaultColor: "Ultramarine",
+    storages: ["128GB", "256GB", "512GB"],
+    colors: [
+      { code: "blk", name: "Black", hex: "#1C1C1E", file: "Black" },
+      { code: "wht", name: "White", hex: "#F5F5F0", file: "White" },
+      { code: "pnk", name: "Pink", hex: "#F2A7B0", file: "Pink" },
+      { code: "tel", name: "Teal", hex: "#5B9EA0", file: "Teal" },
+      { code: "ult", name: "Ultramarine", hex: "#3B5BA5", file: "Ultramarine" },
+    ],
+  },
+  {
+    id: "mod-16", familyId: "fam-16", name: "iPhone 16", sortOrder: 3,
+    fileBase: "iPhone_16", defaultColor: "Ultramarine",
+    storages: ["128GB", "256GB", "512GB"],
+    colors: [
+      { code: "blk", name: "Black", hex: "#1C1C1E", file: "Black" },
+      { code: "wht", name: "White", hex: "#F5F5F0", file: "White" },
+      { code: "pnk", name: "Pink", hex: "#F2A7B0", file: "Pink" },
+      { code: "tel", name: "Teal", hex: "#5B9EA0", file: "Teal" },
+      { code: "ult", name: "Ultramarine", hex: "#3B5BA5", file: "Ultramarine" },
+    ],
+  },
+  {
+    id: "mod-16e", familyId: "fam-16", name: "iPhone 16e", sortOrder: 4,
+    fileBase: "iPhone_16e", defaultColor: "Black",
+    storages: ["128GB", "256GB"],
+    colors: [
+      { code: "blk", name: "Black", hex: "#1C1C1E", file: "Black" },
+      { code: "wht", name: "White", hex: "#F5F5F0", file: "White" },
+    ],
+  },
+
+  // ─── iPhone 15 family ───────────────────────────────────────────────
+  {
+    id: "mod-15promax", familyId: "fam-15", name: "iPhone 15 Pro Max", sortOrder: 0,
+    fileBase: "iPhone_15_Pro_Max", defaultColor: "Natural_Titanium",
+    storages: ["256GB", "512GB", "1TB"],
+    colors: [
+      { code: "nt", name: "Natural Titanium", hex: "#C5B9A8", file: "Natural_Titanium" },
+      { code: "bt", name: "Black Titanium", hex: "#2C2C2C", file: "Black_Titanium" },
+      { code: "blut", name: "Blue Titanium", hex: "#4D5C73", file: "Blue_Titanium" },
+      { code: "wt", name: "White Titanium", hex: "#E8E3DC", file: "White_Titanium" },
+    ],
+  },
+  {
+    id: "mod-15pro", familyId: "fam-15", name: "iPhone 15 Pro", sortOrder: 1,
+    fileBase: "iPhone_15_Pro", defaultColor: "Natural_Titanium",
+    storages: ["128GB", "256GB", "512GB", "1TB"],
+    colors: [
+      { code: "nt", name: "Natural Titanium", hex: "#C5B9A8", file: "Natural_Titanium" },
+      { code: "bt", name: "Black Titanium", hex: "#2C2C2C", file: "Black_Titanium" },
+      { code: "blut", name: "Blue Titanium", hex: "#4D5C73", file: "Blue_Titanium" },
+      { code: "wt", name: "White Titanium", hex: "#E8E3DC", file: "White_Titanium" },
+    ],
+  },
+  {
+    id: "mod-15plus", familyId: "fam-15", name: "iPhone 15 Plus", sortOrder: 2,
+    fileBase: "iPhone_15_Plus", defaultColor: "Pink",
+    storages: ["128GB", "256GB", "512GB"],
+    colors: [
+      { code: "blk", name: "Black", hex: "#1C1C1E", file: "Black" },
+      { code: "bl", name: "Blue", hex: "#A8C4DC", file: "Blue" },
+      { code: "grn", name: "Green", hex: "#A8C8B0", file: "Green" },
+      { code: "pnk", name: "Pink", hex: "#F2C8D0", file: "Pink" },
+      { code: "yl", name: "Yellow", hex: "#F5E8A8", file: "Yellow" },
+    ],
+  },
+  {
+    id: "mod-15", familyId: "fam-15", name: "iPhone 15", sortOrder: 3,
+    fileBase: "iPhone_15", defaultColor: "Pink",
+    storages: ["128GB", "256GB", "512GB"],
+    colors: [
+      { code: "blk", name: "Black", hex: "#1C1C1E", file: "Black" },
+      { code: "bl", name: "Blue", hex: "#A8C4DC", file: "Blue" },
+      { code: "grn", name: "Green", hex: "#A8C8B0", file: "Green" },
+      { code: "pnk", name: "Pink", hex: "#F2C8D0", file: "Pink" },
+      { code: "yl", name: "Yellow", hex: "#F5E8A8", file: "Yellow" },
+    ],
+  },
+
+  // ─── iPhone 14 family ───────────────────────────────────────────────
+  {
+    id: "mod-14promax", familyId: "fam-14", name: "iPhone 14 Pro Max", sortOrder: 0,
+    fileBase: "iPhone_14_Pro_Max", defaultColor: "Deep_Purple",
+    storages: ["128GB", "256GB", "512GB", "1TB"],
+    colors: [
+      { code: "dp", name: "Deep Purple", hex: "#4B3F72", file: "Deep_Purple" },
+      { code: "go", name: "Gold", hex: "#B8975A", file: "Gold" },
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+      { code: "sb", name: "Space Black", hex: "#1C1C1E", file: "Space_Black" },
+    ],
+  },
+  {
+    id: "mod-14pro", familyId: "fam-14", name: "iPhone 14 Pro", sortOrder: 1,
+    fileBase: "iPhone_14_Pro", defaultColor: "Deep_Purple",
+    storages: ["128GB", "256GB", "512GB", "1TB"],
+    colors: [
+      { code: "dp", name: "Deep Purple", hex: "#4B3F72", file: "Deep_Purple" },
+      { code: "go", name: "Gold", hex: "#B8975A", file: "Gold" },
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+      { code: "sb", name: "Space Black", hex: "#1C1C1E", file: "Space_Black" },
+    ],
+  },
+  {
+    id: "mod-14plus", familyId: "fam-14", name: "iPhone 14 Plus", sortOrder: 2,
+    fileBase: "iPhone_14_Plus", defaultColor: "Purple",
+    storages: ["128GB", "256GB", "512GB"],
+    colors: [
+      { code: "blu", name: "Blue", hex: "#A8C4DC", file: "Blue" },
+      { code: "mid", name: "Midnight", hex: "#1C1C1E", file: "Midnight" },
+      { code: "pur", name: "Purple", hex: "#C4B8D4", file: "Purple" },
+      { code: "rd", name: "(PRODUCT)RED", hex: "#CC0000", file: "Red" },
+      { code: "sl", name: "Starlight", hex: "#F5F0E8", file: "Starlight" },
+      { code: "yl", name: "Yellow", hex: "#F5E8A8", file: "Yellow" },
+    ],
+  },
+  {
+    id: "mod-14", familyId: "fam-14", name: "iPhone 14", sortOrder: 3,
+    fileBase: "iPhone_14", defaultColor: "Purple",
+    storages: ["128GB", "256GB", "512GB"],
+    colors: [
+      { code: "blu", name: "Blue", hex: "#A8C4DC", file: "Blue" },
+      { code: "mid", name: "Midnight", hex: "#1C1C1E", file: "Midnight" },
+      { code: "pur", name: "Purple", hex: "#C4B8D4", file: "Purple" },
+      { code: "rd", name: "(PRODUCT)RED", hex: "#CC0000", file: "Red" },
+      { code: "sl", name: "Starlight", hex: "#F5F0E8", file: "Starlight" },
+      { code: "yl", name: "Yellow", hex: "#F5E8A8", file: "Yellow" },
+    ],
+  },
+
+  // ─── iPhone 13 family ───────────────────────────────────────────────
+  {
+    id: "mod-13promax", familyId: "fam-13", name: "iPhone 13 Pro Max", sortOrder: 0,
+    fileBase: "iPhone_13_Pro_Max", defaultColor: "Sierra_Blue",
+    storages: ["128GB", "256GB", "512GB", "1TB"],
+    colors: [
+      { code: "ag", name: "Alpine Green", hex: "#576856", file: "Alpine_Green" },
+      { code: "go", name: "Gold", hex: "#B8975A", file: "Gold" },
+      { code: "gr", name: "Graphite", hex: "#54524F", file: "Graphite" },
+      { code: "sib", name: "Sierra Blue", hex: "#A0B8CC", file: "Sierra_Blue" },
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+    ],
+  },
+  {
+    id: "mod-13pro", familyId: "fam-13", name: "iPhone 13 Pro", sortOrder: 1,
+    fileBase: "iPhone_13_Pro", defaultColor: "Sierra_Blue",
+    storages: ["128GB", "256GB", "512GB", "1TB"],
+    colors: [
+      { code: "ag", name: "Alpine Green", hex: "#576856", file: "Alpine_Green" },
+      { code: "go", name: "Gold", hex: "#B8975A", file: "Gold" },
+      { code: "gr", name: "Graphite", hex: "#54524F", file: "Graphite" },
+      { code: "sib", name: "Sierra Blue", hex: "#A0B8CC", file: "Sierra_Blue" },
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+    ],
+  },
+  {
+    id: "mod-13", familyId: "fam-13", name: "iPhone 13", sortOrder: 2,
+    fileBase: "iPhone_13", defaultColor: "Pink",
+    storages: ["128GB", "256GB", "512GB"],
+    colors: [
+      { code: "blu", name: "Blue", hex: "#A8C4DC", file: "Blue" },
+      { code: "grn", name: "Green", hex: "#5C8FAF", file: "Green" },
+      { code: "mid", name: "Midnight", hex: "#1C1C1E", file: "Midnight" },
+      { code: "pnk", name: "Pink", hex: "#F2C8D0", file: "Pink" },
+      { code: "rd", name: "(PRODUCT)RED", hex: "#CC0000", file: "Product_Red" },
+      { code: "sl", name: "Starlight", hex: "#F5F0E8", file: "Starlight" },
+    ],
+  },
+  {
+    id: "mod-13mini", familyId: "fam-13", name: "iPhone 13 mini", sortOrder: 3,
+    fileBase: "iPhone_13_Mini", defaultColor: "Pink",
+    storages: ["128GB", "256GB", "512GB"],
+    colors: [
+      { code: "blu", name: "Blue", hex: "#A8C4DC", file: "Blue" },
+      { code: "grn", name: "Green", hex: "#5C8FAF", file: "Green" },
+      { code: "mid", name: "Midnight", hex: "#1C1C1E", file: "Midnight" },
+      { code: "pnk", name: "Pink", hex: "#F2C8D0", file: "Pink" },
+      { code: "rd", name: "(PRODUCT)RED", hex: "#CC0000", file: "Product_Red" },
+      { code: "sl", name: "Starlight", hex: "#F5F0E8", file: "Starlight" },
+    ],
+  },
+
+  // ─── iPhone 12 family ───────────────────────────────────────────────
+  {
+    id: "mod-12promax", familyId: "fam-12", name: "iPhone 12 Pro Max", sortOrder: 0,
+    fileBase: "iPhone_12_Pro_Max", defaultColor: "Pacific_Blue",
+    storages: ["128GB", "256GB", "512GB"],
+    colors: [
+      { code: "go", name: "Gold", hex: "#B8975A", file: "Gold" },
+      { code: "gr", name: "Graphite", hex: "#54524F", file: "Graphite" },
+      { code: "pb", name: "Pacific Blue", hex: "#2E6B9E", file: "Pacific_Blue" },
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+    ],
+  },
+  {
+    id: "mod-12pro", familyId: "fam-12", name: "iPhone 12 Pro", sortOrder: 1,
+    fileBase: "iPhone_12_Pro", defaultColor: "Pacific_Blue",
+    storages: ["128GB", "256GB", "512GB"],
+    colors: [
+      { code: "go", name: "Gold", hex: "#B8975A", file: "Gold" },
+      { code: "gr", name: "Graphite", hex: "#54524F", file: "Graphite" },
+      { code: "pb", name: "Pacific Blue", hex: "#2E6B9E", file: "Pacific_Blue" },
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+    ],
+  },
+  {
+    id: "mod-12", familyId: "fam-12", name: "iPhone 12", sortOrder: 2,
+    fileBase: "iPhone_12", defaultColor: "Purple",
+    storages: ["64GB", "128GB", "256GB"],
+    colors: [
+      { code: "blk", name: "Black", hex: "#1C1C1E", file: "Black" },
+      { code: "blu", name: "Blue", hex: "#3D5078", file: "Blue" },
+      { code: "grn", name: "Green", hex: "#A0C8B0", file: "Green" },
+      { code: "pur", name: "Purple", hex: "#C4B0D8", file: "Purple" },
+      { code: "rd", name: "(PRODUCT)RED", hex: "#CC0000", file: "Red" },
+      { code: "wht", name: "White", hex: "#F5F5F0", file: "White" },
+    ],
+  },
+  {
+    id: "mod-12mini", familyId: "fam-12", name: "iPhone 12 mini", sortOrder: 3,
+    fileBase: "iPhone_12_Mini", defaultColor: "Purple",
+    storages: ["64GB", "128GB", "256GB"],
+    colors: [
+      { code: "blk", name: "Black", hex: "#1C1C1E", file: "Black" },
+      { code: "blu", name: "Blue", hex: "#3D5078", file: "Blue" },
+      { code: "grn", name: "Green", hex: "#A0C8B0", file: "Green" },
+      { code: "pur", name: "Purple", hex: "#C4B0D8", file: "Purple" },
+      { code: "rd", name: "(PRODUCT)RED", hex: "#CC0000", file: "Red" },
+      { code: "wht", name: "White", hex: "#F5F5F0", file: "White" },
+    ],
+  },
+
+  // ─── iPhone 11 family ───────────────────────────────────────────────
+  {
+    id: "mod-11promax", familyId: "fam-11", name: "iPhone 11 Pro Max", sortOrder: 0,
+    fileBase: "iPhone_11_Pro_Max", defaultColor: "Midnightgreen",
+    storages: ["64GB", "256GB", "512GB"],
+    colors: [
+      { code: "go", name: "Gold", hex: "#B8975A", file: "Gold" },
+      { code: "mg", name: "Midnight Green", hex: "#3D5A4C", file: "Midnightgreen" },
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+      { code: "sg", name: "Space Grey", hex: "#57534E", file: "Spacegrey" },
+    ],
+  },
+  {
+    id: "mod-11pro", familyId: "fam-11", name: "iPhone 11 Pro", sortOrder: 1,
+    fileBase: "iPhone_11_Pro", defaultColor: "Midnightgreen",
+    storages: ["64GB", "256GB", "512GB"],
+    colors: [
+      { code: "go", name: "Gold", hex: "#B8975A", file: "Gold" },
+      { code: "mg", name: "Midnight Green", hex: "#3D5A4C", file: "Midnightgreen" },
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+      { code: "sg", name: "Space Grey", hex: "#57534E", file: "Spacegrey" },
+    ],
+  },
+  {
+    id: "mod-11", familyId: "fam-11", name: "iPhone 11", sortOrder: 2,
+    fileBase: "iPhone_11", defaultColor: "Purple",
+    storages: ["64GB", "128GB", "256GB"],
+    colors: [
+      { code: "blk", name: "Black", hex: "#1C1C1E", file: "Black" },
+      { code: "grn", name: "Green", hex: "#B0D4B0", file: "Green" },
+      { code: "pur", name: "Purple", hex: "#D4B8D8", file: "Purple" },
+      { code: "rd", name: "(PRODUCT)RED", hex: "#CC0000", file: "Red" },
+      { code: "wht", name: "White", hex: "#F5F5F0", file: "White" },
+      { code: "yl", name: "Yellow", hex: "#F5E08A", file: "Yellow" },
+    ],
+  },
+
+  // ─── iPhone X Series ────────────────────────────────────────────────
+  {
+    id: "mod-xsmax", familyId: "fam-x", name: "iPhone XS Max", sortOrder: 0,
+    fileBase: "iPhone_XS_Max", defaultColor: "Spacegray",
+    storages: ["64GB", "256GB", "512GB"],
+    colors: [
+      { code: "go", name: "Gold", hex: "#B8975A", file: "Gold" },
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+      { code: "sg", name: "Space Gray", hex: "#57534E", file: "Spacegray" },
+    ],
+  },
+  {
+    id: "mod-xs", familyId: "fam-x", name: "iPhone XS", sortOrder: 1,
+    fileBase: "iPhone_XS", defaultColor: "Spacegray",
+    storages: ["64GB", "256GB", "512GB"],
+    colors: [
+      { code: "go", name: "Gold", hex: "#B8975A", file: "Gold" },
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+      { code: "sg", name: "Space Gray", hex: "#57534E", file: "Spacegray" },
+    ],
+  },
+  {
+    id: "mod-xr", familyId: "fam-x", name: "iPhone XR", sortOrder: 2,
+    fileBase: "iPhone_XR", defaultColor: "Coral",
+    storages: ["64GB", "128GB", "256GB"],
+    colors: [
+      { code: "blk", name: "Black", hex: "#1C1C1E", file: "Black" },
+      { code: "blu", name: "Blue", hex: "#5C84B5", file: "Blue" },
+      { code: "co", name: "Coral", hex: "#E89682", file: "Coral" },
+      { code: "rd", name: "(PRODUCT)RED", hex: "#CC0000", file: "Red" },
+      { code: "wht", name: "White", hex: "#F5F5F0", file: "White" },
+      { code: "yl", name: "Yellow", hex: "#F5E08A", file: "Yellow" },
+    ],
+  },
+  {
+    id: "mod-x", familyId: "fam-x", name: "iPhone X", sortOrder: 3,
+    fileBase: "iPhone_X", defaultColor: "Spacegray",
+    storages: ["64GB", "256GB"],
+    colors: [
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+      { code: "sg", name: "Space Gray", hex: "#57534E", file: "Spacegray" },
+    ],
+  },
+
+  // ─── iPhone SE ──────────────────────────────────────────────────────
+  {
+    id: "mod-se3", familyId: "fam-se", name: "iPhone SE (3rd Gen)", sortOrder: 0,
+    fileBase: "iPhone_SE_3rd_Gen", defaultColor: "Starlight",
+    storages: ["64GB", "128GB", "256GB"],
+    colors: [
+      { code: "mid", name: "Midnight", hex: "#1C1C1E", file: "Midnight" },
+      { code: "rd", name: "(PRODUCT)RED", hex: "#CC0000", file: "Red" },
+      { code: "sl", name: "Starlight", hex: "#F5F0E8", file: "Starlight" },
+    ],
+  },
+  {
+    id: "mod-se2", familyId: "fam-se", name: "iPhone SE (2nd Gen)", sortOrder: 1,
+    fileBase: "iPhone_SE_2nd_Gen", defaultColor: "White",
+    storages: ["64GB", "128GB", "256GB"],
+    colors: [
+      { code: "blk", name: "Black", hex: "#1C1C1E", file: "Black" },
+      { code: "rd", name: "(PRODUCT)RED", hex: "#CC0000", file: "Red" },
+      { code: "wht", name: "White", hex: "#F5F5F0", file: "White" },
+    ],
+  },
+
+  // ─── iPhone 8 ───────────────────────────────────────────────────────
+  {
+    id: "mod-8plus", familyId: "fam-8", name: "iPhone 8 Plus", sortOrder: 0,
+    fileBase: "iPhone_8_Plus", defaultColor: "Gold",
+    storages: ["64GB", "128GB", "256GB"],
+    colors: [
+      { code: "go", name: "Gold", hex: "#E8C895", file: "Gold" },
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+      { code: "sg", name: "Space Gray", hex: "#57534E", file: "Spacegray" },
+    ],
+  },
+  {
+    id: "mod-8", familyId: "fam-8", name: "iPhone 8", sortOrder: 1,
+    fileBase: "iPhone_8", defaultColor: "Gold",
+    storages: ["64GB", "128GB", "256GB"],
+    colors: [
+      { code: "go", name: "Gold", hex: "#E8C895", file: "Gold" },
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+      { code: "sg", name: "Space Gray", hex: "#57534E", file: "Spacegray" },
+    ],
+  },
+
+  // ─── iPhone 7 ───────────────────────────────────────────────────────
+  {
+    id: "mod-7plus", familyId: "fam-7", name: "iPhone 7 Plus", sortOrder: 0,
+    fileBase: "iPhone_7_Plus", defaultColor: "Rosegold",
+    storages: ["32GB", "128GB", "256GB"],
+    colors: [
+      { code: "blk", name: "Black", hex: "#1C1C1E", file: "Black" },
+      { code: "go", name: "Gold", hex: "#E8C895", file: "Gold" },
+      { code: "rg", name: "Rose Gold", hex: "#E8B5A8", file: "Rosegold" },
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+    ],
+  },
+  {
+    id: "mod-7", familyId: "fam-7", name: "iPhone 7", sortOrder: 1,
+    fileBase: "iPhone_7", defaultColor: "Rosegold",
+    storages: ["32GB", "128GB", "256GB"],
+    colors: [
+      { code: "blk", name: "Black", hex: "#1C1C1E", file: "Black" },
+      { code: "go", name: "Gold", hex: "#E8C895", file: "Gold" },
+      { code: "rg", name: "Rose Gold", hex: "#E8B5A8", file: "Rosegold" },
+      { code: "si", name: "Silver", hex: "#E8E3DC", file: "Silver" },
+    ],
+  },
+];
+
+export async function refreshIphoneCatalog(): Promise<void> {
+  // Borrar variantes y modelos iPhone existentes (mantenemos las familias)
+  await dbExecute(
+    `DELETE FROM product_variants WHERE model_id IN (
+       SELECT id FROM product_models WHERE family_id IN (
+         SELECT id FROM product_families WHERE category_id = 'cat-iphone'
+       )
+     )`,
+    [],
+  ).catch(() => {});
+  await dbExecute(
+    `DELETE FROM product_models WHERE family_id IN (
+       SELECT id FROM product_families WHERE category_id = 'cat-iphone'
+     )`,
+    [],
+  ).catch(() => {});
+
+  // Re-insertar todos los modelos + variantes desde IPHONE_SEED
+  for (const m of IPHONE_SEED) {
+    const modelImage = `/src/assets/products/iphones/${m.fileBase}_${m.defaultColor}.jpg`;
+    await dbExecute(
+      `INSERT INTO product_models (id, family_id, name, image_path, sort_order) VALUES (?, ?, ?, ?, ?)`,
+      [m.id, m.familyId, m.name, modelImage, m.sortOrder],
+    );
+    for (const c of m.colors) {
+      const variantImage = `/src/assets/products/iphones/${m.fileBase}_${c.file}.jpg`;
+      for (const s of m.storages) {
+        const sCode = s.toLowerCase();
+        const variantId = `var-${m.id.replace("mod-", "")}-${c.code}-${sCode}`;
+        await dbExecute(
+          `INSERT INTO product_variants (id, model_id, color, color_hex, storage, sku, image_path, is_available)
+           VALUES (?, ?, ?, ?, ?, NULL, ?, 1)`,
+          [variantId, m.id, c.name, c.hex, s, variantImage],
+        );
+      }
+    }
+  }
+}
+
 // ─── Queries ──────────────────────────────────────────────────────
 
 export async function getCategories(): Promise<ProductCategory[]> {
@@ -561,6 +1080,84 @@ export async function getStorageForColor(
     [modelId, color],
   );
   return rows.map((r) => r.storage);
+}
+
+/**
+ * Devuelve árbol categorías+familias con la imagen del modelo "representativo"
+ * de cada nivel: prioriza modelo destacado por workspace; si no hay, primer
+ * modelo por sort_order.
+ */
+export interface CategoryWithRep {
+  category: ProductCategory;
+  repImage: string | null;
+  repModelId: string | null;
+  repModelName: string | null;
+  /** Color featured del modelo (o null si destacado sin color, o no destacado) */
+  repColor: string | null;
+  families: Array<{
+    family: ProductFamily;
+    repImage: string | null;
+    repModelId: string | null;
+    repModelName: string | null;
+    repColor: string | null;
+  }>;
+}
+
+export async function getCategoryFamilyTree(workspaceId: string): Promise<CategoryWithRep[]> {
+  const cats = await getCategories();
+  const featuredRows = await dbSelect<{ model_id: string; color: string | null }>(
+    "SELECT model_id, color FROM workspace_featured_models WHERE workspace_id = ?",
+    [workspaceId],
+  ).catch(() => [] as Array<{ model_id: string; color: string | null }>);
+  const featuredMap = new Map<string, string | null>();
+  for (const r of featuredRows) featuredMap.set(r.model_id, r.color ?? null);
+
+  const result: CategoryWithRep[] = [];
+  for (const cat of cats) {
+    const families = await getFamilies(cat.id);
+    const familyEntries: CategoryWithRep["families"] = [];
+    let categoryRepImage: string | null = null;
+    let categoryRepModelId: string | null = null;
+    let categoryRepModelName: string | null = null;
+    let categoryRepColor: string | null = null;
+    let categoryFromFeatured = false;
+
+    for (const fam of families) {
+      const models = await getModels(fam.id);
+      const featuredModel = models.find((m) => featuredMap.has(m.id));
+      const rep = featuredModel ?? models[0] ?? null;
+      const repColor = rep ? featuredMap.get(rep.id) ?? null : null;
+      familyEntries.push({
+        family: fam,
+        repImage: rep?.image_path ?? null,
+        repModelId: rep?.id ?? null,
+        repModelName: rep?.name ?? null,
+        repColor,
+      });
+      if (!categoryRepImage && rep) {
+        categoryRepImage = rep.image_path ?? null;
+        categoryRepModelId = rep.id;
+        categoryRepModelName = rep.name;
+        categoryRepColor = repColor;
+      }
+      if (featuredModel && !categoryFromFeatured) {
+        categoryRepImage = featuredModel.image_path ?? null;
+        categoryRepModelId = featuredModel.id;
+        categoryRepModelName = featuredModel.name;
+        categoryRepColor = featuredMap.get(featuredModel.id) ?? null;
+        categoryFromFeatured = true;
+      }
+    }
+    result.push({
+      category: cat,
+      repImage: categoryRepImage,
+      repModelId: categoryRepModelId,
+      repModelName: categoryRepModelName,
+      repColor: categoryRepColor,
+      families: familyEntries,
+    });
+  }
+  return result;
 }
 
 export async function resolveVariant(

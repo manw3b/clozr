@@ -71,13 +71,19 @@ export async function createSale(
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
+  // sales.subtotal y sales.total siempre en USD (fuente de verdad). items.unit_price es USD.
   const subtotal = data.items.reduce(
     (sum, item) => sum + item.unit_price * item.quantity,
     0,
   );
-  const totalPaid = data.payments.reduce((sum, p) => sum + p.amount, 0);
+  // total_paid también en USD. Si el payment está en ARS, convertimos con la cotización del momento.
+  const rate = data.usd_to_ars ?? 0;
+  const totalPaid = data.payments.reduce((sum, p) => {
+    if ((p.currency ?? "ARS") === "USD" || rate <= 0) return sum + p.amount;
+    return sum + p.amount / rate;
+  }, 0);
   const balance = subtotal - totalPaid;
-  const isPaid = balance <= 0 ? 1 : 0;
+  const isPaid = balance <= 0.01 ? 1 : 0; // tolerancia para errores de redondeo
 
   // Migration 022: denormalized payment_method for quick listing.
   // Pick first non-deposit payment, fallback to first payment.
@@ -105,6 +111,31 @@ export async function createSale(
   );
 
   for (const item of data.items) {
+    // Auto-FIFO: si hay catalog_item pero no IMEI explícito, intentamos
+    // marcar los primeros N IMEIs disponibles (FIFO por created_at).
+    // Esto descuenta el inventario aunque el vendedor no haya elegido unidad.
+    let assignedImeis: string[] = [];
+    if (!item.imei && item.catalog_item_id && data.out_of_stock_sale !== true) {
+      try {
+        const available = await dbSelect<{ imei: string }>(
+          `SELECT imei FROM catalog_imei
+           WHERE catalog_item_id = ? AND sold_at IS NULL
+           ORDER BY rowid ASC LIMIT ?`,
+          [item.catalog_item_id, item.quantity],
+        );
+        assignedImeis = available.map((r) => r.imei);
+      } catch {
+        /* tabla puede no existir en DBs muy viejas */
+      }
+    }
+
+    // El primer IMEI asignado va al sale_item (legacy: una sola columna imei).
+    // Los demás (cuando quantity > 1) se marcan vendidos abajo pero el
+    // sale_item sigue refiriendo solo al primero. Mejora futura: una fila
+    // sale_items por IMEI.
+    const recordedImei = item.imei ?? assignedImeis[0] ?? null;
+    const isFromStock = item.from_stock || assignedImeis.length > 0;
+
     await dbExecute(
       `INSERT INTO sale_items
         (id, sale_id, catalog_item_id, description, quantity, unit_price, base_price, subtotal, imei, from_stock)
@@ -115,24 +146,26 @@ export async function createSale(
         item.description, item.quantity, item.unit_price,
         item.base_price ?? null,
         item.unit_price * item.quantity,
-        item.imei ?? null,
-        item.from_stock ? 1 : 0,
+        recordedImei,
+        isFromStock ? 1 : 0,
       ],
     );
 
-    if (item.from_stock && item.catalog_item_id) {
+    if (isFromStock && item.catalog_item_id) {
       await dbExecute(
         "UPDATE catalog_items SET stock = MAX(0, stock - ?) WHERE id = ? AND track_stock = 1",
         [item.quantity, item.catalog_item_id],
       );
     }
 
-    if (item.imei) {
+    // Marcar todos los IMEIs vendidos: el explícito + los auto-asignados
+    const imeisToMark = item.imei ? [item.imei] : assignedImeis;
+    for (const imei of imeisToMark) {
       await dbExecute(
         "UPDATE catalog_imei SET sold_at = ?, sale_id = ? WHERE imei = ?",
-        [now, id, item.imei],
+        [now, id, imei],
       );
-      await markStockItemSoldWithSale(item.imei, workspaceId, id, data.customer_name ?? null).catch(() => {});
+      await markStockItemSoldWithSale(imei, workspaceId, id, data.customer_name ?? null).catch(() => {});
     }
   }
 

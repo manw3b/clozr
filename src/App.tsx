@@ -8,7 +8,7 @@ import { useAuthStore } from "./store/authStore";
 import { useExchangeRateStore } from "./store/exchangeRateStore";
 import { dbSelect } from "./lib/db/index";
 import { productTemplatesDb } from "./lib/db/productTemplates";
-import { seedAppleCatalog, seedWatchAndMac } from "./lib/db/quickStock";
+import { seedAppleCatalog, seedWatchAndMac, refreshIphoneCatalog } from "./lib/db/quickStock";
 import { applyImagesToTemplates } from "./lib/templates/applyImages";
 import { paymentMethodsDb } from "./lib/db/paymentMethods";
 import { ensurePricingSchema } from "./lib/db/ensureSchema";
@@ -132,8 +132,14 @@ export default function App() {
     productTemplatesDb.seedBuiltinTemplates()
       .then(() => applyImagesToTemplates())
       .catch(() => {});
-    seedAppleCatalog().catch(() => {});
-    seedWatchAndMac().catch(() => {});
+    // Seed inicial (idempotente para usuarios con DB vacía)
+    seedAppleCatalog()
+      .then(() => seedWatchAndMac())
+      // Refresh idempotente del catálogo iPhone (corre siempre — actualiza
+      // modelos/colores/storages cada vez que cambia el seed sin perder data
+      // de catalog_items o ventas existentes).
+      .then(() => refreshIphoneCatalog())
+      .catch(() => {});
   }, []);
 
   useEffect(() => {

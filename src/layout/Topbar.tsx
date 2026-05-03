@@ -20,6 +20,7 @@ import { color, duration, ease, layout, radius, space, text, weight } from '../t
 import { Button } from '../components/Button';
 import { Modal, ModalField } from '../components/Modal';
 import { Input } from '../components/Input';
+import { ExchangeRateChip } from '../components/ExchangeRateChip';
 import { useNotifications, type NotificationItem } from '../lib/notifications';
 import { useBusinessStore } from '../store/businessStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
@@ -52,8 +53,11 @@ export function Topbar({ workspace, onSearchClick, onNewAction, onNotificationCl
         flexShrink: 0,
       }}
     >
-      {/* IZQUIERDA — Business switcher */}
-      <BusinessSwitcher />
+      {/* IZQUIERDA — Business switcher + cotización */}
+      <div style={{ display: "flex", alignItems: "center", gap: space[3] }}>
+        <BusinessSwitcher />
+        <ExchangeRateChip variant="compact" />
+      </div>
 
       {/* CENTRO — Búsqueda global */}
       <SearchTrigger onClick={onSearchClick} />
@@ -587,6 +591,8 @@ function CreateBusinessModal({
 
   const EMOJIS = ['🏪', '📱', '💻', '🎧', '⌚', '🛒', '💼', '🚀', '🏬', '🔧'];
 
+  const isDirty = () => name.trim().length > 0 || emoji !== '🏪';
+
   return (
     <Modal
       open={open}
@@ -594,6 +600,8 @@ function CreateBusinessModal({
         reset();
         onClose();
       }}
+      isDirty={isDirty}
+      confirmCloseText="¿Cerrar y descartar el negocio?"
       title="Nuevo negocio"
       subtitle="Cada negocio tiene su propia caja, ventas y reportes."
       maxWidth={460}

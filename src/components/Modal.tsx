@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { color, radius, space, text, weight } from '../tokens';
 
@@ -14,6 +14,16 @@ interface ModalProps {
   /** Acciones del footer */
   footer?: ReactNode;
   children: ReactNode;
+  /**
+   * Callback que devuelve true si el modal tiene cambios sin guardar.
+   * Si está definido y devuelve true:
+   *  - Click en overlay → solo hace shake (no cierra)
+   *  - X / Esc / Cancel → muestra confirm dialog
+   * Si no está definido, el modal cierra normal.
+   */
+  isDirty?: () => boolean;
+  /** Texto del confirm dialog cuando isDirty=true (default genérico) */
+  confirmCloseText?: string;
 }
 
 /**
@@ -34,12 +44,69 @@ export function Modal({
   maxWidth = 520,
   footer,
   children,
+  isDirty,
+  confirmCloseText = "¿Cerrar y descartar los cambios?",
 }: ModalProps) {
   const visible = open ?? isOpen ?? false;
+  const [shaking, setShaking] = useState(false);
+  const shakeTimer = useRef<number | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  // Refs para evitar stale closures en handlers globales (Escape).
+  // Sin esto, el listener de Esc registrado en mount usa siempre el isDirty
+  // del primer render → no detecta cambios cuando el form se ensucia.
+  const isDirtyRef = useRef(isDirty);
+  const onCloseRef = useRef(onClose);
+  const confirmTextRef = useRef(confirmCloseText);
+  isDirtyRef.current = isDirty;
+  onCloseRef.current = onClose;
+  confirmTextRef.current = confirmCloseText;
+
+  function triggerShake() {
+    // Reset sincrónico antes de re-encender, así la animación se re-dispara
+    // aunque el flag ya estuviera en true por un click anterior.
+    setShaking(false);
+    if (shakeTimer.current) window.clearTimeout(shakeTimer.current);
+    requestAnimationFrame(() => {
+      setShaking(true);
+      shakeTimer.current = window.setTimeout(() => setShaking(false), 450);
+    });
+  }
+
+  function attemptClose(intentional: boolean) {
+    const dirty = isDirtyRef.current?.() ?? false;
+    if (!dirty) {
+      onCloseRef.current();
+      return;
+    }
+    if (!intentional) {
+      // overlay click: solo shake
+      triggerShake();
+      return;
+    }
+    // intentional close (X, Esc, Cancel): confirm
+    if (window.confirm(confirmTextRef.current)) {
+      onCloseRef.current();
+    } else {
+      triggerShake();
+    }
+  }
+
   useEffect(() => {
     if (!visible) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        const dirty = isDirtyRef.current?.() ?? false;
+        if (!dirty) {
+          onCloseRef.current();
+          return;
+        }
+        if (window.confirm(confirmTextRef.current)) {
+          onCloseRef.current();
+        } else {
+          triggerShake();
+        }
+      }
     }
     window.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
@@ -47,14 +114,15 @@ export function Modal({
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
     };
-  }, [visible, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   if (!visible) return null;
 
   return (
     <>
       <div
-        onClick={onClose}
+        onClick={() => attemptClose(false)}
         style={{
           position: 'fixed',
           inset: 0,
@@ -69,6 +137,7 @@ export function Modal({
         }}
       >
         <div
+          ref={panelRef}
           onClick={(e) => e.stopPropagation()}
           style={{
             background: color.surface,
@@ -80,7 +149,9 @@ export function Modal({
             display: 'flex',
             flexDirection: 'column',
             boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
-            animation: 'clozr-modal-pop 220ms cubic-bezier(0.4, 0, 0.2, 1)',
+            animation: shaking
+              ? 'clozr-modal-shake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97)'
+              : 'clozr-modal-pop 220ms cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
           {/* Header */}
@@ -115,7 +186,7 @@ export function Modal({
               )}
             </div>
             <button
-              onClick={onClose}
+              onClick={() => attemptClose(true)}
               aria-label="Cerrar"
               style={{
                 width: 28,
@@ -167,6 +238,12 @@ export function Modal({
         @keyframes clozr-modal-pop {
           from { opacity: 0; transform: translateY(8px) scale(0.98); }
           to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes clozr-modal-shake {
+          10%, 90% { transform: translateX(-2px); }
+          20%, 80% { transform: translateX(4px); }
+          30%, 50%, 70% { transform: translateX(-8px); }
+          40%, 60% { transform: translateX(8px); }
         }
       `}</style>
     </>

@@ -226,10 +226,19 @@ function AddMemberModal({
 
   const canSubmit = name.trim().length >= 2 && email.trim().includes("@");
 
+  const isDirty = () =>
+    name.trim().length > 0 ||
+    email.trim().length > 0 ||
+    phone.trim().length > 0 ||
+    roleDesc.trim().length > 0 ||
+    role !== "vendedor";
+
   return (
     <Modal
       open={open}
       onClose={onClose}
+      isDirty={isDirty}
+      confirmCloseText="¿Cerrar y descartar la invitación?"
       title="Invitar miembro"
       maxWidth={520}
       footer={

@@ -26,9 +26,10 @@ import { Equipo } from "./pages/equipo/Equipo";
 import { Deudas } from "./pages/deudas/Deudas";
 import { Reportes } from "./pages/reportes/Reportes";
 
+import { Inventario } from "./pages/inventario/Inventario";
+
 // Legacy screens (skin pass applied; will be fully migrated later)
 import OnboardingScreen from "./features/onboarding/OnboardingScreen";
-import InventoryScreen from "./features/inventory/InventoryScreen";
 import SettingsScreen from "./features/settings/SettingsScreen";
 
 import Toaster from "./components/Toaster";
@@ -168,7 +169,7 @@ export default function App() {
       case "inventory":
       case "catalog":
       case "stock":
-      case "stock-list": return <InventoryScreen />;
+      case "stock-list": return <Inventario />;
       case "team": return <Equipo />;
       case "settings": return <SettingsScreen />;
     }

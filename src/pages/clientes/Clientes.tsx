@@ -244,7 +244,7 @@ export function Clientes() {
               action={
                 search.trim()
                   ? { label: 'Limpiar búsqueda', onClick: () => setSearch(''), variant: 'secondary' }
-                  : { label: 'Crear cliente', onClick: () => {}, iconLeft: <Plus size={14} /> }
+                  : { label: 'Crear cliente', onClick: () => { setEditingClient(null); setFormOpen(true); }, iconLeft: <Plus size={14} /> }
               }
             />
           }

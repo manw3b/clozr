@@ -116,15 +116,38 @@ export async function close(
   );
 }
 
-/** Garantiza que exista una sesión hoy. Si no hay, abre una con balances en 0. */
+/** Garantiza que exista una sesión hoy. Si no hay, abre una con balances en 0.
+ *  Si la tabla no existe (migración no aplicada), devuelve una sesión "fantasma"
+ *  con balances en 0 — Caja sigue funcionando aunque sin opening real. */
 export async function ensureForDay(
   workspaceId: string,
   businessId: string,
   date: string,
 ): Promise<CashDaySession> {
-  const existing = await getForDay(workspaceId, businessId, date);
-  if (existing) return existing;
-  return open(workspaceId, businessId, date);
+  try {
+    const existing = await getForDay(workspaceId, businessId, date);
+    if (existing) return existing;
+    return await open(workspaceId, businessId, date);
+  } catch {
+    const now = new Date().toISOString();
+    return {
+      id: "ghost-session",
+      workspace_id: workspaceId,
+      business_id: businessId,
+      session_date: date,
+      opened_at: now,
+      opened_balance_ars: 0,
+      opened_balance_usd: 0,
+      opened_by_user_id: null,
+      closed_at: null,
+      closed_balance_ars: null,
+      closed_balance_usd: null,
+      closed_by_user_id: null,
+      notes: null,
+      created_at: now,
+      updated_at: now,
+    };
+  }
 }
 
 export const cashSessionsDb = {

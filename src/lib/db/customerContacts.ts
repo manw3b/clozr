@@ -72,20 +72,27 @@ export async function getForCustomer(
   );
 }
 
-/** Devuelve el último contacto por cliente — útil para `Client.lastContactAt`. */
+/** Devuelve el último contacto por cliente — útil para `Client.lastContactAt`.
+ *  Si la tabla no existe (migración no aplicada todavía), devuelve un Map vacío
+ *  en vez de propagar el error. Esto evita que el listado de Clientes se rompa
+ *  por algo que es enriquecimiento opcional. */
 export async function lastContactByCustomer(
   workspaceId: string,
 ): Promise<Map<string, string>> {
-  const rows = await dbSelect<{ customer_id: string; last_at: string }>(
-    `SELECT customer_id, MAX(at) AS last_at
-     FROM customer_contacts
-     WHERE workspace_id = ?
-     GROUP BY customer_id`,
-    [workspaceId],
-  );
-  const m = new Map<string, string>();
-  for (const r of rows) m.set(r.customer_id, r.last_at);
-  return m;
+  try {
+    const rows = await dbSelect<{ customer_id: string; last_at: string }>(
+      `SELECT customer_id, MAX(at) AS last_at
+       FROM customer_contacts
+       WHERE workspace_id = ?
+       GROUP BY customer_id`,
+      [workspaceId],
+    );
+    const m = new Map<string, string>();
+    for (const r of rows) m.set(r.customer_id, r.last_at);
+    return m;
+  } catch {
+    return new Map();
+  }
 }
 
 export const customerContactsDb = {

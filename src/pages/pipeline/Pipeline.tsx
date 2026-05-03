@@ -181,10 +181,20 @@ export function Pipeline() {
         subtitle={`${filteredLeads.filter((l) => l.stage !== 'cerrado' && l.stage !== 'perdido').length} leads activos`}
         actions={
           <>
-            <Button variant="secondary" size="md" iconLeft={<Filter size={14} />}>
+            <Button
+              variant="secondary"
+              size="md"
+              iconLeft={<Filter size={14} />}
+              onClick={() => showToast('Filtros avanzados: próximamente')}
+            >
               Filtros
             </Button>
-            <Button variant="primary" size="md" iconLeft={<Plus size={16} />}>
+            <Button
+              variant="primary"
+              size="md"
+              iconLeft={<Plus size={16} />}
+              onClick={() => showToast('Crear lead: próximamente — por ahora se generan al crear venta a un cliente')}
+            >
               Nuevo lead
             </Button>
           </>

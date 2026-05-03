@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -72,10 +72,10 @@ export function Pipeline() {
   const leads = localLeads ?? dbLeads;
   const setLeads = (updater: (prev: Lead[]) => Lead[]) => setLocalLeads(updater(leads));
 
-  // Reset local state when server data changes
-  useMemo(() => {
+  // Reset local state when server data changes (and no drag in flight).
+  // Effect, NOT memo — setting state inside useMemo causes infinite re-renders.
+  useEffect(() => {
     if (!moveLeadMut.isPending) setLocalLeads(null);
-    return null;
   }, [dbLeads, moveLeadMut.isPending]);
 
   const sensors = useSensors(

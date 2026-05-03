@@ -17,6 +17,7 @@ import {
 } from "../../../lib/db/quickStock";
 import { catalogDb } from "../../../lib/db/catalog";
 import { pricingDb } from "../../../lib/db/pricing";
+import { settingsDb } from "../../../lib/db/settings";
 import { ensurePricingSchema } from "../../../lib/db/ensureSchema";
 import { useUIStore } from "../../../store/uiStore";
 import { getTemplateImageUrl, categoryEmoji } from "../../../lib/templates/productImageMap";
@@ -52,14 +53,39 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
   const [step, setStep] = useState<Step>("category");
   const [picked, setPicked] = useState<Picked>({});
   const [costUsd, setCostUsd] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [imeis, setImeis] = useState<string[]>([""]);
+  const [prices, setPrices] = useState<Record<string, string>>({}); // customer_type_id -> price USD string
+  const [pricesOpen, setPricesOpen] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setStep("category");
       setPicked({});
       setCostUsd("");
+      setQuantity(1);
+      setImeis([""]);
+      setPrices({});
+      setPricesOpen(false);
     }
   }, [open]);
+
+  // Cargar tipos de cliente cuando llegamos al confirm
+  const customerTypesQ = useQuery({
+    queryKey: ["customer-types", wid],
+    queryFn: () => settingsDb.getCustomerTypes(wid),
+    enabled: open && !!wid,
+  });
+
+  // Cuando cambia la cantidad, ajusto el array de IMEIs
+  useEffect(() => {
+    setImeis((arr) => {
+      if (quantity > arr.length) {
+        return [...arr, ...Array(quantity - arr.length).fill("")];
+      }
+      return arr.slice(0, quantity);
+    });
+  }, [quantity]);
 
   const categoriesQ = useQuery({
     queryKey: ["picker-categories"],
@@ -106,9 +132,6 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
     mutationFn: async () => {
       if (!picked.category || !picked.model) throw new Error("Faltan datos");
       await ensurePricingSchema();
-      // Imagen final: variante > modelo (variantes Apple suelen no tener
-      // image_path propio, así que en la práctica usa la del modelo, pero
-      // si llegara a haber variant.image_path se prioriza).
       const finalImage = picked.variantImage ?? picked.model.image_path ?? undefined;
       const item = await catalogDb.create(wid, {
         name: finalName,
@@ -117,21 +140,46 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
         currency: "ARS",
         image_path: finalImage,
       });
+
+      // 1) Costo USD (opcional)
       const cost = parseFloat(costUsd);
       if (Number.isFinite(cost) && cost > 0) {
         await pricingDb.setCatalogCost(item.id, cost);
       }
-      return item;
+
+      // 2) Precios sugeridos por tipo de cliente (opcional)
+      for (const t of customerTypesQ.data ?? []) {
+        const v = prices[t.id];
+        if (!v) continue;
+        const num = parseFloat(v);
+        if (Number.isFinite(num) && num > 0) {
+          await pricingDb.setCatalogPrice(item.id, t.id, num);
+        }
+      }
+
+      // 3) IMEIs (filtramos vacíos)
+      const cleanImeis = imeis.map((i) => i.trim()).filter(Boolean);
+      let added = 0;
+      if (cleanImeis.length > 0) {
+        const res = await catalogDb.addImeis(item.id, cleanImeis);
+        added = res.added;
+      }
+
+      return { item, addedImeis: added };
     },
-    onSuccess: (item) => {
+    onSuccess: ({ item, addedImeis }) => {
       qc.invalidateQueries({ queryKey: ["inventario"] });
       qc.invalidateQueries({ queryKey: ["catalog"] });
-      showToast("Producto creado", "success");
+      qc.invalidateQueries({ queryKey: ["catalog-item-imeis", item.id] });
+      const msg = addedImeis > 0
+        ? `Producto creado · ${addedImeis} ${addedImeis === 1 ? "unidad cargada" : "unidades cargadas"}`
+        : "Producto creado";
+      showToast(msg, "success");
       const withImeis: CatalogItemWithImeis = {
         ...item,
         cost_usd: parseFloat(costUsd) || 0,
-        available_imeis: 0,
-        total_imeis: 0,
+        available_imeis: addedImeis,
+        total_imeis: addedImeis,
       } as CatalogItemWithImeis;
       onCreated?.(withImeis);
       onClose();
@@ -224,7 +272,11 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
                 onClick={() => createMut.mutate()}
                 loading={createMut.isPending}
               >
-                Crear producto
+                {(() => {
+                  const filledImeis = imeis.filter((i) => i.trim()).length;
+                  if (filledImeis === 0) return "Crear producto";
+                  return `Crear y cargar ${filledImeis} ${filledImeis === 1 ? "unidad" : "unidades"}`;
+                })()}
               </Button>
             ) : (
               <Button variant="ghost" onClick={onClose}>
@@ -287,6 +339,17 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
           variantImage={picked.variantImage ?? null}
           costUsd={costUsd}
           onCostChange={setCostUsd}
+          quantity={quantity}
+          onQuantityChange={setQuantity}
+          imeis={imeis}
+          onImeiChange={(idx, v) =>
+            setImeis((arr) => arr.map((x, i) => (i === idx ? v : x)))
+          }
+          customerTypes={customerTypesQ.data ?? []}
+          prices={prices}
+          onPriceChange={(typeId, v) => setPrices((p) => ({ ...p, [typeId]: v }))}
+          pricesOpen={pricesOpen}
+          onTogglePrices={() => setPricesOpen((o) => !o)}
         />
       )}
     </Modal>
@@ -596,6 +659,15 @@ function ConfirmPanel({
   variantImage,
   costUsd,
   onCostChange,
+  quantity,
+  onQuantityChange,
+  imeis,
+  onImeiChange,
+  customerTypes,
+  prices,
+  onPriceChange,
+  pricesOpen,
+  onTogglePrices,
 }: {
   name: string;
   model: ProductModel;
@@ -603,11 +675,20 @@ function ConfirmPanel({
   variantImage: string | null;
   costUsd: string;
   onCostChange: (v: string) => void;
+  quantity: number;
+  onQuantityChange: (n: number) => void;
+  imeis: string[];
+  onImeiChange: (idx: number, v: string) => void;
+  customerTypes: { id: string; name: string }[];
+  prices: Record<string, string>;
+  onPriceChange: (typeId: string, v: string) => void;
+  pricesOpen: boolean;
+  onTogglePrices: () => void;
 }) {
-  // Variante > modelo
   const img = getTemplateImageUrl(variantImage) ?? getTemplateImageUrl(model.image_path);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: space[4] }}>
+      {/* Hero: producto seleccionado */}
       <div
         style={{
           display: "flex",
@@ -621,8 +702,8 @@ function ConfirmPanel({
       >
         <div
           style={{
-            width: 100,
-            height: 100,
+            width: 84,
+            height: 84,
             background: color.surface,
             borderRadius: radius.md,
             display: "flex",
@@ -635,17 +716,17 @@ function ConfirmPanel({
           {img ? (
             <img src={img} alt={name} style={{ width: "85%", height: "85%", objectFit: "contain" }} />
           ) : (
-            <span style={{ fontSize: 48 }}>📦</span>
+            <span style={{ fontSize: 40 }}>📦</span>
           )}
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: text.lg, fontWeight: weight.bold, color: color.text }}>{name}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: text.md, fontWeight: weight.bold, color: color.text }}>{name}</div>
           {colorHex && (
-            <div style={{ display: "flex", alignItems: "center", gap: space[2], marginTop: space[2] }}>
+            <div style={{ display: "flex", alignItems: "center", gap: space[2], marginTop: space[1] }}>
               <span
                 style={{
-                  width: 14,
-                  height: 14,
+                  width: 12,
+                  height: 12,
                   borderRadius: "50%",
                   background: colorHex,
                   border: `1px solid ${color.border}`,
@@ -657,11 +738,10 @@ function ConfirmPanel({
         </div>
       </div>
 
-      <div>
-        <label style={{ fontSize: text.xs, fontWeight: weight.semibold, color: color.textDim, textTransform: "uppercase", letterSpacing: "0.6px" }}>
-          Costo (USD) — opcional
-        </label>
-        <div style={{ marginTop: space[2] }}>
+      {/* Costo + Cantidad */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: space[3] }}>
+        <div>
+          <label style={SectionLabel}>Costo (USD) — opcional</label>
           <Input
             type="number"
             step="0.01"
@@ -670,13 +750,109 @@ function ConfirmPanel({
             placeholder="Ej: 850"
           />
         </div>
-        <p style={{ fontSize: text.xs, color: color.textMuted, marginTop: space[2] }}>
-          Lo que pagaste por unidad. Lo podés cargar después también.
+        <div>
+          <label style={SectionLabel}>Cantidad</label>
+          <Input
+            type="number"
+            min="1"
+            step="1"
+            value={String(quantity)}
+            onChange={(e) => onQuantityChange(Math.max(1, parseInt(e.target.value, 10) || 1))}
+          />
+        </div>
+      </div>
+
+      {/* IMEIs */}
+      <div>
+        <label style={SectionLabel}>
+          IMEI / Serie por unidad — opcional
+        </label>
+        <p style={{ fontSize: text.xs, color: color.textMuted, marginTop: 2, marginBottom: space[2] }}>
+          Las unidades sin IMEI se pueden completar después desde el detalle del producto.
         </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: space[2], maxHeight: 200, overflowY: "auto" }}>
+          {imeis.map((imei, idx) => (
+            <div key={idx} style={{ display: "flex", alignItems: "center", gap: space[2] }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: color.textMuted,
+                  width: 28,
+                  textAlign: "right",
+                  flexShrink: 0,
+                }}
+              >
+                #{idx + 1}
+              </span>
+              <Input
+                value={imei}
+                onChange={(e) => onImeiChange(idx, e.target.value)}
+                placeholder="35XXXXXXXXXXXXX"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Precios sugeridos (collapsible) */}
+      <div style={{ background: color.surface2, border: `1px solid ${color.border}`, borderRadius: radius.md }}>
+        <button
+          onClick={onTogglePrices}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: space[3],
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            color: color.text,
+          }}
+        >
+          <span style={{ fontSize: text.sm, fontWeight: weight.semibold }}>
+            Precios sugeridos por tipo de cliente
+          </span>
+          <span style={{ fontSize: text.xs, color: color.textMuted }}>
+            {pricesOpen ? "Ocultar" : "Opcional · cargar"}
+          </span>
+        </button>
+        {pricesOpen && (
+          <div style={{ padding: `0 ${space[3]} ${space[3]}`, display: "flex", flexDirection: "column", gap: space[2] }}>
+            {customerTypes.length === 0 ? (
+              <p style={{ fontSize: text.xs, color: color.textMuted, margin: 0 }}>
+                Definí tipos de cliente en Ajustes → Tipos de cliente.
+              </p>
+            ) : (
+              customerTypes.map((t) => (
+                <div key={t.id} style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: space[2], alignItems: "center" }}>
+                  <span style={{ fontSize: text.sm, color: color.text, fontWeight: weight.medium }}>{t.name}</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={prices[t.id] ?? ""}
+                    onChange={(e) => onPriceChange(t.id, e.target.value)}
+                    placeholder="USD"
+                  />
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+const SectionLabel: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: weight.semibold,
+  color: color.textDim,
+  textTransform: "uppercase",
+  letterSpacing: "0.6px",
+  display: "block",
+  marginBottom: space[2],
+};
 
 function Loading() {
   return (

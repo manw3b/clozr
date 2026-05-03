@@ -354,6 +354,40 @@ export async function getPendingCobros(workspaceId: string, limit = 3): Promise<
   );
 }
 
+/** Migration 025 — Ventas fuera de stock pendientes de regularizar. */
+export async function getPendingRegularization(workspaceId: string): Promise<Sale[]> {
+  try {
+    return await dbSelect<Sale>(
+      `SELECT * FROM sales
+       WHERE workspace_id = ? AND out_of_stock_sale = 1 AND regularized_at IS NULL
+       ORDER BY created_at DESC`,
+      [workspaceId],
+    );
+  } catch {
+    return [];
+  }
+}
+
+export async function regularizeSale(
+  saleId: string,
+  catalogItemId: string | null,
+  imei: string | null,
+  byUserId: string | null,
+): Promise<void> {
+  const now = new Date().toISOString();
+  await dbExecute(
+    `UPDATE sales SET regularized_at = ?, regularized_by = ? WHERE id = ?`,
+    [now, byUserId, saleId],
+  );
+  if (catalogItemId) {
+    await dbExecute(
+      `UPDATE sale_items SET catalog_item_id = ?, imei = ?
+       WHERE sale_id = ? AND id IN (SELECT id FROM sale_items WHERE sale_id = ? LIMIT 1)`,
+      [catalogItemId, imei, saleId, saleId],
+    );
+  }
+}
+
 export const salesDb = {
   getAll,
   getByCustomer,
@@ -370,5 +404,7 @@ export const salesDb = {
   getSalesByVendor,
   getSalesByMonth,
   getDayStats,
+  getPendingRegularization,
+  regularizeSale,
   getPendingCobros,
 };

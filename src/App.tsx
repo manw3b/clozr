@@ -133,12 +133,14 @@ export default function App() {
 
   useEffect(() => {
     if (userId || !activeWorkspace) return;
-    dbSelect<{ user_id: string; name: string }>(
-      `SELECT wm.user_id, u.name FROM workspace_members wm
+    dbSelect<{ user_id: string; name: string; role: string }>(
+      `SELECT wm.user_id, wm.role, u.name FROM workspace_members wm
        JOIN users u ON u.id = wm.user_id
        WHERE wm.workspace_id = ? ORDER BY wm.joined_at ASC LIMIT 1`,
       [activeWorkspace.id],
-    ).then((rows) => { if (rows[0]) setUser(rows[0].user_id, rows[0].name); }).catch(() => {});
+    ).then((rows) => {
+      if (rows[0]) setUser(rows[0].user_id, rows[0].name, rows[0].role as never);
+    }).catch(() => {});
   }, [userId, activeWorkspace, setUser]);
 
   // Invalidate caches after mutations from quick modals

@@ -18,6 +18,7 @@ import { useSalesList, useMarkSalePaid, useCreateSale } from './useSalesData';
 import { useUIStore } from '../../store/uiStore';
 import { exportToCsv, timestamp } from '../../lib/exportCsv';
 import { usePersistedState } from '../../lib/usePersistedState';
+import { PendingRegularizationBanner } from './components/PendingRegularizationBanner';
 import { color, space, text, weight } from '../../tokens';
 import { formatMoney, formatRelative } from '../../lib/format';
 import { PAYMENT_METHOD_LABELS } from '../../types/domain';
@@ -165,6 +166,8 @@ export function Ventas() {
           </>
         }
       />
+
+      <PendingRegularizationBanner />
 
       {/* Métricas */}
       <SalesMetrics sales={periodFiltered} />

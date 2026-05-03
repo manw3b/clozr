@@ -326,6 +326,8 @@ export interface CatalogItem {
   condition: 'new' | 'used' | 'refurbished';
   condition_details_json: string | null;
   conditionDetails?: ProductConditionDetails;
+  /** Migration 024: costo en USD del producto */
+  cost_usd?: number;
   created_at: string;
 }
 

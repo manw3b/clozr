@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Layers, CheckCircle, AlertCircle, XCircle, ArrowLeft, ChevronDown } from "lucide-react";
+import { Layers, CheckCircle, AlertCircle, XCircle, ArrowLeft } from "lucide-react";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useUIStore } from "../../store/uiStore";
 import { useBusinessStore } from "../../store/businessStore";
@@ -846,19 +846,23 @@ export default function QuickStockScreen({ onViewStock, preSelection }: QuickSto
               )}
             </div>
 
-            {/* Optional cost recording */}
+            {/* Cost + cash outflow toggle */}
             <div style={{ border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
-              <button
-                onClick={() => setShowCost((v) => !v)}
+              <label
                 style={{
-                  width: "100%", padding: "10px 14px", textAlign: "left",
-                  display: "flex", alignItems: "center", gap: 8,
-                  fontSize: 13, color: "var(--text-muted)", background: "none",
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "10px 14px", cursor: "pointer",
+                  fontSize: 13, color: "var(--text)",
                 }}
               >
-                <ChevronDown size={14} style={{ transform: showCost ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
-                Registrar costo de compra <span style={{ fontSize: 11, opacity: 0.6 }}>(opcional)</span>
-              </button>
+                <input
+                  type="checkbox"
+                  checked={showCost}
+                  onChange={(e) => setShowCost(e.target.checked)}
+                  style={{ accentColor: "var(--primary)", width: 16, height: 16 }}
+                />
+                <span style={{ fontWeight: 600 }}>Registrar compra como egreso de caja</span>
+              </label>
               {showCost && (
                 <div style={{ padding: "12px 14px", borderTop: "1px solid var(--border)", display: "flex", gap: 10 }}>
                   <div style={{ flex: 1 }}>

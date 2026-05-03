@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { paymentMethodsDb } from "../../lib/db/paymentMethods";
+import { ensurePricingSchema } from "../../lib/db/ensureSchema";
 import { Button } from "../../components/Button";
 import { Modal, ModalField } from "../../components/Modal";
 import { Input, Select } from "../../components/Input";
@@ -321,6 +322,8 @@ function PaymentMethodFormModal({
 
   const mut = useMutation({
     mutationFn: async () => {
+      // Defensa por si la migración 023 no corrió en esta DB
+      await ensurePricingSchema();
       const payload = {
         name: form.name.trim(),
         modifier_pct: parseFloat(form.modifier_pct) || 0,

@@ -11,6 +11,7 @@ import { formatMoney } from "../../../lib/format";
 import { computeSuggestedPrice, compareToSuggested } from "../../../lib/pricing";
 import { useClientsList } from "../../clientes/useClientsData";
 import { paymentMethodsDb } from "../../../lib/db/paymentMethods";
+import { ensurePricingSchema } from "../../../lib/db/ensureSchema";
 import { settingsDb } from "../../../lib/db/settings";
 import { catalogDb } from "../../../lib/db/catalog";
 import { pricingDb } from "../../../lib/db/pricing";
@@ -73,8 +74,8 @@ export function NewSaleModal({ open, onClose, onSubmit }: NewSaleModalProps) {
   useEffect(() => {
     if (!open || !wid) return;
     if (paymentsQ.data && paymentsQ.data.length === 0) {
-      paymentMethodsDb
-        .seedDefaults(wid)
+      ensurePricingSchema()
+        .then(() => paymentMethodsDb.seedDefaults(wid))
         .then(() => paymentsQ.refetch())
         .catch(() => {});
     }
@@ -293,8 +294,8 @@ export function NewSaleModal({ open, onClose, onSubmit }: NewSaleModalProps) {
               variant="secondary"
               onClick={() => {
                 if (!wid) return;
-                paymentMethodsDb
-                  .seedDefaults(wid)
+                ensurePricingSchema()
+                  .then(() => paymentMethodsDb.seedDefaults(wid))
                   .then(() => paymentsQ.refetch())
                   .catch(() => {});
               }}

@@ -1,4 +1,4 @@
-import { dbExecute } from "./index";
+import type Database from "@tauri-apps/plugin-sql";
 
 /**
  * Replayer defensivo de TODAS las migraciones (001-025) en JS.
@@ -16,7 +16,19 @@ import { dbExecute } from "./index";
  * Nombre legacy `ensurePricingSchema` mantenido por compatibilidad con los
  * callers — ahora cubre todo el schema, no solo pricing.
  */
+/**
+ * Versión legacy: usa `getDb()` por dentro. Mantenida para callers existentes.
+ * Internamente delega en `ensureSchemaOn(db)`.
+ */
 export async function ensurePricingSchema(): Promise<void> {
+  const { getDb } = await import("./index");
+  const db = await getDb();
+  await ensureSchemaOn(db);
+}
+
+export async function ensureSchemaOn(db: Database): Promise<void> {
+  const dbExecute = (sql: string) => db.execute(sql, []);
+
   // ════════════════════════════════════════════════════════════
   // 001 — initial
   // ════════════════════════════════════════════════════════════
@@ -315,6 +327,14 @@ export async function ensurePricingSchema(): Promise<void> {
       completed_at  TEXT,
       created_at    TEXT NOT NULL
     )`));
+
+  // Defensa por si las tablas se crearon sin customer_name (versiones tempranas)
+  await safe(() => dbExecute(`ALTER TABLE cash_movements ADD COLUMN customer_name TEXT`));
+  await safe(() => dbExecute(`ALTER TABLE cash_movements ADD COLUMN customer_id TEXT`));
+  await safe(() => dbExecute(`ALTER TABLE cash_movements ADD COLUMN reference_id TEXT`));
+  await safe(() => dbExecute(`ALTER TABLE cash_movements ADD COLUMN reference_type TEXT`));
+  await safe(() => dbExecute(`ALTER TABLE followups ADD COLUMN customer_name TEXT`));
+  await safe(() => dbExecute(`ALTER TABLE followups ADD COLUMN customer_id TEXT`));
 
   // ════════════════════════════════════════════════════════════
   // 013 — exchange rate + workspace.daily_goal

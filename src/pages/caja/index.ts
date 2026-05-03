@@ -1,1 +1,0 @@
-export { Caja } from './Caja';

@@ -1,13 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Search,
-  Plus,
-  MessageCircle,
-  Phone,
-  MoreHorizontal,
-  Users,
-  Download,
-} from 'lucide-react';
+import { Search, Plus, MoreHorizontal, Users, Download } from 'lucide-react';
 import { PageHeader } from '../../components/PageHeader';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -440,26 +432,15 @@ const columns: ColumnDef<Client>[] = [
   {
     id: 'actions',
     header: '',
-    width: '120px',
+    width: '60px',
     align: 'right',
-    cell: (c) => (
+    cell: () => (
       <RowActions
         actions={[
           {
-            icon: <MessageCircle size={14} strokeWidth={2.2} />,
-            label: 'WhatsApp',
-            onClick: () => console.log('WhatsApp', c.id),
-            tone: 'success',
-          },
-          {
-            icon: <Phone size={14} strokeWidth={2.2} />,
-            label: 'Llamar',
-            onClick: () => console.log('Call', c.id),
-          },
-          {
             icon: <MoreHorizontal size={14} strokeWidth={2.2} />,
-            label: 'Más',
-            onClick: () => console.log('More', c.id),
+            label: 'Abrir',
+            onClick: () => {}, // Row click ya abre el drawer; este botón es decorativo
           },
         ]}
       />

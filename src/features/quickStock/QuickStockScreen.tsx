@@ -113,7 +113,7 @@ function resolveColorImage(model: ProductModel, color: string): string | null {
   // Normalize color: "(PRODUCT)RED" → ["red"], "Natural Titanium" → ["natural","titanium"]
   const colorParts = color
     .toLowerCase()
-    .split(/[\s_()\-]+/)
+    .split(/[\s_()-]+/)
     .filter((p) => p.length > 0 && p !== "product");
 
   if (colorParts.length === 0) return null;

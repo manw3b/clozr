@@ -1,1 +1,0 @@
-export { MyDay } from './MyDay';

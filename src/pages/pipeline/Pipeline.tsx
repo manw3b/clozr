@@ -23,7 +23,8 @@ import { PipelineColumn, ColumnEmpty } from './components/PipelineColumn';
 import { PipelineMetrics } from './components/PipelineMetrics';
 import { groupLeadsByStage } from '../../lib/groupings';
 import { usePipelineLeads, useMoveLead } from './usePipelineData';
-import { useClientDetail } from '../clientes/useClientsData';
+import { useClientDetail, useRecordContact } from '../clientes/useClientsData';
+import { useUIStore } from '../../store/uiStore';
 import { space } from '../../tokens';
 import { STAGES } from '../../types/domain';
 import type { Lead, LeadStage } from '../../types/domain';
@@ -38,6 +39,28 @@ const priorityFilters = [
 export function Pipeline() {
   const { data: dbLeads = [] } = usePipelineLeads();
   const moveLeadMut = useMoveLead();
+  const { setActiveScreen, showToast } = useUIStore();
+  const recordContactMut = useRecordContact();
+
+  function whatsappCustomer(phone: string | null | undefined, customerId: string) {
+    if (!phone) {
+      showToast('Este cliente no tiene teléfono registrado');
+      return;
+    }
+    const num = phone.replace(/\D/g, '');
+    const final = num.startsWith('54') ? num : `54${num}`;
+    window.open(`https://wa.me/${final}`, '_blank');
+    recordContactMut.mutate({ customerId, kind: 'whatsapp' });
+  }
+
+  function callCustomer(phone: string | null | undefined, customerId: string) {
+    if (!phone) {
+      showToast('Este cliente no tiene teléfono registrado');
+      return;
+    }
+    window.open(`tel:${phone}`);
+    recordContactMut.mutate({ customerId, kind: 'call' });
+  }
   const [search, setSearch] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('todos');
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -225,7 +248,7 @@ export function Pipeline() {
                 count={stageLeads.length}
                 totalAmount={totalAmount}
                 isTerminal={stage.terminal}
-                onAddLead={() => console.log('Add lead to', stage.id)}
+                onAddLead={() => showToast('Crear lead: próximamente')}
               >
                 <SortableContext
                   items={stageLeads.map((l) => l.id)}
@@ -240,8 +263,15 @@ export function Pipeline() {
                         key={lead.id}
                         lead={lead}
                         onClick={(l) => setOpenClientId(l.clientId)}
-                        onWhatsApp={(l) => console.log('WhatsApp', l.id)}
-                        onCall={(l) => console.log('Call', l.id)}
+                        onWhatsApp={(l) => {
+                          const phone = leads.find((x) => x.id === l.id)?.clientId;
+                          // The card-level WA shortcut needs the phone — for now, navigate to the client
+                          if (phone) setOpenClientId(phone);
+                        }}
+                        onCall={(l) => {
+                          const cid = leads.find((x) => x.id === l.id)?.clientId;
+                          if (cid) setOpenClientId(cid);
+                        }}
                       />
                     ))
                   )}
@@ -262,12 +292,21 @@ export function Pipeline() {
         <ClientDrawer
           client={openClient}
           onClose={() => setOpenClientId(null)}
-          onWhatsApp={() => console.log('WhatsApp', openClient.id)}
-          onCall={() => console.log('Call', openClient.id)}
-          onEmail={() => console.log('Email', openClient.id)}
-          onNewSale={() => console.log('New sale', openClient.id)}
-          onEdit={() => console.log('Edit', openClient.id)}
-          onMarkPaid={(id) => console.log('Mark paid', id)}
+          onWhatsApp={() => whatsappCustomer(openClient.phone, openClient.id)}
+          onCall={() => callCustomer(openClient.phone, openClient.id)}
+          onEmail={() => {
+            if (openClient.email) {
+              window.open(`mailto:${openClient.email}`);
+              recordContactMut.mutate({ customerId: openClient.id, kind: 'email' });
+            } else showToast('Este cliente no tiene email registrado');
+          }}
+          onNewSale={() => {
+            setOpenClientId(null);
+            setActiveScreen('sales');
+            window.dispatchEvent(new CustomEvent('clozr:open-new-sale'));
+          }}
+          onEdit={() => showToast('Editar desde Clientes')}
+          onMarkPaid={() => showToast('Cobrar desde Deudas')}
         />
       )}
     </div>

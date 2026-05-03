@@ -1,12 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Search,
-  Plus,
-  Download,
-  MessageCircle,
-  CheckCircle2,
-  MoreHorizontal,
-} from 'lucide-react';
+import { Search, Plus, Download, MoreHorizontal } from 'lucide-react';
 import { PageHeader } from '../../components/PageHeader';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -48,7 +41,7 @@ export function Ventas() {
   const { data: sales = [] } = useSalesList();
   const markPaidMut = useMarkSalePaid();
   const createSaleMut = useCreateSale();
-  const { showToast } = useUIStore();
+  const { showToast, setActiveScreen } = useUIStore();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = usePersistedState<string>('ventas.statusFilter', 'todos');
   const [periodFilter, setPeriodFilter] = usePersistedState<string>('ventas.periodFilter', '30d');
@@ -263,10 +256,13 @@ export function Ventas() {
           sale={openSale}
           onClose={() => setOpenSaleId(null)}
           onMarkPaid={() => handleMarkPaid(openSale.id)}
-          onAddPayment={() => console.log('Add payment', openSale.id)}
-          onEdit={() => console.log('Edit', openSale.id)}
-          onCancel={() => console.log('Cancel', openSale.id)}
-          onOpenClient={() => console.log('Open client', openSale.clientId)}
+          onAddPayment={() => showToast('Pagos parciales: próximamente')}
+          onEdit={() => showToast('Editar venta: próximamente')}
+          onCancel={() => showToast('Cancelar venta: próximamente')}
+          onOpenClient={() => {
+            setOpenSaleId(null);
+            setActiveScreen('customers');
+          }}
         />
       )}
 
@@ -390,42 +386,15 @@ const columns: ColumnDef<Sale>[] = [
     header: '',
     width: '120px',
     align: 'right',
-    cell: (s) => (
+    cell: () => (
       <RowActions
-        actions={
-          s.status === 'paid'
-            ? [
-                {
-                  icon: <MessageCircle size={14} strokeWidth={2.2} />,
-                  label: 'Enviar comprobante',
-                  onClick: () => console.log('Send receipt', s.id),
-                  tone: 'success',
-                },
-                {
-                  icon: <MoreHorizontal size={14} strokeWidth={2.2} />,
-                  label: 'Más',
-                  onClick: () => console.log('More', s.id),
-                },
-              ]
-            : [
-                {
-                  icon: <CheckCircle2 size={14} strokeWidth={2.2} />,
-                  label: 'Marcar pagado',
-                  onClick: () => console.log('Mark paid', s.id),
-                  tone: 'success',
-                },
-                {
-                  icon: <MessageCircle size={14} strokeWidth={2.2} />,
-                  label: 'Recordatorio WhatsApp',
-                  onClick: () => console.log('WhatsApp', s.id),
-                },
-                {
-                  icon: <MoreHorizontal size={14} strokeWidth={2.2} />,
-                  label: 'Más',
-                  onClick: () => console.log('More', s.id),
-                },
-              ]
-        }
+        actions={[
+          {
+            icon: <MoreHorizontal size={14} strokeWidth={2.2} />,
+            label: 'Abrir',
+            onClick: () => {}, // Click en la fila ya abre el drawer
+          },
+        ]}
       />
     ),
   },

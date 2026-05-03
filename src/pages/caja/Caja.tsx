@@ -125,7 +125,7 @@ export function Caja() {
       <div style={{ flex: 1, minHeight: 0 }}>
         <CashMovementsList
           movements={filteredMovements}
-          onMovementClick={(m) => console.log('Open movement', m.id)}
+          onMovementClick={() => { /* Detalle de movimiento: próxima iteración */ }}
         />
       </div>
 

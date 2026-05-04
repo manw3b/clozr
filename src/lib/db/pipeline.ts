@@ -44,49 +44,57 @@ export async function create(
 ): Promise<PipelineItem> {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
+  const currency = data.currency ?? "USD";
   await dbExecute(
     `INSERT INTO pipeline_items (
-      id, workspace_id, customer_id, stage_id, stage_name, stage_order,
-      status, estimated_value, currency, inactive_days, created_by, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, 'open', ?, 'ARS', 0, ?, ?, ?)`,
+      id, workspace_id, customer_id, customer_name, stage_id, stage_name, stage_order,
+      status, estimated_value, currency, inactive_days, created_by, created_at, updated_at,
+      product, priority, next_action_at, next_action_label, short_note
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       workspaceId,
       data.customer_id,
+      data.customer_name ?? null,
       data.stage_id,
       data.stage_name,
       data.stage_order,
       data.estimated_value ?? null,
+      currency,
       data.created_by ?? null,
       now,
       now,
+      data.product ?? null,
+      data.priority ?? null,
+      data.next_action_at ?? null,
+      data.next_action_label ?? null,
+      data.short_note ?? null,
     ],
   );
   return {
     id,
     workspace_id: workspaceId,
     customer_id: data.customer_id,
-    customer_name: null,
+    customer_name: data.customer_name ?? null,
     stage_id: data.stage_id,
     stage_name: data.stage_name,
     stage_order: data.stage_order,
     status: "open",
     estimated_value: data.estimated_value ?? null,
-    currency: "ARS",
+    currency,
     inactive_days: 0,
     closed_at: null,
     created_by: data.created_by ?? null,
     created_at: now,
     updated_at: now,
     last_activity_at: null,
-    // Migration 021 fields — null on create, set later via update.
-    product: null,
-    next_action_at: null,
-    next_action_label: null,
+    product: data.product ?? null,
+    next_action_at: data.next_action_at ?? null,
+    next_action_label: data.next_action_label ?? null,
     owner_id: null,
     owner_name: null,
-    short_note: null,
-    priority: null,
+    short_note: data.short_note ?? null,
+    priority: data.priority ?? null,
     position: null,
   };
 }

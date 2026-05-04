@@ -31,6 +31,7 @@ import { STAGES } from '../../types/domain';
 import type { Lead, LeadStage } from '../../types/domain';
 import { NewSaleModal, type NewSalePreset } from '../ventas/components/NewSaleModal';
 import { useCreateSale } from '../ventas/useSalesData';
+import { NewLeadModal } from './components/NewLeadModal';
 
 const priorityFilters = [
   { value: 'todos', label: 'Todos' },
@@ -51,6 +52,10 @@ export function Pipeline() {
   // Estado para "Convertir a venta"
   const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
   const [salePreset, setSalePreset] = useState<NewSalePreset | null>(null);
+
+  // Estado para "Nuevo lead"
+  const [newLeadOpen, setNewLeadOpen] = useState(false);
+  const [newLeadStage, setNewLeadStage] = useState<LeadStage>('prospecto');
 
   function startConvertToSale(lead: Lead) {
     const fullClient = allClients.find((c) => c.id === lead.clientId);
@@ -223,7 +228,10 @@ export function Pipeline() {
               variant="primary"
               size="md"
               iconLeft={<Plus size={16} />}
-              onClick={() => showToast('Crear lead: próximamente — por ahora se generan al crear venta a un cliente')}
+              onClick={() => {
+                setNewLeadStage('prospecto');
+                setNewLeadOpen(true);
+              }}
             >
               Nuevo lead
             </Button>
@@ -288,7 +296,10 @@ export function Pipeline() {
                 count={stageLeads.length}
                 totalAmount={totalAmount}
                 isTerminal={stage.terminal}
-                onAddLead={() => showToast('Crear lead: próximamente')}
+                onAddLead={() => {
+                  setNewLeadStage(stage.id);
+                  setNewLeadOpen(true);
+                }}
               >
                 <SortableContext
                   items={stageLeads.map((l) => l.id)}
@@ -350,6 +361,13 @@ export function Pipeline() {
           onMarkPaid={() => showToast('Cobrar desde Deudas')}
         />
       )}
+
+      {/* Crear lead manual */}
+      <NewLeadModal
+        open={newLeadOpen}
+        onClose={() => setNewLeadOpen(false)}
+        initialStage={newLeadStage}
+      />
 
       {/* Convertir lead → venta */}
       <NewSaleModal

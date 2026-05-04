@@ -371,7 +371,14 @@ export interface CreatePipelineItemInput {
   stage_name: string;
   stage_order: number;
   estimated_value?: number | null;
+  currency?: "ARS" | "USD";
   created_by?: string | null;
+  product?: string | null;
+  priority?: "low" | "medium" | "high" | "hot" | null;
+  next_action_at?: string | null;
+  next_action_label?: string | null;
+  short_note?: string | null;
+  customer_name?: string | null;
 }
 
 export interface CreateActivityInput {

@@ -11,6 +11,7 @@ import { Modal, ModalField } from "../../components/Modal";
 import { Input, Select } from "../../components/Input";
 import { teamDb } from "../../lib/db/team";
 import { useWorkspaceStore } from "../../store/workspaceStore";
+import { useAuthStore, assertCan } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import { color, space, text, weight } from "../../tokens";
 import type { WorkspaceMember, MemberRole } from "../../lib/db/types";
@@ -34,6 +35,7 @@ export function Equipo() {
   const { showToast } = useUIStore();
   const wid = activeWorkspace?.id ?? "";
   const qc = useQueryClient();
+  const currentRole = useAuthStore((s) => s.userRole);
   const [openForm, setOpenForm] = useState(false);
 
   const { data: members = [] } = useQuery({
@@ -43,7 +45,10 @@ export function Equipo() {
   });
 
   const removeMut = useMutation({
-    mutationFn: (userId: string) => teamDb.removeMember(wid, userId),
+    mutationFn: (userId: string) => {
+      assertCan(currentRole, "manageTeam");
+      return teamDb.removeMember(wid, userId);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["team"] });
       showToast("Miembro eliminado", "success");
@@ -51,8 +56,10 @@ export function Equipo() {
   });
 
   const updateRoleMut = useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: Exclude<MemberRole, "owner"> }) =>
-      teamDb.updateRole(wid, userId, role),
+    mutationFn: ({ userId, role }: { userId: string; role: Exclude<MemberRole, "owner"> }) => {
+      assertCan(currentRole, "manageTeam");
+      return teamDb.updateRole(wid, userId, role);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["team"] });
       showToast("Rol actualizado", "success");
@@ -150,15 +157,19 @@ export function Equipo() {
     },
   ];
 
+  const canManage = currentRole === "owner";
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: space[5], height: "100%" }}>
       <PageHeader
         title="Equipo"
         subtitle={`${members.length} ${members.length === 1 ? "miembro" : "miembros"}`}
         actions={
-          <Button variant="primary" iconLeft={<Plus size={16} />} onClick={() => setOpenForm(true)}>
-            Invitar miembro
-          </Button>
+          canManage ? (
+            <Button variant="primary" iconLeft={<Plus size={16} />} onClick={() => setOpenForm(true)}>
+              Invitar miembro
+            </Button>
+          ) : null
         }
       />
 
@@ -194,6 +205,7 @@ function AddMemberModal({
 }) {
   const qc = useQueryClient();
   const { showToast } = useUIStore();
+  const currentRole = useAuthStore((s) => s.userRole);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -201,8 +213,9 @@ function AddMemberModal({
   const [roleDesc, setRoleDesc] = useState("");
 
   const mut = useMutation({
-    mutationFn: () =>
-      teamDb.addMember(
+    mutationFn: () => {
+      assertCan(currentRole, "manageTeam");
+      return teamDb.addMember(
         workspaceId,
         {
           name,
@@ -211,7 +224,8 @@ function AddMemberModal({
           role_description: roleDesc || null,
         },
         role,
-      ),
+      );
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["team"] });
       showToast("Miembro agregado", "success");

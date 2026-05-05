@@ -8,6 +8,7 @@ import { Badge } from "../../../components/Badge";
 import { catalogDb } from "../../../lib/db/catalog";
 import { useUIStore } from "../../../store/uiStore";
 import { useWorkspaceStore } from "../../../store/workspaceStore";
+import { useAuthStore, assertCan, can } from "../../../store/authStore";
 import { color, radius, space, text, weight } from "../../../tokens";
 import { formatMoney } from "../../../lib/format";
 import { resolveImageUrl } from "../../../lib/images";
@@ -97,8 +98,13 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onLoadAnotherVarian
     },
   });
 
+  const role = useAuthStore((s) => s.userRole);
+
   const deleteProductMut = useMutation({
-    mutationFn: () => (item ? catalogDb.softDelete(wid, item.id) : Promise.resolve()),
+    mutationFn: () => {
+      assertCan(role, "deleteCatalogItem");
+      return item ? catalogDb.softDelete(wid, item.id) : Promise.resolve();
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["inventario"] });
       qc.invalidateQueries({ queryKey: ["catalog"] });
@@ -158,7 +164,7 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onLoadAnotherVarian
               }}
               onMouseLeave={() => setMenuOpen(false)}
             >
-              {onEditPrices && (
+              {onEditPrices && can(role, "editPricing") && (
                 <MenuItem
                   label="Editar precios"
                   onClick={() => {
@@ -167,6 +173,7 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onLoadAnotherVarian
                   }}
                 />
               )}
+              {can(role, "deleteCatalogItem") && (
               <MenuItem
                 label="Eliminar producto"
                 danger
@@ -177,6 +184,7 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onLoadAnotherVarian
                   }
                 }}
               />
+              )}
             </div>
           )}
         </div>

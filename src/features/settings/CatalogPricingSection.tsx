@@ -10,7 +10,7 @@ import { settingsDb } from "../../lib/db/settings";
 import { pricingDb } from "../../lib/db/pricing";
 import { useUIStore } from "../../store/uiStore";
 import { useExchangeRateStore } from "../../store/exchangeRateStore";
-import { useAuthStore, canEditPricing } from "../../store/authStore";
+import { useAuthStore, canEditPricing, assertCan } from "../../store/authStore";
 import { color, radius, space, text, weight } from "../../tokens";
 import { formatMoney } from "../../lib/format";
 import type { CatalogItemWithImeis, CustomerTypeRow } from "../../lib/db/types";
@@ -136,6 +136,7 @@ function PricingModal({
   const qc = useQueryClient();
   const { showToast } = useUIStore();
   const { usdToArs } = useExchangeRateStore();
+  const role = useAuthStore((s) => s.userRole);
 
   const [cost, setCost] = useState("");
   const [prices, setPrices] = useState<Record<string, string>>({});
@@ -167,6 +168,7 @@ function PricingModal({
   const mut = useMutation({
     mutationFn: async () => {
       if (!item) return;
+      assertCan(role, "editPricing");
       const costNum = parseFloat(cost) || 0;
       await pricingDb.setCatalogCost(item.id, costNum);
       for (const t of types) {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, X, Pencil } from "lucide-react";
 import { useExchangeRateStore } from "../store/exchangeRateStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
-import { useAuthStore, canEditPricing } from "../store/authStore";
+import { useAuthStore, canEditPricing, assertCan } from "../store/authStore";
 import { useUIStore } from "../store/uiStore";
 import { color, radius, space, text, weight } from "../tokens";
 import { formatMoney } from "../lib/format";
@@ -53,6 +53,7 @@ export function ExchangeRateChip({ variant = "compact" }: Props) {
     }
     setSaving(true);
     try {
+      assertCan(role, "manageExchangeRate");
       await setRate(wid, n);
       showToast(`Cotización actualizada: ${formatMoney(n, "ARS")} = US$ 1`, "success");
       setEditing(false);

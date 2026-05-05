@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { paymentMethodsDb } from "../../lib/db/paymentMethods";
+import { useAuthStore, assertCan, can } from "../../store/authStore";
 import { ensurePricingSchema } from "../../lib/db/ensureSchema";
 import { Button } from "../../components/Button";
 import { Modal, ModalField } from "../../components/Modal";
@@ -60,8 +61,14 @@ export function PaymentMethodsSection({ wid }: { wid: string }) {
     enabled: !!wid,
   });
 
+  const role = useAuthStore((s) => s.userRole);
+  const allowed = can(role, "managePaymentMethods");
+
   const removeMut = useMutation({
-    mutationFn: (id: string) => paymentMethodsDb.remove(id),
+    mutationFn: (id: string) => {
+      assertCan(role, "managePaymentMethods");
+      return paymentMethodsDb.remove(id);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["payment-methods"] });
       showToast("Método eliminado", "success");
@@ -69,14 +76,18 @@ export function PaymentMethodsSection({ wid }: { wid: string }) {
   });
 
   const toggleActiveMut = useMutation({
-    mutationFn: ({ id, active }: { id: string; active: boolean }) =>
-      paymentMethodsDb.update(id, { active }),
+    mutationFn: ({ id, active }: { id: string; active: boolean }) => {
+      assertCan(role, "managePaymentMethods");
+      return paymentMethodsDb.update(id, { active });
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["payment-methods"] }),
   });
 
   const reorderMut = useMutation({
-    mutationFn: ({ id, sort_order }: { id: string; sort_order: number }) =>
-      paymentMethodsDb.update(id, { sort_order }),
+    mutationFn: ({ id, sort_order }: { id: string; sort_order: number }) => {
+      assertCan(role, "managePaymentMethods");
+      return paymentMethodsDb.update(id, { sort_order });
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["payment-methods"] }),
   });
 
@@ -103,10 +114,28 @@ export function PaymentMethodsSection({ wid }: { wid: string }) {
             Positivo = el cliente paga más (cubre comisiones). Negativo = descuento.
           </p>
         </div>
-        <Button variant="primary" iconLeft={<Plus size={14} />} onClick={() => setCreating(true)}>
-          Nuevo método
-        </Button>
+        {allowed && (
+          <Button variant="primary" iconLeft={<Plus size={14} />} onClick={() => setCreating(true)}>
+            Nuevo método
+          </Button>
+        )}
       </header>
+
+      {!allowed && (
+        <div
+          style={{
+            padding: space[3],
+            background: color.surface2,
+            border: `1px dashed ${color.border}`,
+            borderRadius: radius.md,
+            marginBottom: space[4],
+            fontSize: text.sm,
+            color: color.textMuted,
+          }}
+        >
+          Solo el owner o admin pueden modificar los métodos de pago. Estás en modo lectura.
+        </div>
+      )}
 
       {methods.length === 0 ? (
         <EmptyState
@@ -304,6 +333,7 @@ function PaymentMethodFormModal({
   const { showToast } = useUIStore();
   const editing = !!method;
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const role = useAuthStore((s) => s.userRole);
 
   useEffect(() => {
     if (open) {
@@ -322,6 +352,7 @@ function PaymentMethodFormModal({
 
   const mut = useMutation({
     mutationFn: async () => {
+      assertCan(role, "managePaymentMethods");
       // Defensa por si la migración 023 no corrió en esta DB
       await ensurePricingSchema();
       const payload = {

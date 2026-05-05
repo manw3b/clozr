@@ -26,6 +26,7 @@ import { useBusinessStore } from '../store/businessStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { useUIStore } from '../store/uiStore';
 import { businessesDb } from '../lib/db/businesses';
+import { useAuthStore, assertCan } from '../store/authStore';
 
 export type NewAction = 'cliente' | 'venta' | 'lead' | 'tarea' | 'movimiento';
 export type NotifNavigate = 'tasks' | 'cash' | 'pipeline';
@@ -575,6 +576,7 @@ function CreateBusinessModal({
 }) {
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('🏪');
+  const role = useAuthStore((s) => s.userRole);
 
   const reset = () => {
     setName('');
@@ -582,7 +584,10 @@ function CreateBusinessModal({
   };
 
   const mut = useMutation({
-    mutationFn: () => businessesDb.create(wid, { name: name.trim(), emoji }),
+    mutationFn: () => {
+      assertCan(role, 'manageBusiness');
+      return businessesDb.create(wid, { name: name.trim(), emoji });
+    },
     onSuccess: (b) => {
       onCreated(b);
       reset();

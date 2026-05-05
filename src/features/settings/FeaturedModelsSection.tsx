@@ -5,7 +5,7 @@ import { Input } from "../../components/Input";
 import { EmptyState } from "../../components/EmptyState";
 import { featuredModelsDb } from "../../lib/db/featuredModels";
 import { getCategoryFamilyTree, getModels, getColorsForModel, type ProductModel } from "../../lib/db/quickStock";
-import { useAuthStore, canEditPricing } from "../../store/authStore";
+import { useAuthStore, canEditPricing, assertCan } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import { getTemplateImageUrl, resolveColorImage } from "../../lib/templates/productImageMap";
 import { color, radius, space, text, weight } from "../../tokens";
@@ -60,7 +60,10 @@ export function FeaturedModelsSection({ wid }: { wid: string }) {
   });
 
   const toggleMut = useMutation({
-    mutationFn: (modelId: string) => featuredModelsDb.toggle(wid, modelId),
+    mutationFn: (modelId: string) => {
+      assertCan(role, "manageFeatured");
+      return featuredModelsDb.toggle(wid, modelId);
+    },
     onSuccess: (isNowFeatured) => {
       qc.invalidateQueries({ queryKey: ["featured-models", wid] });
       qc.invalidateQueries({ queryKey: ["picker-tree", wid] });
@@ -69,8 +72,10 @@ export function FeaturedModelsSection({ wid }: { wid: string }) {
   });
 
   const setColorMut = useMutation({
-    mutationFn: ({ modelId, color: c }: { modelId: string; color: string | null }) =>
-      featuredModelsDb.setFeatured(wid, modelId, c),
+    mutationFn: ({ modelId, color: c }: { modelId: string; color: string | null }) => {
+      assertCan(role, "manageFeatured");
+      return featuredModelsDb.setFeatured(wid, modelId, c);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["featured-models", wid] });
       qc.invalidateQueries({ queryKey: ["picker-tree", wid] });

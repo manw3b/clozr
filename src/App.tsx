@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { resolveImageUrl } from "./lib/images";
 import { useWorkspaceStore } from "./store/workspaceStore";
@@ -13,25 +13,25 @@ import { followupsDb } from "./lib/db/followups";
 import { ensurePricingSchema } from "./lib/db/ensureSchema";
 import { autoBackupIfDue } from "./lib/backup";
 
-// New design system pages
+// AppShell stays eager — render shell immediately
 import { AppShell } from "./layout/AppShell";
+
+// MyDay (home) eager: landing page, sin spinner inicial
 import { MyDayContainer } from "./pages/mi-dia/MyDayContainer";
-import { Clientes } from "./pages/clientes/Clientes";
-import { Pipeline } from "./pages/pipeline/Pipeline";
-import { Ventas } from "./pages/ventas/Ventas";
-import { Caja } from "./pages/caja/Caja";
 
-// Migrated to new design system
-import { Tareas } from "./pages/tareas/Tareas";
-import { Equipo } from "./pages/equipo/Equipo";
-import { Deudas } from "./pages/deudas/Deudas";
-import { Reportes } from "./pages/reportes/Reportes";
-
-import { Inventario } from "./pages/inventario/Inventario";
-
-// Legacy screens (skin pass applied; will be fully migrated later)
-import OnboardingScreen from "./features/onboarding/OnboardingScreen";
-import SettingsScreen from "./features/settings/SettingsScreen";
+// Resto: lazy-loaded por pantalla. Cada uno hace su propio chunk de Vite —
+// arranca más rápido y solo descarga lo que el usuario navega.
+const Clientes = lazy(() => import("./pages/clientes/Clientes").then((m) => ({ default: m.Clientes })));
+const Pipeline = lazy(() => import("./pages/pipeline/Pipeline").then((m) => ({ default: m.Pipeline })));
+const Ventas = lazy(() => import("./pages/ventas/Ventas").then((m) => ({ default: m.Ventas })));
+const Caja = lazy(() => import("./pages/caja/Caja").then((m) => ({ default: m.Caja })));
+const Tareas = lazy(() => import("./pages/tareas/Tareas").then((m) => ({ default: m.Tareas })));
+const Equipo = lazy(() => import("./pages/equipo/Equipo").then((m) => ({ default: m.Equipo })));
+const Deudas = lazy(() => import("./pages/deudas/Deudas").then((m) => ({ default: m.Deudas })));
+const Reportes = lazy(() => import("./pages/reportes/Reportes").then((m) => ({ default: m.Reportes })));
+const Inventario = lazy(() => import("./pages/inventario/Inventario").then((m) => ({ default: m.Inventario })));
+const OnboardingScreen = lazy(() => import("./features/onboarding/OnboardingScreen"));
+const SettingsScreen = lazy(() => import("./features/settings/SettingsScreen"));
 
 import Toaster from "./components/Toaster";
 import { CommandPalette } from "./components/CommandPalette";
@@ -87,6 +87,28 @@ function LoadingScreen() {
   return (
     <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
       <img src={logoIsotipo} alt="Clozr" style={{ height: 56, width: "auto", objectFit: "contain", opacity: 0.5, animation: "fadeIn 0.4s ease" }} />
+    </div>
+  );
+}
+
+/** Spinner liviano para los Suspense boundaries de páginas lazy-loaded.
+ *  Más sutil que LoadingScreen — no toma viewport completo. */
+function PageLoader() {
+  return (
+    <div
+      style={{
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "var(--space-6)",
+      }}
+    >
+      <img
+        src={logoIsotipo}
+        alt=""
+        style={{ height: 32, width: "auto", opacity: 0.4, animation: "fadeIn 0.3s ease" }}
+      />
     </div>
   );
 }
@@ -176,7 +198,13 @@ export default function App() {
   }, [queryClient]);
 
   if (isLoading) return <LoadingScreen />;
-  if (!activeWorkspace || workspaces.length === 0) return <OnboardingScreen />;
+  if (!activeWorkspace || workspaces.length === 0) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <OnboardingScreen />
+      </Suspense>
+    );
+  }
 
   const renderScreen = (screen: ScreenId) => {
     switch (screen) {
@@ -230,7 +258,9 @@ export default function App() {
           }
         }}
       >
-        {renderScreen(activeScreen)}
+        <Suspense fallback={<PageLoader />}>
+          {renderScreen(activeScreen)}
+        </Suspense>
       </AppShell>
       <CommandPalette />
       <ShortcutsHelp />

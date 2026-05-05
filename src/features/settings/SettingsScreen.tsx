@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, X } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { settingsDb } from "../../lib/db/settings";
@@ -609,8 +609,77 @@ function DataSection({ wid }: { wid: string }) {
   const { showToast } = useUIStore();
   const [exporting, setExporting] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [backups, setBackups] = useState<import("../../lib/backup").BackupFile[]>([]);
 
-  const handleExport = async () => {
+  const refreshBackups = useCallback(async () => {
+    try {
+      const list = await (await import("../../lib/backup")).listBackups();
+      setBackups(list);
+    } catch {
+      setBackups([]);
+    }
+  }, []);
+
+  useEffect(() => { refreshBackups(); }, [refreshBackups]);
+
+  const handleCreateBackup = async () => {
+    setCreating(true);
+    try {
+      const { createBackup, formatBytes } = await import("../../lib/backup");
+      const b = await createBackup();
+      showToast(`Backup creado · ${formatBytes(b.size)}`, "success");
+      refreshBackups();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Error al crear backup");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleRestoreFromDialog = async () => {
+    if (!confirm("⚠ Restaurar va a reemplazar TODA la data actual con la del backup elegido. Se hace un backup automático antes por seguridad. ¿Continuar?")) return;
+    setRestoring(true);
+    try {
+      const { restoreFromDialog } = await import("../../lib/backup");
+      const path = await restoreFromDialog();
+      if (!path) {
+        setRestoring(false);
+        return;
+      }
+      // El restore relaunches automáticamente; nunca deberíamos llegar acá
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Error al restaurar");
+      setRestoring(false);
+    }
+  };
+
+  const handleRestoreFromList = async (path: string, name: string) => {
+    if (!confirm(`⚠ Restaurar "${name}" va a reemplazar TODA la data actual. Se hace un backup automático antes. ¿Continuar?`)) return;
+    setRestoring(true);
+    try {
+      const { restoreFromPath } = await import("../../lib/backup");
+      await restoreFromPath(path);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Error al restaurar");
+      setRestoring(false);
+    }
+  };
+
+  const handleDeleteBackup = async (path: string, name: string) => {
+    if (!confirm(`¿Eliminar "${name}"? Esta acción no se puede deshacer.`)) return;
+    try {
+      const { deleteBackup } = await import("../../lib/backup");
+      await deleteBackup(path);
+      showToast("Backup eliminado", "success");
+      refreshBackups();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Error al eliminar");
+    }
+  };
+
+  const handleExportJson = async () => {
     setExporting(true);
     try {
       const json = await settingsDb.exportWorkspaceJson(wid);
@@ -618,21 +687,17 @@ function DataSection({ wid }: { wid: string }) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `clozr-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `clozr-export-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      showToast("Backup exportado", "success");
+      showToast("Export JSON descargado", "success");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Error al exportar");
     } finally {
       setExporting(false);
     }
-  };
-
-  const handleShowPath = () => {
-    showToast("Base de datos: ~/.local/share/com.clozr.dev/clozr.db (Linux) · ~/Library/Application Support/com.clozr.dev/clozr.db (Mac)", "info");
   };
 
   const handleClear = async () => {
@@ -650,43 +715,74 @@ function DataSection({ wid }: { wid: string }) {
 
   return (
     <div>
-      <SectionHeader title="Datos y backup" description="Exportá o gestioná los datos de tu workspace" />
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 480 }}>
-        {/* Export */}
-        <div style={{ padding: "16px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>Exportar todo como JSON</p>
+      <SectionHeader title="Datos y backup" description="Backup nativo de la base de datos · export legacy · limpieza" />
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 640 }}>
+        {/* Backup nativo */}
+        <div style={{ padding: 16, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>
+            Backup nativo de la base de datos
+          </p>
           <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
-            Incluye clientes, pipeline, ventas, tareas y catálogo
+            Copia binaria del archivo SQLite (.db). Se guarda automáticamente 1 vez por día (mantiene los últimos 14).
+            Restaurar reemplaza TODA la data actual y reinicia la app.
+          </p>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <button
+              onClick={handleCreateBackup}
+              disabled={creating}
+              style={{ padding: "8px 16px", background: "var(--primary)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#fff", opacity: creating ? 0.6 : 1 }}
+            >
+              {creating ? "Creando…" : "Crear backup ahora"}
+            </button>
+            <button
+              onClick={handleRestoreFromDialog}
+              disabled={restoring}
+              style={{ padding: "8px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, color: "var(--text)", opacity: restoring ? 0.6 : 1 }}
+            >
+              {restoring ? "Restaurando…" : "Restaurar desde archivo…"}
+            </button>
+          </div>
+
+          {backups.length === 0 ? (
+            <p style={{ fontSize: 12, color: "var(--text-dim)" }}>
+              No hay backups todavía. Hacé click en “Crear backup ahora” o esperá al backup automático del día.
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 4 }}>
+                {backups.length} backup{backups.length === 1 ? "" : "s"} guardado{backups.length === 1 ? "" : "s"}
+              </p>
+              {backups.slice(0, 14).map((b) => (
+                <BackupRow
+                  key={b.path}
+                  backup={b}
+                  onRestore={() => handleRestoreFromList(b.path, b.name)}
+                  onDelete={() => handleDeleteBackup(b.path, b.name)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Export JSON (legacy) */}
+        <div style={{ padding: 16, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>Export JSON (legacy)</p>
+          <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
+            Snapshot parcial en JSON (clientes, pipeline, ventas, tareas, catálogo). Útil para compartir o auditar.
+            Para backup completo usá el botón de arriba.
           </p>
           <button
-            onClick={handleExport}
+            onClick={handleExportJson}
             disabled={exporting}
-            style={{
-              padding: "8px 16px", background: "var(--primary)", borderRadius: 8,
-              fontSize: 13, fontWeight: 600, color: "#fff", opacity: exporting ? 0.6 : 1,
-            }}
+            style={{ padding: "8px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, color: "var(--text)", opacity: exporting ? 0.6 : 1 }}
           >
-            {exporting ? "Exportando..." : "Descargar backup"}
+            {exporting ? "Exportando…" : "Descargar JSON"}
           </button>
         </div>
 
-        {/* DB path */}
-        <div style={{ padding: "16px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>Ubicación de la base de datos</p>
-          <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
-            Archivo SQLite local donde se guardan todos tus datos
-          </p>
-          <button
-            onClick={handleShowPath}
-            style={{ padding: "8px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, color: "var(--text-muted)" }}
-          >
-            Ver ubicación
-          </button>
-        </div>
-
-        {/* Clear test data */}
+        {/* Clear test data — dev only */}
         {import.meta.env.DEV && (
-          <div style={{ padding: "16px", background: "rgba(232,0,29,0.05)", border: "1px solid rgba(232,0,29,0.2)", borderRadius: 10 }}>
+          <div style={{ padding: 16, background: "rgba(232,0,29,0.05)", border: "1px solid rgba(232,0,29,0.2)", borderRadius: 10 }}>
             <p style={{ fontSize: 14, fontWeight: 600, color: "var(--primary)", marginBottom: 4 }}>Limpiar datos de prueba</p>
             <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
               Elimina registros con IDs: cust-, pipe-, task-, sale-, cat- · Solo visible en dev
@@ -701,6 +797,59 @@ function DataSection({ wid }: { wid: string }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function BackupRow({
+  backup,
+  onRestore,
+  onDelete,
+}: {
+  backup: import("../../lib/backup").BackupFile;
+  onRestore: () => void;
+  onDelete: () => void;
+}) {
+  const sizeKb = backup.size < 1024 * 1024 ? `${(backup.size / 1024).toFixed(0)} KB` : `${(backup.size / (1024 * 1024)).toFixed(1)} MB`;
+  const date = new Date(backup.modifiedAt);
+  const dateStr = date.toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr auto auto auto",
+        gap: 8,
+        padding: "8px 12px",
+        background: "var(--surface-2)",
+        borderRadius: 8,
+        alignItems: "center",
+        fontSize: 12,
+      }}
+    >
+      <div>
+        <div style={{ color: "var(--text)", fontWeight: 500, fontFamily: "monospace" }}>{backup.name}</div>
+        <div style={{ color: "var(--text-dim)", fontSize: 11, marginTop: 1 }}>{dateStr}</div>
+      </div>
+      <span style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>{sizeKb}</span>
+      <button
+        onClick={onRestore}
+        style={{ fontSize: 11, padding: "4px 10px", background: "transparent", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
+      >
+        Restaurar
+      </button>
+      <button
+        onClick={onDelete}
+        title="Eliminar"
+        style={{ fontSize: 11, padding: "4px 10px", background: "transparent", border: "1px solid var(--border)", borderRadius: 6, color: "var(--danger)" }}
+      >
+        ✕
+      </button>
     </div>
   );
 }

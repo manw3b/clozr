@@ -11,6 +11,7 @@ import { seedAppleCatalog, seedWatchAndMac, refreshIphoneCatalog } from "./lib/d
 import { paymentMethodsDb } from "./lib/db/paymentMethods";
 import { followupsDb } from "./lib/db/followups";
 import { ensurePricingSchema } from "./lib/db/ensureSchema";
+import { autoBackupIfDue } from "./lib/backup";
 
 // New design system pages
 import { AppShell } from "./layout/AppShell";
@@ -148,6 +149,9 @@ export default function App() {
       // de catalog_items o ventas existentes).
       .then(() => refreshIphoneCatalog())
       .catch(() => {});
+
+    // Backup nativo automático: 1 vez por día, mantiene los últimos 14
+    autoBackupIfDue().catch(() => {});
   }, []);
 
   useEffect(() => {

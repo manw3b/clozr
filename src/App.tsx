@@ -7,9 +7,7 @@ import { useUIStore, type ScreenId } from "./store/uiStore";
 import { useAuthStore } from "./store/authStore";
 import { useExchangeRateStore } from "./store/exchangeRateStore";
 import { dbSelect } from "./lib/db/index";
-import { productTemplatesDb } from "./lib/db/productTemplates";
 import { seedAppleCatalog, seedWatchAndMac, refreshIphoneCatalog } from "./lib/db/quickStock";
-import { applyImagesToTemplates } from "./lib/templates/applyImages";
 import { paymentMethodsDb } from "./lib/db/paymentMethods";
 import { followupsDb } from "./lib/db/followups";
 import { ensurePricingSchema } from "./lib/db/ensureSchema";
@@ -142,9 +140,6 @@ export default function App() {
   }, [activeWorkspace?.id, activeBusiness?.id]);
 
   useEffect(() => {
-    productTemplatesDb.seedBuiltinTemplates()
-      .then(() => applyImagesToTemplates())
-      .catch(() => {});
     // Seed inicial (idempotente para usuarios con DB vacía)
     seedAppleCatalog()
       .then(() => seedWatchAndMac())

@@ -46,7 +46,12 @@ export default function OnboardingScreen() {
       const workspace = await workspaceDb.create(data.businessName);
       const userId = crypto.randomUUID();
       const now = new Date().toISOString();
-      const emailFallback = `${data.userName.toLowerCase().replace(/\s+/g, ".")}@clozr.local`;
+      // Sufijo random para evitar colisiones de UNIQUE(users.email) cuando el
+      // usuario no provee email (varias instalaciones / re-onboarding del
+      // mismo nombre).
+      const slug = data.userName.toLowerCase().replace(/\s+/g, ".");
+      const shortId = userId.slice(0, 8);
+      const emailFallback = `${slug}+${shortId}@clozr.local`;
       const email = data.userEmail?.trim() || emailFallback;
       await dbExecute(
         "INSERT INTO users (id, name, email, created_at) VALUES (?, ?, ?, ?)",

@@ -1,6 +1,6 @@
 // Build-time resolution of all product image URLs via Vite glob
 const iphoneUrls  = import.meta.glob<string>("/src/assets/products/iphones/*.jpg",  { eager: true, query: "?url", import: "default" });
-const ipadUrls    = import.meta.glob<string>("/src/assets/products/ipads/*.jpg",    { eager: true, query: "?url", import: "default" });
+const ipadUrls    = import.meta.glob<string>("/src/assets/products/ipads/*.{jpg,png}", { eager: true, query: "?url", import: "default" });
 const watchUrls   = import.meta.glob<string>("/src/assets/products/watch/*.jpg",    { eager: true, query: "?url", import: "default" });
 const macUrls     = import.meta.glob<string>("/src/assets/products/mac/*.jpg",      { eager: true, query: "?url", import: "default" });
 const airpodsUrls = import.meta.glob<string>("/src/assets/products/airpods/*.{jpg,png}", { eager: true, query: "?url", import: "default" });

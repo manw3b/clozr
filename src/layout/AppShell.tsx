@@ -11,6 +11,7 @@ interface AppShellProps {
   onSearchClick?: () => void;
   onNewAction?: (action: NewAction) => void;
   onNotificationClick?: (screen: NotifNavigate) => void;
+  onLogout?: () => void;
   children: ReactNode;
   /** Right drawer opcional. Cuando se pasa, se renderiza al costado derecho. */
   drawer?: ReactNode;
@@ -29,6 +30,7 @@ export function AppShell({
   onSearchClick = () => {},
   onNewAction = () => {},
   onNotificationClick = () => {},
+  onLogout,
   children,
   drawer,
 }: AppShellProps) {
@@ -50,6 +52,7 @@ export function AppShell({
         collapsed={collapsed}
         onToggleCollapse={() => setCollapsed((c) => !c)}
         user={user}
+        onLogout={onLogout}
       />
 
       <div

@@ -258,6 +258,13 @@ function ProfileSection() {
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // PIN
+  const [hasPin, setHasPin] = useState(false);
+  const [showPinForm, setShowPinForm] = useState(false);
+  const [pinValue, setPinValue] = useState("");
+  const [pinConfirm, setPinConfirm] = useState("");
+  const [pinSaving, setPinSaving] = useState(false);
+
   useEffect(() => {
     if (!userId) return;
     import("../../lib/db/index").then(({ dbSelect }) =>
@@ -269,6 +276,7 @@ function ProfileSection() {
           }
         }),
     );
+    import("../../lib/db/auth").then(({ authDb }) => authDb.hasPin(userId).then(setHasPin));
   }, [userId]);
 
   const handleSave = async () => {
@@ -285,6 +293,43 @@ function ProfileSection() {
     }
   };
 
+  const handleSavePin = async () => {
+    if (!userId) return;
+    if (pinValue !== pinConfirm) {
+      showToast("Los PINs no coinciden", "error");
+      return;
+    }
+    setPinSaving(true);
+    try {
+      const { authDb } = await import("../../lib/db/auth");
+      await authDb.setPin(userId, pinValue);
+      setHasPin(true);
+      setShowPinForm(false);
+      setPinValue("");
+      setPinConfirm("");
+      showToast("PIN actualizado", "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Error al guardar PIN", "error");
+    } finally {
+      setPinSaving(false);
+    }
+  };
+
+  const handleClearPin = async () => {
+    if (!userId) return;
+    if (!window.confirm("¿Quitar tu PIN? Cualquiera con acceso al equipo podrá entrar a tu sesión sin clave.")) return;
+    try {
+      const { authDb } = await import("../../lib/db/auth");
+      await authDb.clearPin(userId);
+      setHasPin(false);
+      showToast("PIN eliminado", "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Error", "error");
+    }
+  };
+
+  const pinValid = /^\d{4,6}$/.test(pinValue) && pinValue === pinConfirm;
+
   return (
     <div>
       <SectionHeader title="Tu perfil" description="Tus datos personales en este workspace" />
@@ -300,6 +345,102 @@ function ProfileSection() {
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <SaveBtn onSave={handleSave} saving={saving} />
         </div>
+      </div>
+
+      {/* PIN management */}
+      <div style={{ marginTop: 32, paddingTop: 24, borderTop: "1px solid var(--border)", maxWidth: 480 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: 0 }}>
+          PIN de acceso
+        </h3>
+        <p style={{ fontSize: 12, color: "var(--text-dim)", margin: "4px 0 16px" }}>
+          {hasPin
+            ? "Tu sesión está protegida con un PIN. Te lo van a pedir cada vez que inicies sesión."
+            : "Sin PIN cualquiera con acceso al equipo puede entrar a tu sesión. Recomendado para owner/admin."}
+        </p>
+
+        {!showPinForm && (
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => setShowPinForm(true)}
+              style={{
+                padding: "8px 14px",
+                fontSize: 13,
+                fontWeight: 600,
+                background: "var(--surface-2)",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                color: "var(--text)",
+                cursor: "pointer",
+              }}
+            >
+              {hasPin ? "Cambiar PIN" : "Crear PIN"}
+            </button>
+            {hasPin && (
+              <button
+                onClick={handleClearPin}
+                style={{
+                  padding: "8px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  background: "transparent",
+                  color: "var(--danger)",
+                  cursor: "pointer",
+                }}
+              >
+                Quitar PIN
+              </button>
+            )}
+          </div>
+        )}
+
+        {showPinForm && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <label style={labelStyle}>PIN nuevo (4–6 dígitos)</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={pinValue}
+                onChange={(e) => setPinValue(e.target.value.replace(/\D/g, ""))}
+                style={inputStyle}
+                autoFocus
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Confirmar PIN</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={pinConfirm}
+                onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, ""))}
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                onClick={() => {
+                  setShowPinForm(false);
+                  setPinValue("");
+                  setPinConfirm("");
+                }}
+                style={{
+                  padding: "8px 14px",
+                  fontSize: 13,
+                  background: "transparent",
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                }}
+              >
+                Cancelar
+              </button>
+              <SaveBtn onSave={pinValid ? handleSavePin : () => {}} saving={pinSaving} label="Guardar PIN" />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

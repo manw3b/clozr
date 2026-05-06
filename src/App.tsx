@@ -6,7 +6,6 @@ import { useBusinessStore } from "./store/businessStore";
 import { useUIStore, type ScreenId } from "./store/uiStore";
 import { useAuthStore } from "./store/authStore";
 import { useExchangeRateStore } from "./store/exchangeRateStore";
-import { dbSelect } from "./lib/db/index";
 import { seedAppleCatalog, seedWatchAndMac, refreshIphoneCatalog } from "./lib/db/quickStock";
 import { paymentMethodsDb } from "./lib/db/paymentMethods";
 import { followupsDb } from "./lib/db/followups";
@@ -32,6 +31,7 @@ const Reportes = lazy(() => import("./pages/reportes/Reportes").then((m) => ({ d
 const Inventario = lazy(() => import("./pages/inventario/Inventario").then((m) => ({ default: m.Inventario })));
 const OnboardingScreen = lazy(() => import("./features/onboarding/OnboardingScreen"));
 const SettingsScreen = lazy(() => import("./features/settings/SettingsScreen"));
+const LoginScreen = lazy(() => import("./features/auth/LoginScreen"));
 
 import Toaster from "./components/Toaster";
 import { CommandPalette } from "./components/CommandPalette";
@@ -131,7 +131,7 @@ export default function App() {
   const { workspaces, activeWorkspace, isLoading, loadWorkspaces } = useWorkspaceStore();
   const { activeBusiness, loadBusinesses } = useBusinessStore();
   const { activeScreen, setActiveScreen } = useUIStore();
-  const { userId, userName, setUser } = useAuthStore();
+  const { userId, userName, clearUser } = useAuthStore();
   const { loadRate } = useExchangeRateStore();
   const queryClient = useQueryClient();
 
@@ -176,17 +176,9 @@ export default function App() {
     autoBackupIfDue().catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (userId || !activeWorkspace) return;
-    dbSelect<{ user_id: string; name: string; role: string }>(
-      `SELECT wm.user_id, wm.role, u.name FROM workspace_members wm
-       JOIN users u ON u.id = wm.user_id
-       WHERE wm.workspace_id = ? ORDER BY wm.joined_at ASC LIMIT 1`,
-      [activeWorkspace.id],
-    ).then((rows) => {
-      if (rows[0]) setUser(rows[0].user_id, rows[0].name, rows[0].role as never);
-    }).catch(() => {});
-  }, [userId, activeWorkspace, setUser]);
+  // Nota: la auto-selección del primer miembro como sesión activa fue
+  // reemplazada por LoginScreen — ahora si no hay userId mostramos el
+  // selector de miembros (con PIN si lo tienen).
 
   // Invalidate caches after mutations from quick modals
   useEffect(() => {
@@ -202,6 +194,14 @@ export default function App() {
     return (
       <Suspense fallback={<LoadingScreen />}>
         <OnboardingScreen />
+      </Suspense>
+    );
+  }
+  // Sin sesión activa → LoginScreen.
+  if (!userId) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <LoginScreen />
       </Suspense>
     );
   }
@@ -233,6 +233,12 @@ export default function App() {
         onNavigate={(id) => setActiveScreen(id as ScreenId)}
         workspace={{ name: activeBusiness?.name ?? activeWorkspace.name, emoji: activeBusiness?.emoji ?? activeWorkspace.emoji }}
         user={{ name: userName ?? "Usuario", email: "" }}
+        onLogout={() => {
+          if (window.confirm("¿Cerrar sesión?")) {
+            clearUser();
+            queryClient.clear();
+          }
+        }}
         onSearchClick={() => { window.dispatchEvent(new CustomEvent("clozr:open-cmdk")); }}
         onNotificationClick={(screen) => setActiveScreen(screen as ScreenId)}
         onNewAction={(action) => {

@@ -577,6 +577,12 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
   // Columna color: el owner puede elegir qué variante destacar (NULL = default)
   await safe(() => dbExecute(`ALTER TABLE workspace_featured_models ADD COLUMN color TEXT`));
   await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_featured_models_ws ON workspace_featured_models (workspace_id)`));
+
+  // ════════════════════════════════════════════════════════════
+  // 027 — user auth (PIN + last login)
+  // ════════════════════════════════════════════════════════════
+  await safe(() => dbExecute(`ALTER TABLE users ADD COLUMN pin_hash TEXT`));
+  await safe(() => dbExecute(`ALTER TABLE users ADD COLUMN last_login_at TEXT`));
 }
 
 async function safe(fn: () => Promise<unknown>) {

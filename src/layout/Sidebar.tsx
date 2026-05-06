@@ -11,6 +11,7 @@ import {
   Receipt,
   BarChart3,
   ChevronLeft,
+  LogOut,
   type LucideIcon,
 } from 'lucide-react';
 import { color, duration, ease, layout, radius, space, text, weight } from '../tokens';
@@ -63,9 +64,10 @@ interface SidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
   user: { name: string; email: string };
+  onLogout?: () => void;
 }
 
-export function Sidebar({ active, onNavigate, collapsed, onToggleCollapse, user }: SidebarProps) {
+export function Sidebar({ active, onNavigate, collapsed, onToggleCollapse, user, onLogout }: SidebarProps) {
   return (
     <aside
       style={{
@@ -186,24 +188,20 @@ export function Sidebar({ active, onNavigate, collapsed, onToggleCollapse, user 
           padding: collapsed ? `${space[2]} 0` : space[3],
           borderTop: `1px solid ${color.border}`,
           display: 'flex',
-          justifyContent: 'center',
+          alignItems: 'center',
+          gap: space[2],
+          justifyContent: collapsed ? 'center' : 'space-between',
         }}
       >
-        <button
+        <div
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: space[3],
-            width: collapsed ? 'auto' : '100%',
+            flex: 1,
+            minWidth: 0,
             padding: collapsed ? 4 : `${space[2]} ${space[3]}`,
             borderRadius: radius.md,
-            transition: `background ${duration.fast} ${ease}`,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = color.surfaceHover;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
           }}
         >
           <Avatar name={user.name} size={collapsed ? 32 : 28} />
@@ -234,7 +232,37 @@ export function Sidebar({ active, onNavigate, collapsed, onToggleCollapse, user 
               </div>
             </div>
           )}
-        </button>
+        </div>
+        {!collapsed && onLogout && (
+          <button
+            onClick={onLogout}
+            title="Cerrar sesión"
+            aria-label="Cerrar sesión"
+            style={{
+              width: 28,
+              height: 28,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: radius.sm,
+              color: color.textDim,
+              background: 'transparent',
+              cursor: 'pointer',
+              flexShrink: 0,
+              transition: `color ${duration.fast} ${ease}, background ${duration.fast} ${ease}`,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = color.danger;
+              e.currentTarget.style.background = color.surfaceHover;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = color.textDim;
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <LogOut size={14} />
+          </button>
+        )}
       </div>
     </aside>
   );

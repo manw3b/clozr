@@ -6,7 +6,7 @@ import { useBusinessStore } from "./store/businessStore";
 import { useUIStore, type ScreenId } from "./store/uiStore";
 import { useAuthStore } from "./store/authStore";
 import { useExchangeRateStore } from "./store/exchangeRateStore";
-import { seedAppleCatalog, seedWatchAndMac, refreshIphoneCatalog } from "./lib/db/quickStock";
+import { seedAppleCatalog, seedWatchAndMac, refreshIphoneCatalog, refreshIpadCatalog } from "./lib/db/quickStock";
 import { paymentMethodsDb } from "./lib/db/paymentMethods";
 import { followupsDb } from "./lib/db/followups";
 import { ensurePricingSchema } from "./lib/db/ensureSchema";
@@ -170,6 +170,8 @@ export default function App() {
       // modelos/colores/storages cada vez que cambia el seed sin perder data
       // de catalog_items o ventas existentes).
       .then(() => refreshIphoneCatalog())
+      // Mismo refresh para iPad — fuente de verdad en IPAD_SEED
+      .then(() => refreshIpadCatalog())
       .catch(() => {});
 
     // Backup nativo automático: 1 vez por día, mantiene los últimos 14

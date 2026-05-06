@@ -194,17 +194,8 @@ export async function seedAppleCatalog(): Promise<void> {
     [],
   );
 
-  // Models — iPad
-  await dbExecute(
-    `INSERT OR IGNORE INTO product_models (id, family_id, name, image_path, sort_order) VALUES
-    ('mod-ipadpro13m4','fam-ipadpro','iPad Pro 13" M4','/src/assets/products/ipads/iPad_Pro_13_M4_Silver.jpg',0),
-    ('mod-ipadpro11m4','fam-ipadpro','iPad Pro 11" M4','/src/assets/products/ipads/iPad_Pro_11_M4_Silver.jpg',1),
-    ('mod-ipadairm3-13','fam-ipadair','iPad Air 13" M3','/src/assets/products/ipads/iPad_Air_13_M4_Blue.jpg',0),
-    ('mod-ipadairm3-11','fam-ipadair','iPad Air 11" M3','/src/assets/products/ipads/iPad_Air_11_M4_Blue.jpg',1),
-    ('mod-ipadmini7','fam-ipadmini','iPad mini (A17 Pro)','/src/assets/products/ipads/iPad_Mini_A17pro_Blue.jpg',0),
-    ('mod-ipad11','fam-ipad','iPad (A16)','/src/assets/products/ipads/iPad_11th_A16_Blue.jpg',0)`,
-    [],
-  );
+  // Models — iPad: gestionado en refreshIpadCatalog (idempotente, corre en
+  // cada boot). Las familias se siguen seedeando arriba.
 
   // Variants — iPhone 17 Pro Max / Pro
   await dbExecute(
@@ -473,39 +464,7 @@ export async function seedAppleCatalog(): Promise<void> {
     [],
   );
 
-  // Variants — iPad
-  await dbExecute(
-    `INSERT OR IGNORE INTO product_variants (id, model_id, color, color_hex, storage, sku, image_path, is_available) VALUES
-    ('var-pp13-si-256','mod-ipadpro13m4','Silver','#E8E3DC','256GB',NULL,NULL,1),
-    ('var-pp13-si-512','mod-ipadpro13m4','Silver','#E8E3DC','512GB',NULL,NULL,1),
-    ('var-pp13-si-1tb','mod-ipadpro13m4','Silver','#E8E3DC','1TB',NULL,NULL,1),
-    ('var-pp13-sb-256','mod-ipadpro13m4','Space Black','#1C1C1E','256GB',NULL,NULL,1),
-    ('var-pp13-sb-512','mod-ipadpro13m4','Space Black','#1C1C1E','512GB',NULL,NULL,1),
-    ('var-pp11-si-256','mod-ipadpro11m4','Silver','#E8E3DC','256GB',NULL,NULL,1),
-    ('var-pp11-si-512','mod-ipadpro11m4','Silver','#E8E3DC','512GB',NULL,NULL,1),
-    ('var-pp11-sb-256','mod-ipadpro11m4','Space Black','#1C1C1E','256GB',NULL,NULL,1),
-    ('var-pp11-sb-512','mod-ipadpro11m4','Space Black','#1C1C1E','512GB',NULL,NULL,1),
-    ('var-pa13-bl-128','mod-ipadairm3-13','Blue','#4A7BA8','128GB',NULL,NULL,1),
-    ('var-pa13-pu-128','mod-ipadairm3-13','Purple','#9B7FB6','128GB',NULL,NULL,1),
-    ('var-pa13-sl-128','mod-ipadairm3-13','Starlight','#F5F0E8','128GB',NULL,NULL,1),
-    ('var-pa13-sg-128','mod-ipadairm3-13','Space Gray','#57534E','128GB',NULL,NULL,1),
-    ('var-pa11-bl-128','mod-ipadairm3-11','Blue','#4A7BA8','128GB',NULL,NULL,1),
-    ('var-pa11-pu-128','mod-ipadairm3-11','Purple','#9B7FB6','128GB',NULL,NULL,1),
-    ('var-pa11-sl-128','mod-ipadairm3-11','Starlight','#F5F0E8','128GB',NULL,NULL,1),
-    ('var-pa11-sg-128','mod-ipadairm3-11','Space Gray','#57534E','128GB',NULL,NULL,1),
-    ('var-pa11-bl-256','mod-ipadairm3-11','Blue','#4A7BA8','256GB',NULL,NULL,1),
-    ('var-pm-bl-128','mod-ipadmini7','Blue','#4A7BA8','128GB',NULL,NULL,1),
-    ('var-pm-pu-128','mod-ipadmini7','Purple','#9B7FB6','128GB',NULL,NULL,1),
-    ('var-pm-sl-128','mod-ipadmini7','Starlight','#F5F0E8','128GB',NULL,NULL,1),
-    ('var-pm-sg-128','mod-ipadmini7','Space Gray','#57534E','128GB',NULL,NULL,1),
-    ('var-pm-bl-256','mod-ipadmini7','Blue','#4A7BA8','256GB',NULL,NULL,1),
-    ('var-pi-si-128','mod-ipad11','Silver','#E8E3DC','128GB',NULL,NULL,1),
-    ('var-pi-bl-128','mod-ipad11','Blue','#4A7BA8','128GB',NULL,NULL,1),
-    ('var-pi-pnk-128','mod-ipad11','Pink','#F2A7B0','128GB',NULL,NULL,1),
-    ('var-pi-yl-128','mod-ipad11','Yellow','#F5E642','128GB',NULL,NULL,1),
-    ('var-pi-si-256','mod-ipad11','Silver','#E8E3DC','256GB',NULL,NULL,1)`,
-    [],
-  );
+  // Variants — iPad: gestionado en refreshIpadCatalog (mismo motivo que models).
 }
 
 /**
@@ -1014,6 +973,221 @@ export async function refreshIphoneCatalog(): Promise<void> {
     );
     for (const c of m.colors) {
       const variantImage = `/src/assets/products/iphones/${m.fileBase}_${c.file}.jpg`;
+      for (const s of m.storages) {
+        const sCode = s.toLowerCase();
+        const variantId = `var-${m.id.replace("mod-", "")}-${c.code}-${sCode}`;
+        await dbExecute(
+          `INSERT INTO product_variants (id, model_id, color, color_hex, storage, sku, image_path, is_available)
+           VALUES (?, ?, ?, ?, ?, NULL, ?, 1)`,
+          [variantId, m.id, c.name, c.hex, s, variantImage],
+        );
+      }
+    }
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * iPad seed — mismo patrón que iPhone. refreshIpadCatalog corre cada boot.
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Decisiones de naming:
+ *   - Los nombres de modelos NO usan `"` ni paréntesis para que
+ *     resolveColorImage() arme paths que matcheen los archivos. Ej:
+ *     'iPad Pro 11 M4' → iPad_Pro_11_M4_Silver.jpg ✓
+ *   - El campo `file` de cada color matchea el sufijo del archivo (ej:
+ *     "Spacegray", "Spaceblack" — sin underscore intermedio).
+ *   - `ext` opcional para los iPad mini 4 que vienen en .png.
+ */
+type IpadSeed = {
+  id: string;
+  familyId: string;
+  name: string;
+  sortOrder: number;
+  fileBase: string;        // ej "iPad_Air_13_M4"
+  defaultColor: string;    // matchea uno de colors[].file — usa para image_path del modelo
+  ext?: "jpg" | "png";     // default jpg
+  storages: string[];
+  colors: Array<{ code: string; name: string; hex: string; file: string }>;
+};
+
+// Paleta compartida — un solo source of truth para hex/labels
+const IPAD_COLOR = {
+  silver:    { code: "si",  name: "Silver",      hex: "#E8E3DC", file: "Silver" },
+  spacegray: { code: "sg",  name: "Space Gray",  hex: "#57534E", file: "Spacegray" },
+  spaceblack:{ code: "sb",  name: "Space Black", hex: "#1C1C1E", file: "Spaceblack" },
+  gold:      { code: "go",  name: "Gold",        hex: "#E8C895", file: "Gold" },
+  rosegold:  { code: "rg",  name: "Rose Gold",   hex: "#E8B5A8", file: "Rosegold" },
+  blue:      { code: "bl",  name: "Blue",        hex: "#4A7BA8", file: "Blue" },
+  pink:      { code: "pnk", name: "Pink",        hex: "#F2A7B0", file: "Pink" },
+  purple:    { code: "pu",  name: "Purple",      hex: "#9B7FB6", file: "Purple" },
+  yellow:    { code: "yl",  name: "Yellow",      hex: "#F5E642", file: "Yellow" },
+  starlight: { code: "sl",  name: "Starlight",   hex: "#F5F0E8", file: "Starlight" },
+  green:     { code: "gr",  name: "Green",       hex: "#95B8A6", file: "Green" },
+  skyblue:   { code: "sky", name: "Sky Blue",    hex: "#B5D7E5", file: "Skyblue" },
+} as const;
+
+const C = IPAD_COLOR;
+
+const IPAD_SEED: IpadSeed[] = [
+  // ─── iPad Pro family ──────────────────────────────────────────
+  { id: "mod-ipadpro13m5", familyId: "fam-ipadpro", name: "iPad Pro 13 M5", sortOrder: 0,
+    fileBase: "iPad_Pro_13_M5", defaultColor: "Spaceblack",
+    storages: ["256GB", "512GB", "1TB"], colors: [C.silver, C.spaceblack] },
+  { id: "mod-ipadpro13m4", familyId: "fam-ipadpro", name: "iPad Pro 13 M4", sortOrder: 1,
+    fileBase: "iPad_Pro_13_M4", defaultColor: "Spaceblack",
+    storages: ["256GB", "512GB", "1TB"], colors: [C.silver, C.spaceblack] },
+  { id: "mod-ipadpro11m4", familyId: "fam-ipadpro", name: "iPad Pro 11 M4", sortOrder: 2,
+    fileBase: "iPad_Pro_11_M4", defaultColor: "Spaceblack",
+    storages: ["256GB", "512GB", "1TB"], colors: [C.silver, C.spaceblack] },
+  { id: "mod-ipadpro12-6", familyId: "fam-ipadpro", name: "iPad Pro 12 6th Gen", sortOrder: 3,
+    fileBase: "iPad_Pro_12_6th_Gen", defaultColor: "Spacegray",
+    storages: ["128GB", "256GB", "512GB"], colors: [C.silver, C.spacegray] },
+  { id: "mod-ipadpro11-4", familyId: "fam-ipadpro", name: "iPad Pro 11 4th Gen", sortOrder: 4,
+    fileBase: "iPad_Pro_11_4th_Gen", defaultColor: "Spacegray",
+    storages: ["128GB", "256GB", "512GB"], colors: [C.silver, C.spacegray] },
+  { id: "mod-ipadpro12-5", familyId: "fam-ipadpro", name: "iPad Pro 12 5th Gen", sortOrder: 5,
+    fileBase: "iPad_Pro_12_5th_Gen", defaultColor: "Spacegray",
+    storages: ["128GB", "256GB", "512GB"], colors: [C.silver, C.spacegray] },
+  { id: "mod-ipadpro11-3", familyId: "fam-ipadpro", name: "iPad Pro 11 3rd Gen", sortOrder: 6,
+    fileBase: "iPad_Pro_11_3rd_Gen", defaultColor: "Spacegray",
+    storages: ["128GB", "256GB", "512GB"], colors: [C.silver, C.spacegray] },
+  { id: "mod-ipadpro12-4", familyId: "fam-ipadpro", name: "iPad Pro 12 4th Gen", sortOrder: 7,
+    fileBase: "iPad_Pro_12_4th_Gen", defaultColor: "Spacegray",
+    storages: ["128GB", "256GB", "512GB"], colors: [C.silver, C.spacegray] },
+  { id: "mod-ipadpro11-2", familyId: "fam-ipadpro", name: "iPad Pro 11 2nd Gen", sortOrder: 8,
+    fileBase: "iPad_Pro_11_2nd_Gen", defaultColor: "Spacegray",
+    storages: ["128GB", "256GB", "512GB"], colors: [C.silver, C.spacegray] },
+  { id: "mod-ipadpro12-3", familyId: "fam-ipadpro", name: "iPad Pro 12 3rd Gen", sortOrder: 9,
+    fileBase: "iPad_Pro_12_3rd_Gen", defaultColor: "Spacegray",
+    storages: ["64GB", "256GB", "512GB"], colors: [C.silver, C.spacegray] },
+  { id: "mod-ipadpro11-1", familyId: "fam-ipadpro", name: "iPad Pro 11 1st Gen", sortOrder: 10,
+    fileBase: "iPad_Pro_11_1st_Gen", defaultColor: "Spacegray",
+    storages: ["64GB", "256GB", "512GB"], colors: [C.silver, C.spacegray] },
+  { id: "mod-ipadpro12-2", familyId: "fam-ipadpro", name: "iPad Pro 12 2nd Gen", sortOrder: 11,
+    fileBase: "iPad_Pro_12_2nd_Gen", defaultColor: "Spacegray",
+    storages: ["64GB", "256GB", "512GB"], colors: [C.silver, C.spacegray, C.gold] },
+  { id: "mod-ipadpro12-1", familyId: "fam-ipadpro", name: "iPad Pro 12 1st Gen", sortOrder: 12,
+    fileBase: "iPad_Pro_12_1st_Gen", defaultColor: "Spacegray",
+    storages: ["32GB", "128GB", "256GB"], colors: [C.silver, C.spacegray, C.gold] },
+  { id: "mod-ipadpro10", familyId: "fam-ipadpro", name: "iPad Pro 10", sortOrder: 13,
+    fileBase: "iPad_Pro_10", defaultColor: "Spacegray",
+    storages: ["64GB", "256GB", "512GB"], colors: [C.silver, C.spacegray, C.gold, C.rosegold] },
+  { id: "mod-ipadpro9", familyId: "fam-ipadpro", name: "iPad Pro 9", sortOrder: 14,
+    fileBase: "iPad_Pro_9", defaultColor: "Spacegray",
+    storages: ["32GB", "128GB", "256GB"], colors: [C.silver, C.spacegray, C.gold, C.rosegold] },
+
+  // ─── iPad Air family ──────────────────────────────────────────
+  { id: "mod-ipadairm4-13", familyId: "fam-ipadair", name: "iPad Air 13 M4", sortOrder: 0,
+    fileBase: "iPad_Air_13_M4", defaultColor: "Blue",
+    storages: ["128GB", "256GB", "512GB"], colors: [C.blue, C.purple, C.starlight, C.spacegray] },
+  { id: "mod-ipadairm4-11", familyId: "fam-ipadair", name: "iPad Air 11 M4", sortOrder: 1,
+    fileBase: "iPad_Air_11_M4", defaultColor: "Blue",
+    storages: ["128GB", "256GB", "512GB"], colors: [C.blue, C.purple, C.starlight, C.spacegray] },
+  { id: "mod-ipadairm3-13", familyId: "fam-ipadair", name: "iPad Air 13 M3", sortOrder: 2,
+    fileBase: "iPad_Air_13_M3", defaultColor: "Blue",
+    storages: ["128GB", "256GB", "512GB"], colors: [C.blue, C.purple, C.starlight, C.spacegray] },
+  { id: "mod-ipadairm3-11", familyId: "fam-ipadair", name: "iPad Air 11 M3", sortOrder: 3,
+    fileBase: "iPad_Air_11_M3", defaultColor: "Blue",
+    storages: ["128GB", "256GB", "512GB"], colors: [C.blue, C.purple, C.starlight, C.spacegray] },
+  { id: "mod-ipadairm2-13", familyId: "fam-ipadair", name: "iPad Air 13 M2", sortOrder: 4,
+    fileBase: "iPad_Air_13_M2", defaultColor: "Blue",
+    storages: ["128GB", "256GB", "512GB"], colors: [C.blue, C.purple, C.starlight, C.spacegray] },
+  { id: "mod-ipadairm2-11", familyId: "fam-ipadair", name: "iPad Air 11 M2", sortOrder: 5,
+    fileBase: "iPad_Air_11_M2", defaultColor: "Blue",
+    storages: ["128GB", "256GB", "512GB"], colors: [C.blue, C.purple, C.starlight, C.spacegray] },
+  { id: "mod-ipadair5", familyId: "fam-ipadair", name: "iPad Air 5th Gen", sortOrder: 6,
+    fileBase: "iPad_Air_5th_Gen", defaultColor: "Blue",
+    storages: ["64GB", "256GB"],
+    colors: [C.blue, C.pink, C.purple, C.starlight, C.spacegray] },
+  { id: "mod-ipadair4", familyId: "fam-ipadair", name: "iPad Air 4th Gen", sortOrder: 7,
+    fileBase: "iPad_Air_4th_Gen", defaultColor: "Spacegray",
+    storages: ["64GB", "256GB"],
+    colors: [C.silver, C.spacegray, C.green, C.skyblue, C.gold] },
+  { id: "mod-ipadair3", familyId: "fam-ipadair", name: "iPad Air 3rd Gen", sortOrder: 8,
+    fileBase: "iPad_Air_3rd_Gen", defaultColor: "Spacegray",
+    storages: ["64GB", "256GB"], colors: [C.silver, C.spacegray, C.gold] },
+  { id: "mod-ipadair2", familyId: "fam-ipadair", name: "iPad Air 2", sortOrder: 9,
+    fileBase: "iPad_Air_2", defaultColor: "Spacegray",
+    storages: ["16GB", "64GB", "128GB"], colors: [C.silver, C.spacegray, C.gold] },
+  { id: "mod-ipadair1", familyId: "fam-ipadair", name: "iPad Air 1st Gen", sortOrder: 10,
+    fileBase: "iPad_Air_1st_Gen", defaultColor: "Spacegray",
+    storages: ["16GB", "32GB", "64GB", "128GB"], colors: [C.silver, C.spacegray] },
+
+  // ─── iPad mini family ─────────────────────────────────────────
+  { id: "mod-ipadmini7", familyId: "fam-ipadmini", name: "iPad Mini A17 Pro", sortOrder: 0,
+    fileBase: "iPad_Mini_A17_Pro", defaultColor: "Blue",
+    storages: ["128GB", "256GB", "512GB"], colors: [C.blue, C.purple, C.starlight, C.spacegray] },
+  { id: "mod-ipadmini6", familyId: "fam-ipadmini", name: "iPad Mini 6th Gen", sortOrder: 1,
+    fileBase: "iPad_Mini_6th_Gen", defaultColor: "Spacegray",
+    storages: ["64GB", "256GB"], colors: [C.spacegray, C.pink, C.purple, C.starlight] },
+  { id: "mod-ipadmini5", familyId: "fam-ipadmini", name: "iPad Mini 5th Gen", sortOrder: 2,
+    fileBase: "iPad_Mini_5th_Gen", defaultColor: "Spacegray",
+    storages: ["64GB", "256GB"], colors: [C.silver, C.spacegray, C.gold] },
+  { id: "mod-ipadmini4", familyId: "fam-ipadmini", name: "iPad Mini 4", sortOrder: 3,
+    fileBase: "iPad_Mini_4", defaultColor: "Spacegray", ext: "png",
+    storages: ["16GB", "64GB", "128GB"], colors: [C.silver, C.spacegray, C.gold] },
+  { id: "mod-ipadmini3", familyId: "fam-ipadmini", name: "iPad Mini 3", sortOrder: 4,
+    fileBase: "iPad_Mini_3", defaultColor: "Spacegray",
+    storages: ["16GB", "64GB", "128GB"], colors: [C.silver, C.spacegray, C.gold] },
+  { id: "mod-ipadmini2", familyId: "fam-ipadmini", name: "iPad Mini 2", sortOrder: 5,
+    fileBase: "iPad_Mini_2", defaultColor: "Spacegray",
+    storages: ["16GB", "32GB", "64GB", "128GB"], colors: [C.silver, C.spacegray] },
+
+  // ─── iPad (basic) family ──────────────────────────────────────
+  { id: "mod-ipad11", familyId: "fam-ipad", name: "iPad 11th A16", sortOrder: 0,
+    fileBase: "iPad_11th_A16", defaultColor: "Blue",
+    storages: ["128GB", "256GB", "512GB"], colors: [C.silver, C.blue, C.pink, C.yellow] },
+  { id: "mod-ipad10", familyId: "fam-ipad", name: "iPad 10th Gen", sortOrder: 1,
+    fileBase: "iPad_10th_Gen", defaultColor: "Blue",
+    storages: ["64GB", "256GB"], colors: [C.silver, C.blue, C.pink, C.yellow] },
+  { id: "mod-ipad9", familyId: "fam-ipad", name: "iPad 9th Gen", sortOrder: 2,
+    fileBase: "iPad_9th_Gen", defaultColor: "Space_Gray",
+    storages: ["64GB", "256GB"],
+    // Override del 'file' del Space Gray porque el archivo viejo usa underscore
+    colors: [
+      C.silver,
+      { code: "sg", name: "Space Gray", hex: "#57534E", file: "Space_Gray" },
+    ] },
+  { id: "mod-ipad8", familyId: "fam-ipad", name: "iPad 8th Gen", sortOrder: 3,
+    fileBase: "iPad_8th_Gen", defaultColor: "Spacegray",
+    storages: ["32GB", "128GB"], colors: [C.silver, C.spacegray, C.gold] },
+  { id: "mod-ipad7", familyId: "fam-ipad", name: "iPad 7th Gen", sortOrder: 4,
+    fileBase: "iPad_7th_Gen", defaultColor: "Spacegray",
+    storages: ["32GB", "128GB"], colors: [C.silver, C.spacegray, C.gold] },
+  { id: "mod-ipad6", familyId: "fam-ipad", name: "iPad 6th Gen", sortOrder: 5,
+    fileBase: "iPad_6th_Gen", defaultColor: "Spacegray",
+    storages: ["32GB", "128GB"], colors: [C.silver, C.spacegray, C.gold] },
+  { id: "mod-ipad5", familyId: "fam-ipad", name: "iPad 5th Gen", sortOrder: 6,
+    fileBase: "iPad_5th_Gen", defaultColor: "Spacegray",
+    storages: ["32GB", "128GB"], colors: [C.silver, C.spacegray, C.gold] },
+];
+
+export async function refreshIpadCatalog(): Promise<void> {
+  // Borrar variantes y modelos iPad existentes (mantenemos las familias)
+  await dbExecute(
+    `DELETE FROM product_variants WHERE model_id IN (
+       SELECT id FROM product_models WHERE family_id IN (
+         SELECT id FROM product_families WHERE category_id = 'cat-ipad'
+       )
+     )`,
+    [],
+  ).catch(() => {});
+  await dbExecute(
+    `DELETE FROM product_models WHERE family_id IN (
+       SELECT id FROM product_families WHERE category_id = 'cat-ipad'
+     )`,
+    [],
+  ).catch(() => {});
+
+  for (const m of IPAD_SEED) {
+    const ext = m.ext ?? "jpg";
+    const modelImage = `/src/assets/products/ipads/${m.fileBase}_${m.defaultColor}.${ext}`;
+    await dbExecute(
+      `INSERT INTO product_models (id, family_id, name, image_path, sort_order) VALUES (?, ?, ?, ?, ?)`,
+      [m.id, m.familyId, m.name, modelImage, m.sortOrder],
+    );
+    for (const c of m.colors) {
+      const variantImage = `/src/assets/products/ipads/${m.fileBase}_${c.file}.${ext}`;
       for (const s of m.storages) {
         const sCode = s.toLowerCase();
         const variantId = `var-${m.id.replace("mod-", "")}-${c.code}-${sCode}`;

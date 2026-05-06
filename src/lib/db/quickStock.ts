@@ -1531,13 +1531,9 @@ export async function findModelForItem(nameHint: string): Promise<ModelWithConte
 // ─── Watch + Mac seed ─────────────────────────────────────────────
 
 export async function seedWatchAndMac(): Promise<void> {
-  // Check for AirPods Max 2 Midnight variant as indicator of full seed.
-  // Using a variant (not a model) ensures we re-run if variants failed to insert.
-  const check = await dbSelect<{ count: number }>(
-    "SELECT COUNT(*) as count FROM product_variants WHERE id = 'var-apmax2-mi'",
-    [],
-  );
-  if ((check[0]?.count ?? 0) > 0) return;
+  // Idempotente: todos los inserts usan INSERT OR IGNORE, así que correr
+  // siempre permite que cambios al seed (ej: agregar Series 1-7) se
+  // apliquen también a usuarios con DB ya inicializada.
 
   // Watch families
   await dbExecute(
@@ -1546,11 +1542,19 @@ export async function seedWatchAndMac(): Promise<void> {
     ('fam-w10','cat-watch','Series 10',1),
     ('fam-w9','cat-watch','Series 9',2),
     ('fam-w8','cat-watch','Series 8',3),
-    ('fam-wu3','cat-watch','Ultra 3',10),
-    ('fam-wu2','cat-watch','Ultra 2',11),
-    ('fam-wu1','cat-watch','Ultra',12),
-    ('fam-wse3','cat-watch','SE (3rd Gen)',20),
-    ('fam-wse2','cat-watch','SE (2nd Gen)',21)`,
+    ('fam-w7','cat-watch','Series 7',4),
+    ('fam-w6','cat-watch','Series 6',5),
+    ('fam-w5','cat-watch','Series 5',6),
+    ('fam-w4','cat-watch','Series 4',7),
+    ('fam-w3','cat-watch','Series 3',8),
+    ('fam-w2','cat-watch','Series 2',9),
+    ('fam-w1','cat-watch','Series 1',10),
+    ('fam-wu3','cat-watch','Ultra 3',20),
+    ('fam-wu2','cat-watch','Ultra 2',21),
+    ('fam-wu1','cat-watch','Ultra',22),
+    ('fam-wse3','cat-watch','SE (3rd Gen)',30),
+    ('fam-wse2','cat-watch','SE (2nd Gen)',31),
+    ('fam-wse1','cat-watch','SE (1st Gen)',32)`,
     [],
   );
 
@@ -1579,7 +1583,15 @@ export async function seedWatchAndMac(): Promise<void> {
     ('mod-wu2',     'fam-wu2','Apple Watch Ultra 2',            '/src/assets/products/watch/ultra_2_titanium_natural.jpg',0),
     ('mod-wu1',     'fam-wu1','Apple Watch Ultra',              '/src/assets/products/watch/ultra_titanium_natural.jpg',0),
     ('mod-wse3',    'fam-wse3','Apple Watch SE (3rd Gen)',       '/src/assets/products/watch/se_3_aluminum_midnight.jpg',0),
-    ('mod-wse2',    'fam-wse2','Apple Watch SE (2nd Gen)',       '/src/assets/products/watch/se_2_aluminum_midnight.jpg',0)`,
+    ('mod-wse2',    'fam-wse2','Apple Watch SE (2nd Gen)',       '/src/assets/products/watch/se_2_aluminum_midnight.jpg',0),
+    ('mod-wse1',    'fam-wse1','Apple Watch SE (1st Gen)',       '/src/assets/products/watch/se_1st_gen_aluminum_brush_gold.jpg',0),
+    ('mod-w7',      'fam-w7', 'Apple Watch Series 7',            '/src/assets/products/watch/series_7_aluminum_green.jpg',0),
+    ('mod-w6',      'fam-w6', 'Apple Watch Series 6',            '/src/assets/products/watch/series_6_aluminum_blue.jpg',0),
+    ('mod-w5',      'fam-w5', 'Apple Watch Series 5',            '/src/assets/products/watch/series_5_aluminum_brush_gold.jpg',0),
+    ('mod-w4',      'fam-w4', 'Apple Watch Series 4 Stainless',  '/src/assets/products/watch/series_4_stainless_gold.jpg',0),
+    ('mod-w3',      'fam-w3', 'Apple Watch Series 3',            '/src/assets/products/watch/series_3_aluminum_space_gray.jpg',0),
+    ('mod-w2',      'fam-w2', 'Apple Watch Series 2',            '/src/assets/products/watch/series_2_aluminum_silver.jpg',0),
+    ('mod-w1',      'fam-w1', 'Apple Watch Series 1',            '/src/assets/products/watch/series_1_aluminum_rose_gold.jpg',0)`,
     [],
   );
 
@@ -1655,6 +1667,68 @@ export async function seedWatchAndMac(): Promise<void> {
     ('var-wse2-si-44','mod-wse2','Silver','#E8E3DC','44mm',NULL,NULL,1),
     ('var-wse2-st-40','mod-wse2','Starlight','#F5F0E8','40mm',NULL,NULL,1),
     ('var-wse2-st-44','mod-wse2','Starlight','#F5F0E8','44mm',NULL,NULL,1)`,
+    [],
+  );
+
+  // Watch variants — SE 1st Gen + Series 1-7
+  await dbExecute(
+    `INSERT OR IGNORE INTO product_variants (id, model_id, color, color_hex, storage, sku, image_path, is_available) VALUES
+    ('var-wse1-si-40','mod-wse1','Silver','#E8E3DC','40mm',NULL,NULL,1),
+    ('var-wse1-si-44','mod-wse1','Silver','#E8E3DC','44mm',NULL,NULL,1),
+    ('var-wse1-sg-40','mod-wse1','Space Gray','#57534E','40mm',NULL,NULL,1),
+    ('var-wse1-sg-44','mod-wse1','Space Gray','#57534E','44mm',NULL,NULL,1),
+    ('var-wse1-go-40','mod-wse1','Gold','#E8C895','40mm',NULL,NULL,1),
+    ('var-wse1-go-44','mod-wse1','Gold','#E8C895','44mm',NULL,NULL,1),
+    ('var-w7-mi-41','mod-w7','Midnight','#1C1C1E','41mm',NULL,NULL,1),
+    ('var-w7-mi-45','mod-w7','Midnight','#1C1C1E','45mm',NULL,NULL,1),
+    ('var-w7-st-41','mod-w7','Starlight','#F5F0E8','41mm',NULL,NULL,1),
+    ('var-w7-st-45','mod-w7','Starlight','#F5F0E8','45mm',NULL,NULL,1),
+    ('var-w7-gr-41','mod-w7','Green','#5C6F4D','41mm',NULL,NULL,1),
+    ('var-w7-gr-45','mod-w7','Green','#5C6F4D','45mm',NULL,NULL,1),
+    ('var-w7-bl-41','mod-w7','Blue','#3B5C8A','41mm',NULL,NULL,1),
+    ('var-w7-bl-45','mod-w7','Blue','#3B5C8A','45mm',NULL,NULL,1),
+    ('var-w7-rd-41','mod-w7','(PRODUCT)RED','#CC0000','41mm',NULL,NULL,1),
+    ('var-w7-rd-45','mod-w7','(PRODUCT)RED','#CC0000','45mm',NULL,NULL,1),
+    ('var-w6-si-40','mod-w6','Silver','#E8E3DC','40mm',NULL,NULL,1),
+    ('var-w6-si-44','mod-w6','Silver','#E8E3DC','44mm',NULL,NULL,1),
+    ('var-w6-sg-40','mod-w6','Space Gray','#57534E','40mm',NULL,NULL,1),
+    ('var-w6-sg-44','mod-w6','Space Gray','#57534E','44mm',NULL,NULL,1),
+    ('var-w6-go-40','mod-w6','Gold','#E8C895','40mm',NULL,NULL,1),
+    ('var-w6-go-44','mod-w6','Gold','#E8C895','44mm',NULL,NULL,1),
+    ('var-w6-bl-40','mod-w6','Blue','#3B5C8A','40mm',NULL,NULL,1),
+    ('var-w6-bl-44','mod-w6','Blue','#3B5C8A','44mm',NULL,NULL,1),
+    ('var-w6-rd-40','mod-w6','(PRODUCT)RED','#CC0000','40mm',NULL,NULL,1),
+    ('var-w6-rd-44','mod-w6','(PRODUCT)RED','#CC0000','44mm',NULL,NULL,1),
+    ('var-w5-si-40','mod-w5','Silver','#E8E3DC','40mm',NULL,NULL,1),
+    ('var-w5-si-44','mod-w5','Silver','#E8E3DC','44mm',NULL,NULL,1),
+    ('var-w5-sg-40','mod-w5','Space Gray','#57534E','40mm',NULL,NULL,1),
+    ('var-w5-sg-44','mod-w5','Space Gray','#57534E','44mm',NULL,NULL,1),
+    ('var-w5-go-40','mod-w5','Gold','#E8C895','40mm',NULL,NULL,1),
+    ('var-w5-go-44','mod-w5','Gold','#E8C895','44mm',NULL,NULL,1),
+    ('var-w4-go-40','mod-w4','Gold','#B8975A','40mm',NULL,NULL,1),
+    ('var-w4-go-44','mod-w4','Gold','#B8975A','44mm',NULL,NULL,1),
+    ('var-w4-si-40','mod-w4','Silver','#E8E3DC','40mm',NULL,NULL,1),
+    ('var-w4-si-44','mod-w4','Silver','#E8E3DC','44mm',NULL,NULL,1),
+    ('var-w4-bk-40','mod-w4','Black','#1C1C1E','40mm',NULL,NULL,1),
+    ('var-w4-bk-44','mod-w4','Black','#1C1C1E','44mm',NULL,NULL,1),
+    ('var-w3-si-38','mod-w3','Silver','#E8E3DC','38mm',NULL,NULL,1),
+    ('var-w3-si-42','mod-w3','Silver','#E8E3DC','42mm',NULL,NULL,1),
+    ('var-w3-sg-38','mod-w3','Space Gray','#57534E','38mm',NULL,NULL,1),
+    ('var-w3-sg-42','mod-w3','Space Gray','#57534E','42mm',NULL,NULL,1),
+    ('var-w3-go-38','mod-w3','Gold','#E8C895','38mm',NULL,NULL,1),
+    ('var-w3-go-42','mod-w3','Gold','#E8C895','42mm',NULL,NULL,1),
+    ('var-w2-si-38','mod-w2','Silver','#E8E3DC','38mm',NULL,NULL,1),
+    ('var-w2-si-42','mod-w2','Silver','#E8E3DC','42mm',NULL,NULL,1),
+    ('var-w2-sg-38','mod-w2','Space Gray','#57534E','38mm',NULL,NULL,1),
+    ('var-w2-sg-42','mod-w2','Space Gray','#57534E','42mm',NULL,NULL,1),
+    ('var-w2-rg-38','mod-w2','Rose Gold','#E8B5A8','38mm',NULL,NULL,1),
+    ('var-w2-rg-42','mod-w2','Rose Gold','#E8B5A8','42mm',NULL,NULL,1),
+    ('var-w1-si-38','mod-w1','Silver','#E8E3DC','38mm',NULL,NULL,1),
+    ('var-w1-si-42','mod-w1','Silver','#E8E3DC','42mm',NULL,NULL,1),
+    ('var-w1-rg-38','mod-w1','Rose Gold','#E8B5A8','38mm',NULL,NULL,1),
+    ('var-w1-rg-42','mod-w1','Rose Gold','#E8B5A8','42mm',NULL,NULL,1),
+    ('var-w1-sg-38','mod-w1','Space Gray','#57534E','38mm',NULL,NULL,1),
+    ('var-w1-sg-42','mod-w1','Space Gray','#57534E','42mm',NULL,NULL,1)`,
     [],
   );
 

@@ -27,6 +27,28 @@ export default defineConfig({
     target: process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
     minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
+    rollupOptions: {
+      output: {
+        // Splittear las dependencias pesadas en chunks dedicados así se
+        // cachean por separado y el index queda chico. Las pantallas
+        // (lazy-loaded) ya tienen su propio chunk.
+        manualChunks: {
+          react: ["react", "react-dom"],
+          tanstack: ["@tanstack/react-query"],
+          tauri: [
+            "@tauri-apps/api",
+            "@tauri-apps/plugin-sql",
+            "@tauri-apps/plugin-fs",
+            "@tauri-apps/plugin-dialog",
+            "@tauri-apps/plugin-process",
+            "@tauri-apps/plugin-opener",
+            "@tauri-apps/plugin-updater",
+          ],
+          icons: ["lucide-react"],
+          state: ["zustand"],
+        },
+      },
+    },
   },
   test: {
     environment: "node",

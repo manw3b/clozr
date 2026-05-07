@@ -34,10 +34,16 @@ export function resolveColorImage(
   const folder = inferFolder(category, modelName);
   if (!folder) return fallback;
 
-  const safeModel = modelName.replace(/\s+/g, "_");
-  const safeColor = color.replace(/\s+/g, "_");
+  // Sanitizamos chars no-filename-safe: comillas, paréntesis, ".".
+  // Esto permite que nombres de modelo con `"` (ej: 'iPad Pro 11" M4' del
+  // seed viejo) o paréntesis ('iPhone SE (3rd Gen)') resuelvan al archivo
+  // correcto. Múltiples espacios consecutivos colapsan a un único `_`.
+  const safe = (s: string) =>
+    s.replace(/["'().]/g, "").replace(/\s+/g, "_").replace(/_+/g, "_");
+  const safeModel = safe(modelName);
+  const safeColor = safe(color);
 
-  // Probamos varios sufijos (.jpg | .png) y nombres de carpeta
+  // Probamos varios sufijos (.jpg | .png)
   const candidates = [
     `/src/assets/products/${folder}/${safeModel}_${safeColor}.jpg`,
     `/src/assets/products/${folder}/${safeModel}_${safeColor}.png`,

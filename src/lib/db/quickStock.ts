@@ -968,7 +968,7 @@ export async function refreshIphoneCatalog(): Promise<void> {
   for (const m of IPHONE_SEED) {
     const modelImage = `/src/assets/products/iphones/${m.fileBase}_${m.defaultColor}.jpg`;
     await dbExecute(
-      `INSERT INTO product_models (id, family_id, name, image_path, sort_order) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO product_models (id, family_id, name, image_path, sort_order) VALUES (?, ?, ?, ?, ?)`,
       [m.id, m.familyId, m.name, modelImage, m.sortOrder],
     );
     for (const c of m.colors) {
@@ -977,7 +977,7 @@ export async function refreshIphoneCatalog(): Promise<void> {
         const sCode = s.toLowerCase();
         const variantId = `var-${m.id.replace("mod-", "")}-${c.code}-${sCode}`;
         await dbExecute(
-          `INSERT INTO product_variants (id, model_id, color, color_hex, storage, sku, image_path, is_available)
+          `INSERT OR REPLACE INTO product_variants (id, model_id, color, color_hex, storage, sku, image_path, is_available)
            VALUES (?, ?, ?, ?, ?, NULL, ?, 1)`,
           [variantId, m.id, c.name, c.hex, s, variantImage],
         );
@@ -1182,8 +1182,11 @@ export async function refreshIpadCatalog(): Promise<void> {
   for (const m of IPAD_SEED) {
     const ext = m.ext ?? "jpg";
     const modelImage = `/src/assets/products/ipads/${m.fileBase}_${m.defaultColor}.${ext}`;
+    // INSERT OR REPLACE así, si el DELETE de arriba no removió la fila vieja
+    // (por la razón que sea), la sobreescribimos con el nombre y la imagen
+    // nuevos. Es el último seguro contra schema drift.
     await dbExecute(
-      `INSERT INTO product_models (id, family_id, name, image_path, sort_order) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO product_models (id, family_id, name, image_path, sort_order) VALUES (?, ?, ?, ?, ?)`,
       [m.id, m.familyId, m.name, modelImage, m.sortOrder],
     );
     for (const c of m.colors) {
@@ -1192,7 +1195,7 @@ export async function refreshIpadCatalog(): Promise<void> {
         const sCode = s.toLowerCase();
         const variantId = `var-${m.id.replace("mod-", "")}-${c.code}-${sCode}`;
         await dbExecute(
-          `INSERT INTO product_variants (id, model_id, color, color_hex, storage, sku, image_path, is_available)
+          `INSERT OR REPLACE INTO product_variants (id, model_id, color, color_hex, storage, sku, image_path, is_available)
            VALUES (?, ?, ?, ?, ?, NULL, ?, 1)`,
           [variantId, m.id, c.name, c.hex, s, variantImage],
         );
@@ -1348,6 +1351,20 @@ export async function resolveVariant(
         "SELECT * FROM product_variants WHERE model_id = ? AND color = ? AND storage IS NULL LIMIT 1",
         [modelId, color],
       );
+  return rows[0] ?? null;
+}
+
+/** Devuelve cualquier variant del color (cualquier storage). Útil para
+ *  previews donde sólo queremos el image_path color-aware antes de que el
+ *  usuario elija storage. */
+export async function resolveAnyVariantForColor(
+  modelId: string,
+  color: string,
+): Promise<ProductVariant | null> {
+  const rows = await dbSelect<ProductVariant>(
+    "SELECT * FROM product_variants WHERE model_id = ? AND color = ? LIMIT 1",
+    [modelId, color],
+  );
   return rows[0] ?? null;
 }
 

@@ -12,6 +12,7 @@ import {
   getColorsForModel,
   getStorageForColor,
   resolveVariant,
+  resolveAnyVariantForColor,
   getCategoryFamilyTree,
   type ProductCategory,
   type ProductFamily,
@@ -251,10 +252,16 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
   const pickColor = async (color_: string, color_hex: string | null) => {
     // Solo selecciona, no avanza. La preview de arriba se actualiza al color.
     setPicked((p) => ({ ...p, color: color_, colorHex: color_hex, storage: undefined, variantImage: null }));
-    // Pre-cargamos el variantImage del color para que el preview se actualice
+    // Pre-cargamos el variantImage del color para que el preview se actualice.
+    // Importante: probamos primero sin storage (variants de Watch/AirPods sin
+    // storage) y, si no hay match, agarramos cualquier variant de ese color
+    // (los iPad/Mac tienen siempre storage seteado).
     if (picked.model) {
       try {
-        const v = await resolveVariant(picked.model.id, color_, null);
+        let v = await resolveVariant(picked.model.id, color_, null);
+        if (!v) {
+          v = await resolveAnyVariantForColor(picked.model.id, color_);
+        }
         setPicked((p) => ({ ...p, variantImage: v?.image_path ?? null }));
       } catch {
         /* ignore */

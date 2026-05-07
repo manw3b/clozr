@@ -6,7 +6,7 @@ import { useCreateSale } from "../ventas/useSalesData";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useBusinessStore } from "../../store/businessStore";
 import { useAuthStore } from "../../store/authStore";
-import { useUIStore } from "../../store/uiStore";
+import { useUIStore, type ScreenId } from "../../store/uiStore";
 import { tasksDb } from "../../lib/db/tasks";
 import { followupsDb } from "../../lib/db/followups";
 import { salesDb } from "../../lib/db/sales";
@@ -176,7 +176,7 @@ export function MyDayContainer() {
         }
       }}
       onNavigate={(page) => {
-        const map: Record<string, string> = {
+        const map: Record<string, ScreenId> = {
           tareas: "tasks",
           pipeline: "pipeline",
           clientes: "customers",
@@ -184,7 +184,7 @@ export function MyDayContainer() {
           deudas: "cash",
         };
         const target = map[page];
-        if (target) setActiveScreen(target as never);
+        if (target) setActiveScreen(target);
       }}
     />
     <NewSaleModal

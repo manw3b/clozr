@@ -583,6 +583,21 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
   // ════════════════════════════════════════════════════════════
   await safe(() => dbExecute(`ALTER TABLE users ADD COLUMN pin_hash TEXT`));
   await safe(() => dbExecute(`ALTER TABLE users ADD COLUMN last_login_at TEXT`));
+
+  // ════════════════════════════════════════════════════════════
+  // 028 — índices compuestos para queries frecuentes (escala >1000 filas)
+  // ════════════════════════════════════════════════════════════
+  // Hoy con pocos datos no se nota, pero sin estos índices SQLite hace full
+  // table scan en cada filtro. A 5k+ ventas/clientes empieza a doler.
+  await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_sales_workspace_date ON sales(workspace_id, sale_date DESC)`));
+  await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_sales_workspace_business ON sales(workspace_id, business_id, sale_date DESC)`));
+  await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_customers_workspace_status ON customers(workspace_id, status)`));
+  await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_pipeline_workspace_stage ON pipeline_items(workspace_id, stage_id, position)`));
+  await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_catalog_workspace_active ON catalog_items(workspace_id, active)`));
+  await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_cash_movements_workspace_date ON cash_movements(workspace_id, business_id, created_at DESC)`));
+  await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_followups_workspace_due ON followups(workspace_id, business_id, completed, due_date)`));
+  await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)`));
+  await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_sale_payments_sale ON sale_payments(sale_id)`));
 }
 
 async function safe(fn: () => Promise<unknown>) {

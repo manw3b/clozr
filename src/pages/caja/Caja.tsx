@@ -9,7 +9,7 @@ import { CashMovementsList } from './components/CashMovementsList';
 import { NewMovementModal } from './components/NewMovementModal';
 import { space } from '../../tokens';
 import { useCashSummary, useCreateMovement } from './useCashData';
-import type { CashSummary, CashMovementKind } from '../../types/domain';
+import type { CashSummary, CashMovementKind, CashCategory, PaymentMethod } from '../../types/domain';
 
 const EMPTY_SUMMARY: CashSummary = {
   date: new Date().toISOString().slice(0, 10),
@@ -51,7 +51,14 @@ export function Caja() {
     return true;
   });
 
-  function handleNewMovement(data: any) {
+  function handleNewMovement(data: {
+    kind: CashMovementKind;
+    amount: number;
+    currency: 'ARS' | 'USD';
+    description: string;
+    category: CashCategory;
+    paymentMethod?: PaymentMethod;
+  }) {
     createMovementMut.mutate(
       {
         kind: data.kind,

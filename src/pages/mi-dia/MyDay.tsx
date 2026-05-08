@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { MyDayHero } from './components/MyDayHero';
 import { TasksBlock } from './components/TasksBlock';
 import { FollowUpsBlock } from './components/FollowUpsBlock';
@@ -46,17 +45,17 @@ export function MyDay({
   onCreateTask = () => {},
   onNavigate = () => {},
 }: MyDayProps) {
-  // Estado local para tareas — toggle visual rápido sin esperar la mutation
-  const [tasks, setTasks] = useState(data.tasks);
-
+  // Antes había un `useState(data.tasks)` local para hacer toggle instantáneo,
+  // pero ese patrón es buggy: useState con prop como initial value sólo
+  // captura el valor en el primer render, así que cuando la query del
+  // container resolvía después del primer paint, las tareas nunca aparecían
+  // hasta que el componente se desmontaba/remontaba (ej: navegar y volver).
+  //
+  // La fix correcta es leer data.tasks directo. La latencia de la mutation
+  // + invalidate + refetch contra SQLite local es <50ms — imperceptible.
+  // Si necesitamos optimistic UI a futuro, lo implementamos con
+  // useMutation onMutate + setQueryData en el container.
   function handleToggleTask(id: string) {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? { ...t, status: t.status === 'done' ? 'pending' : 'done' }
-          : t
-      )
-    );
     onToggleTask(id);
   }
 
@@ -84,7 +83,7 @@ export function MyDay({
         {/* COLUMNA IZQUIERDA — acción */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: space[5], minWidth: 0 }}>
           <TasksBlock
-            tasks={tasks}
+            tasks={data.tasks}
             onToggleTask={handleToggleTask}
             onTaskClick={onTaskClick}
             onViewAll={() => onNavigate('tareas')}

@@ -11,6 +11,7 @@ import { paymentMethodsDb } from "./lib/db/paymentMethods";
 import { followupsDb } from "./lib/db/followups";
 import { ensurePricingSchema } from "./lib/db/ensureSchema";
 import { autoBackupIfDue } from "./lib/backup";
+import { log } from "./lib/logger";
 
 // AppShell stays eager — render shell immediately
 import { AppShell } from "./layout/AppShell";
@@ -137,17 +138,25 @@ export default function App() {
 
   useGlobalShortcuts();
 
-  useEffect(() => { loadWorkspaces().catch(() => {}); }, [loadWorkspaces]);
+  useEffect(() => {
+    loadWorkspaces().catch((err) => log.error("loadWorkspaces failed", { scope: "boot", err }));
+  }, [loadWorkspaces]);
 
   useEffect(() => {
     if (!activeWorkspace) return;
-    loadBusinesses(activeWorkspace.id).catch(() => {});
-    loadRate(activeWorkspace.id).catch(() => {});
+    loadBusinesses(activeWorkspace.id).catch((err) =>
+      log.error("loadBusinesses failed", { scope: "boot", err }),
+    );
+    loadRate(activeWorkspace.id).catch((err) =>
+      log.error("loadRate failed", { scope: "boot", err }),
+    );
     // Defensa: si las migraciones 023-025 no corrieron en esta DB,
     // crear las tablas/columnas a mano antes de seedear defaults.
     ensurePricingSchema()
       .then(() => paymentMethodsDb.seedDefaults(activeWorkspace.id))
-      .catch(() => {});
+      .catch((err) =>
+        log.error("ensureSchema/seedPaymentDefaults failed", { scope: "boot", err }),
+      );
   }, [activeWorkspace?.id, loadBusinesses, loadRate]);
 
   // Scan de clientes inactivos: corre 1 vez al cargar workspace+business.
@@ -157,7 +166,9 @@ export default function App() {
     if (!activeWorkspace || !activeBusiness) return;
     const wid = activeWorkspace.id;
     const bid = activeBusiness.id;
-    followupsDb.scanInactiveCustomers(wid, bid, 60).catch(() => {});
+    followupsDb.scanInactiveCustomers(wid, bid, 60).catch((err) =>
+      log.warn("scanInactiveCustomers failed", { scope: "boot", err }),
+    );
     // Solo dispara cuando cambian los IDs
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeWorkspace?.id, activeBusiness?.id]);
@@ -172,10 +183,12 @@ export default function App() {
       .then(() => refreshIphoneCatalog())
       // Mismo refresh para iPad — fuente de verdad en IPAD_SEED
       .then(() => refreshIpadCatalog())
-      .catch(() => {});
+      .catch((err) => log.error("Apple catalog seed/refresh failed", { scope: "boot", err }));
 
     // Backup nativo automático: 1 vez por día, mantiene los últimos 14
-    autoBackupIfDue().catch(() => {});
+    autoBackupIfDue().catch((err) =>
+      log.warn("autoBackupIfDue failed", { scope: "backup", err }),
+    );
   }, []);
 
   // Nota: la auto-selección del primer miembro como sesión activa fue

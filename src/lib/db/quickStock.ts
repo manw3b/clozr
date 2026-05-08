@@ -473,18 +473,23 @@ export async function seedAppleCatalog(): Promise<void> {
  * boot. Mantiene los `model_id` estables, así workspace_featured_models y
  * cualquier referencia se preserva.
  */
-type IphoneSeed = {
+/**
+ * Tipo unificado de seed para refresh*Catalog. iPhone, iPad, Mac y AirPods
+ * comparten esta estructura — el folder lo decide la función de refresh.
+ */
+export type ProductSeed = {
   id: string;
   familyId: string;
   name: string;
   sortOrder: number;
-  fileBase: string; // "iPhone_17_Pro_Max" → arma /src/assets/products/iphones/iPhone_17_Pro_Max_<Color>.jpg
-  defaultColor: string; // file color suffix para image_path del modelo
-  storages: string[];
+  fileBase: string;        // "iPhone_17_Pro_Max" → /src/assets/products/<folder>/<fileBase>_<Color>.<ext>
+  defaultColor: string;    // matchea uno de colors[].file
+  ext?: "jpg" | "png";     // default "jpg"
+  storages: string[];      // si la categoría no usa storage (Watch sin storage), pasar [""]
   colors: Array<{ code: string; name: string; hex: string; file: string }>;
 };
 
-const IPHONE_SEED: IphoneSeed[] = [
+const IPHONE_SEED: ProductSeed[] = [
   // ─── iPhone 17 family ───────────────────────────────────────────────
   {
     id: "mod-17promax", familyId: "fam-17", name: "iPhone 17 Pro Max", sortOrder: 0,
@@ -947,43 +952,100 @@ const IPHONE_SEED: IphoneSeed[] = [
   },
 ];
 
-export async function refreshIphoneCatalog(): Promise<void> {
-  // Borrar variantes y modelos iPhone existentes (mantenemos las familias)
+/* ─────────────────────────────────────────────────────────────────────
+ * refreshCatalogFromSeed — borra y re-inserta todos los modelos+variantes
+ * de una categoría desde una lista de ProductSeed. Usa batched INSERT
+ * (50 filas por query) para minimizar round-trips a SQLite — antes
+ * eran ~360 awaits secuenciales por boot, ahora ~7.
+ *
+ * Idempotente: corre cada vez que arranca la app sin acumular duplicados.
+ * INSERT OR REPLACE asegura que si por algún motivo el DELETE no removió
+ * la fila vieja (FK constraint, lock, etc.), igual sobrescribimos.
+ * ───────────────────────────────────────────────────────────────────── */
+async function refreshCatalogFromSeed(opts: {
+  categoryId: string;
+  folder: string;
+  seed: ProductSeed[];
+}): Promise<void> {
+  const { categoryId, folder, seed } = opts;
+
+  // Borrar variantes y modelos de la categoría (mantenemos las familias)
   await dbExecute(
     `DELETE FROM product_variants WHERE model_id IN (
        SELECT id FROM product_models WHERE family_id IN (
-         SELECT id FROM product_families WHERE category_id = 'cat-iphone'
+         SELECT id FROM product_families WHERE category_id = ?
        )
      )`,
-    [],
+    [categoryId],
   ).catch(() => {});
   await dbExecute(
     `DELETE FROM product_models WHERE family_id IN (
-       SELECT id FROM product_families WHERE category_id = 'cat-iphone'
+       SELECT id FROM product_families WHERE category_id = ?
      )`,
-    [],
+    [categoryId],
   ).catch(() => {});
 
-  // Re-insertar todos los modelos + variantes desde IPHONE_SEED
-  for (const m of IPHONE_SEED) {
-    const modelImage = `/src/assets/products/iphones/${m.fileBase}_${m.defaultColor}.jpg`;
-    await dbExecute(
-      `INSERT OR REPLACE INTO product_models (id, family_id, name, image_path, sort_order) VALUES (?, ?, ?, ?, ?)`,
-      [m.id, m.familyId, m.name, modelImage, m.sortOrder],
-    );
+  // Modelos en un único INSERT batched
+  const modelRows: unknown[][] = seed.map((m) => {
+    const ext = m.ext ?? "jpg";
+    const modelImage = `/src/assets/products/${folder}/${m.fileBase}_${m.defaultColor}.${ext}`;
+    return [m.id, m.familyId, m.name, modelImage, m.sortOrder];
+  });
+  await batchedInsert(
+    `INSERT OR REPLACE INTO product_models (id, family_id, name, image_path, sort_order) VALUES`,
+    5,
+    modelRows,
+  );
+
+  // Variantes en INSERTs batched (chunks de 50 filas)
+  const variantRows: unknown[][] = [];
+  for (const m of seed) {
+    const ext = m.ext ?? "jpg";
     for (const c of m.colors) {
-      const variantImage = `/src/assets/products/iphones/${m.fileBase}_${c.file}.jpg`;
+      const variantImage = `/src/assets/products/${folder}/${m.fileBase}_${c.file}.${ext}`;
       for (const s of m.storages) {
         const sCode = s.toLowerCase();
         const variantId = `var-${m.id.replace("mod-", "")}-${c.code}-${sCode}`;
-        await dbExecute(
-          `INSERT OR REPLACE INTO product_variants (id, model_id, color, color_hex, storage, sku, image_path, is_available)
-           VALUES (?, ?, ?, ?, ?, NULL, ?, 1)`,
-          [variantId, m.id, c.name, c.hex, s, variantImage],
-        );
+        variantRows.push([variantId, m.id, c.name, c.hex, s, variantImage]);
       }
     }
   }
+  await batchedInsert(
+    `INSERT OR REPLACE INTO product_variants (id, model_id, color, color_hex, storage, sku, image_path, is_available) VALUES`,
+    6,
+    variantRows,
+    "(?, ?, ?, ?, ?, NULL, ?, 1)", // 6 params, 2 hardcoded (sku NULL, is_available 1)
+  );
+}
+
+/**
+ * Insert con N filas por query. SQLite tiene límite de 999 params por
+ * default; chunkeamos a 50 filas (× ~10 cols max = 500 params) para
+ * dejar margen.
+ */
+async function batchedInsert(
+  prefix: string,
+  paramsPerRow: number,
+  rows: unknown[][],
+  rowTemplate?: string,
+): Promise<void> {
+  if (rows.length === 0) return;
+  const tmpl = rowTemplate ?? `(${Array(paramsPerRow).fill("?").join(", ")})`;
+  const CHUNK = 50;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const sql = `${prefix} ${chunk.map(() => tmpl).join(", ")}`;
+    const params = chunk.flat();
+    await dbExecute(sql, params);
+  }
+}
+
+export async function refreshIphoneCatalog(): Promise<void> {
+  await refreshCatalogFromSeed({
+    categoryId: "cat-iphone",
+    folder: "iphones",
+    seed: IPHONE_SEED,
+  });
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -998,18 +1060,6 @@ export async function refreshIphoneCatalog(): Promise<void> {
  *     "Spacegray", "Spaceblack" — sin underscore intermedio).
  *   - `ext` opcional para los iPad mini 4 que vienen en .png.
  */
-type IpadSeed = {
-  id: string;
-  familyId: string;
-  name: string;
-  sortOrder: number;
-  fileBase: string;        // ej "iPad_Air_13_M4"
-  defaultColor: string;    // matchea uno de colors[].file — usa para image_path del modelo
-  ext?: "jpg" | "png";     // default jpg
-  storages: string[];
-  colors: Array<{ code: string; name: string; hex: string; file: string }>;
-};
-
 // Paleta compartida — un solo source of truth para hex/labels
 const IPAD_COLOR = {
   silver:    { code: "si",  name: "Silver",      hex: "#E8E3DC", file: "Silver" },
@@ -1028,7 +1078,7 @@ const IPAD_COLOR = {
 
 const C = IPAD_COLOR;
 
-const IPAD_SEED: IpadSeed[] = [
+const IPAD_SEED: ProductSeed[] = [
   // ─── iPad Pro family ──────────────────────────────────────────
   { id: "mod-ipadpro13m5", familyId: "fam-ipadpro", name: "iPad Pro 13 M5", sortOrder: 0,
     fileBase: "iPad_Pro_13_M5", defaultColor: "Spaceblack",
@@ -1163,45 +1213,11 @@ const IPAD_SEED: IpadSeed[] = [
 ];
 
 export async function refreshIpadCatalog(): Promise<void> {
-  // Borrar variantes y modelos iPad existentes (mantenemos las familias)
-  await dbExecute(
-    `DELETE FROM product_variants WHERE model_id IN (
-       SELECT id FROM product_models WHERE family_id IN (
-         SELECT id FROM product_families WHERE category_id = 'cat-ipad'
-       )
-     )`,
-    [],
-  ).catch(() => {});
-  await dbExecute(
-    `DELETE FROM product_models WHERE family_id IN (
-       SELECT id FROM product_families WHERE category_id = 'cat-ipad'
-     )`,
-    [],
-  ).catch(() => {});
-
-  for (const m of IPAD_SEED) {
-    const ext = m.ext ?? "jpg";
-    const modelImage = `/src/assets/products/ipads/${m.fileBase}_${m.defaultColor}.${ext}`;
-    // INSERT OR REPLACE así, si el DELETE de arriba no removió la fila vieja
-    // (por la razón que sea), la sobreescribimos con el nombre y la imagen
-    // nuevos. Es el último seguro contra schema drift.
-    await dbExecute(
-      `INSERT OR REPLACE INTO product_models (id, family_id, name, image_path, sort_order) VALUES (?, ?, ?, ?, ?)`,
-      [m.id, m.familyId, m.name, modelImage, m.sortOrder],
-    );
-    for (const c of m.colors) {
-      const variantImage = `/src/assets/products/ipads/${m.fileBase}_${c.file}.${ext}`;
-      for (const s of m.storages) {
-        const sCode = s.toLowerCase();
-        const variantId = `var-${m.id.replace("mod-", "")}-${c.code}-${sCode}`;
-        await dbExecute(
-          `INSERT OR REPLACE INTO product_variants (id, model_id, color, color_hex, storage, sku, image_path, is_available)
-           VALUES (?, ?, ?, ?, ?, NULL, ?, 1)`,
-          [variantId, m.id, c.name, c.hex, s, variantImage],
-        );
-      }
-    }
-  }
+  await refreshCatalogFromSeed({
+    categoryId: "cat-ipad",
+    folder: "ipads",
+    seed: IPAD_SEED,
+  });
 }
 
 // ─── Queries ──────────────────────────────────────────────────────

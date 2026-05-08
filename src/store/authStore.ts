@@ -70,7 +70,7 @@ export const PERMISSIONS: Readonly<Record<string, readonly UserRole[]>> = {
 export type Permission = keyof typeof PERMISSIONS;
 
 export function can(role: UserRole, permission: Permission): boolean {
-  return PERMISSIONS[permission].includes(role);
+  return PERMISSIONS[permission]?.includes(role) ?? false;
 }
 
 /**

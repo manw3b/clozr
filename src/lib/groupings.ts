@@ -20,7 +20,7 @@ export function groupLeadsByStage(leads: Lead[]): Record<string, Lead[]> {
     if (arr) arr.push(lead);
   }
   for (const k of Object.keys(grouped)) {
-    grouped[k].sort((a, b) => (a.position || 0) - (b.position || 0));
+    grouped[k]?.sort((a, b) => (a.position || 0) - (b.position || 0));
   }
   return grouped;
 }

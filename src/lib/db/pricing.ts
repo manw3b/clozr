@@ -116,7 +116,8 @@ export async function resolvePrice(
        WHERE stock_item_id = ? AND customer_type_id = ? LIMIT 1`,
       [stockItemId, customerTypeId],
     ).catch(() => []);
-    if (rows.length > 0) return { priceUsd: rows[0].price_usd, source: "stock-override" };
+    const first = rows[0];
+    if (first) return { priceUsd: first.price_usd, source: "stock-override" };
   }
   // 2. Catalog price
   const rows = await dbSelect<{ price_usd: number }>(
@@ -124,7 +125,8 @@ export async function resolvePrice(
      WHERE catalog_item_id = ? AND customer_type_id = ? LIMIT 1`,
     [catalogItemId, customerTypeId],
   ).catch(() => []);
-  if (rows.length > 0) return { priceUsd: rows[0].price_usd, source: "catalog" };
+  const first = rows[0];
+  if (first) return { priceUsd: first.price_usd, source: "catalog" };
   return { priceUsd: null, source: "none" };
 }
 

@@ -15,13 +15,15 @@ const palette = ['#E11D48', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899
 function hashColor(name: string) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return palette[Math.abs(hash) % palette.length];
+  return palette[Math.abs(hash) % palette.length] ?? palette[0]!;
 }
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  const first = parts[0] ?? '';
+  if (parts.length === 1) return first.slice(0, 1).toUpperCase();
+  const last = parts[parts.length - 1] ?? first;
+  return ((first[0] ?? '') + (last[0] ?? '')).toUpperCase();
 }
 
 export function Avatar({ name, size = 32, bg, src }: AvatarProps) {

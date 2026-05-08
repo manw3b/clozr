@@ -43,8 +43,9 @@ export default function LoginScreen() {
       .then((list) => {
         setMembers(list);
         // Auto-login si hay 1 solo miembro sin PIN
-        if (list.length === 1 && !list[0].has_pin) {
-          handleLogin(list[0], "");
+        const only = list[0];
+        if (list.length === 1 && only && !only.has_pin) {
+          handleLogin(only, "");
         }
       })
       .catch(() => setMembers([]))

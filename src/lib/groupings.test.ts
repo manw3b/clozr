@@ -53,7 +53,7 @@ describe("groupLeadsByStage", () => {
       lead({ id: "3", stage: "prospecto", position: 2 }),
     ];
     const grouped = groupLeadsByStage(leads);
-    expect(grouped.prospecto.map((l) => l.id)).toEqual(["2", "3", "1"]);
+    expect(grouped.prospecto?.map((l) => l.id)).toEqual(["2", "3", "1"]);
   });
 });
 
@@ -72,8 +72,8 @@ describe("buildSalesTimeline", () => {
     ];
     const buckets = buildSalesTimeline(sales, 7);
     const last = buckets[buckets.length - 1];
-    expect(last.total).toBe(300);
-    expect(last.count).toBe(2);
+    expect(last?.total).toBe(300);
+    expect(last?.count).toBe(2);
   });
 
   it("ignores sales outside the window", () => {

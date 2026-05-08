@@ -482,7 +482,11 @@ function PipelineSection({ wid }: { wid: string }) {
     const arr = [...stages];
     const swap = idx + dir;
     if (swap < 0 || swap >= arr.length) return;
-    [arr[idx], arr[swap]] = [arr[swap], arr[idx]];
+    const a = arr[idx];
+    const b = arr[swap];
+    if (!a || !b) return;
+    arr[idx] = b;
+    arr[swap] = a;
     update(arr.map((s, i) => ({ ...s, stage_order: i })));
   };
 
@@ -656,7 +660,11 @@ function CustomerTypesSection({ wid }: { wid: string }) {
     const arr = [...types];
     const swap = idx + dir;
     if (swap < 0 || swap >= arr.length) return;
-    [arr[idx], arr[swap]] = [arr[swap], arr[idx]];
+    const a = arr[idx];
+    const b = arr[swap];
+    if (!a || !b) return;
+    arr[idx] = b;
+    arr[swap] = a;
     update(arr.map((t, i) => ({ ...t, sort_order: i })));
   };
 

@@ -187,7 +187,7 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
     const lastUsed = lastUsedId
       ? paymentsQ.data.find((p) => p.id === lastUsedId)
       : null;
-    setPaymentMethodId(lastUsed?.id ?? paymentsQ.data[0].id);
+    setPaymentMethodId(lastUsed?.id ?? paymentsQ.data[0]?.id ?? "");
   }, [open, paymentsQ.data, paymentMethodId, wid]);
 
   const customerTypes = customerTypesQ.data ?? [];

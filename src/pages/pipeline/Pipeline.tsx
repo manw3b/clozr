@@ -190,8 +190,12 @@ export function Pipeline() {
       const overIdx = prev.findIndex((l) => l.id === overId);
       if (activeIdx === -1 || overIdx === -1) return prev;
 
+      const activeLead = prev[activeIdx];
+      const overLead = prev[overIdx];
+      if (!activeLead || !overLead) return prev;
+
       // Si están en la misma stage, reordenamos
-      if (prev[activeIdx].stage === prev[overIdx].stage) {
+      if (activeLead.stage === overLead.stage) {
         return arrayMove(prev, activeIdx, overIdx);
       }
 

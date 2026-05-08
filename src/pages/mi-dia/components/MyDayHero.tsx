@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Plus, Pencil, Check, X, Target } from 'lucide-react';
 import { Button } from '../../../components/Button';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney, formatDateLong, greetText, plural } from '../../../lib/format';
@@ -13,6 +13,9 @@ interface MyDayHeroProps {
   goal: DailyGoal;
   score: number;
   onNewSale: () => void;
+  /** Setea el objetivo en USD del workspace activo. Si no se pasa, se oculta
+   *  el control de edición (defensivo para previews/storybook). */
+  onSetGoal?: (amountUsd: number) => void;
 }
 
 /**
@@ -29,9 +32,12 @@ export function MyDayHero({
   goal,
   score,
   onNewSale,
+  onSetGoal,
 }: MyDayHeroProps) {
   const progress = goal.amount > 0 ? Math.min(100, (goal.current / goal.amount) * 100) : 0;
   const remaining = Math.max(0, goal.amount - goal.current);
+  const hasGoal = goal.amount > 0;
+  const canEdit = !!onSetGoal;
 
   return (
     <div
@@ -102,91 +108,110 @@ export function MyDayHero({
 
         {/* Objetivo del día */}
         <div style={{ maxWidth: 520 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              justifyContent: 'space-between',
-              marginBottom: space[2],
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: space[2] }}>
-              <span
+          {hasGoal ? (
+            <>
+              <div
                 style={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                  marginBottom: space[2],
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: space[2] }}>
+                  <span
+                    style={{
+                      fontSize: text.sm,
+                      color: color.textMuted,
+                      fontWeight: weight.medium,
+                    }}
+                  >
+                    Objetivo del día
+                  </span>
+                  {goal.salesGoal ? (
+                    <span
+                      style={{
+                        fontSize: text.xs,
+                        fontWeight: weight.semibold,
+                        color: color.textDim,
+                      }}
+                    >
+                      {goal.salesCount} de {goal.salesGoal}{' '}
+                      {plural(goal.salesGoal, 'venta', 'ventas')}
+                    </span>
+                  ) : null}
+                </div>
+                <span
+                  style={{
+                    fontSize: text.sm,
+                    fontWeight: weight.semibold,
+                    color: progress >= 100 ? color.success : color.text,
+                  }}
+                >
+                  {progress.toFixed(0)}%
+                </span>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  gap: space[2],
+                  marginBottom: space[2],
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: text['2xl'],
+                    fontWeight: weight.bold,
+                    color: color.text,
+                    letterSpacing: '-0.5px',
+                    lineHeight: 1,
+                  }}
+                >
+                  {formatMoney(goal.current)}
+                </span>
+                <span
+                  style={{
+                    fontSize: text.sm,
+                    color: color.textMuted,
+                    fontWeight: weight.medium,
+                  }}
+                >
+                  de {formatMoney(goal.amount)}
+                </span>
+                {canEdit && (
+                  <GoalEditButton current={goal.amount} onSave={onSetGoal!} />
+                )}
+              </div>
+
+              <ProgressBar value={progress} />
+
+              <div
+                style={{
+                  marginTop: space[2],
                   fontSize: text.sm,
                   color: color.textMuted,
-                  fontWeight: weight.medium,
                 }}
               >
-                Objetivo del día
-              </span>
-              <span
-                style={{
-                  fontSize: text.xs,
-                  fontWeight: weight.semibold,
-                  color: color.textDim,
-                }}
-              >
-                {goal.salesCount} de {goal.salesGoal || '?'} {plural(goal.salesGoal || 0, 'venta', 'ventas')}
-              </span>
-            </div>
-            <span
-              style={{
-                fontSize: text.sm,
-                fontWeight: weight.semibold,
-                color: progress >= 100 ? color.success : color.text,
-              }}
-            >
-              {progress.toFixed(0)}%
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: space[2], marginBottom: space[2] }}>
-            <span
-              style={{
-                fontSize: text['2xl'],
-                fontWeight: weight.bold,
-                color: color.text,
-                letterSpacing: '-0.5px',
-                lineHeight: 1,
-              }}
-            >
-              {formatMoney(goal.current)}
-            </span>
-            <span
-              style={{
-                fontSize: text.sm,
-                color: color.textMuted,
-                fontWeight: weight.medium,
-              }}
-            >
-              de {formatMoney(goal.amount)}
-            </span>
-          </div>
-
-          <ProgressBar value={progress} />
-
-          <div
-            style={{
-              marginTop: space[2],
-              fontSize: text.sm,
-              color: color.textMuted,
-            }}
-          >
-            {progress >= 100 ? (
-              <span style={{ color: color.success, fontWeight: weight.semibold }}>
-                ¡Objetivo cumplido! 🎯
-              </span>
-            ) : (
-              <>
-                Faltan{' '}
-                <span style={{ color: color.text, fontWeight: weight.semibold }}>
-                  {formatMoney(remaining)}
-                </span>{' '}
-                para el objetivo
-              </>
-            )}
-          </div>
+                {progress >= 100 ? (
+                  <span style={{ color: color.success, fontWeight: weight.semibold }}>
+                    ¡Objetivo cumplido! 🎯
+                  </span>
+                ) : (
+                  <>
+                    Faltan{' '}
+                    <span style={{ color: color.text, fontWeight: weight.semibold }}>
+                      {formatMoney(remaining)}
+                    </span>{' '}
+                    para el objetivo
+                  </>
+                )}
+              </div>
+            </>
+          ) : (
+            <GoalEmptyState onSetGoal={canEdit ? onSetGoal! : undefined} />
+          )}
         </div>
       </div>
 
@@ -212,6 +237,272 @@ export function MyDayHero({
         </Button>
       </div>
     </div>
+  );
+}
+
+/* ============================================================
+ *  GoalEmptyState — mostrado cuando aún no hay objetivo seteado
+ * ============================================================ */
+
+function GoalEmptyState({ onSetGoal }: { onSetGoal?: (amountUsd: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (editing) requestAnimationFrame(() => inputRef.current?.focus());
+  }, [editing]);
+
+  function commit() {
+    const n = parseFloat(draft);
+    if (!Number.isFinite(n) || n <= 0) {
+      setEditing(false);
+      setDraft('');
+      return;
+    }
+    onSetGoal?.(n);
+    setEditing(false);
+    setDraft('');
+  }
+
+  if (!editing) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: space[3],
+          padding: `${space[3]} ${space[4]}`,
+          background: 'rgba(225, 29, 72, 0.06)',
+          border: `1px dashed ${color.primary}`,
+          borderRadius: radius.md,
+        }}
+      >
+        <Target size={18} color={color.primary} strokeWidth={2.2} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: text.sm,
+              fontWeight: weight.semibold,
+              color: color.text,
+              marginBottom: 2,
+            }}
+          >
+            Configurá tu objetivo del día
+          </div>
+          <div style={{ fontSize: text.xs, color: color.textMuted }}>
+            En USD. Lo podés cambiar cuando quieras.
+          </div>
+        </div>
+        {onSetGoal && (
+          <button
+            onClick={() => setEditing(true)}
+            style={{
+              padding: `${space[2]} ${space[3]}`,
+              background: color.primary,
+              color: '#fff',
+              borderRadius: radius.sm,
+              fontSize: text.sm,
+              fontWeight: weight.semibold,
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            Configurar
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: space[2],
+        padding: `${space[3]} ${space[4]}`,
+        background: color.surface,
+        border: `1px solid ${color.borderStrong}`,
+        borderRadius: radius.md,
+      }}
+    >
+      <span style={{ fontSize: text.sm, color: color.textMuted, fontWeight: weight.medium }}>
+        US$
+      </span>
+      <input
+        ref={inputRef}
+        type="number"
+        min={1}
+        step="any"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+          if (e.key === 'Escape') {
+            setEditing(false);
+            setDraft('');
+          }
+        }}
+        placeholder="500"
+        style={{
+          flex: 1,
+          minWidth: 0,
+          background: 'transparent',
+          border: 'none',
+          outline: 'none',
+          fontSize: text.lg,
+          fontWeight: weight.bold,
+          color: color.text,
+          padding: 0,
+        }}
+      />
+      <button
+        onClick={commit}
+        title="Guardar (Enter)"
+        style={{
+          width: 30,
+          height: 30,
+          borderRadius: radius.sm,
+          background: color.primary,
+          color: '#fff',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+        }}
+      >
+        <Check size={16} />
+      </button>
+      <button
+        onClick={() => {
+          setEditing(false);
+          setDraft('');
+        }}
+        title="Cancelar (Esc)"
+        style={{
+          width: 30,
+          height: 30,
+          borderRadius: radius.sm,
+          background: 'transparent',
+          color: color.textMuted,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+        }}
+      >
+        <X size={16} />
+      </button>
+    </div>
+  );
+}
+
+/* ============================================================
+ *  GoalEditButton — pencil icon que abre input inline para editar el goal
+ * ============================================================ */
+
+function GoalEditButton({
+  current,
+  onSave,
+}: {
+  current: number;
+  onSave: (amountUsd: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(current));
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (editing) {
+      setDraft(String(current));
+      requestAnimationFrame(() => inputRef.current?.select());
+    }
+  }, [editing, current]);
+
+  function commit() {
+    const n = parseFloat(draft);
+    if (!Number.isFinite(n) || n <= 0) {
+      setEditing(false);
+      return;
+    }
+    if (n !== current) onSave(n);
+    setEditing(false);
+  }
+
+  if (!editing) {
+    return (
+      <button
+        onClick={() => setEditing(true)}
+        title="Editar objetivo"
+        aria-label="Editar objetivo"
+        style={{
+          marginLeft: space[1],
+          width: 24,
+          height: 24,
+          borderRadius: radius.sm,
+          color: color.textDim,
+          background: 'transparent',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          transition: 'color 100ms, background 100ms',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = color.text;
+          e.currentTarget.style.background = color.surfaceHover;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = color.textDim;
+          e.currentTarget.style.background = 'transparent';
+        }}
+      >
+        <Pencil size={12} />
+      </button>
+    );
+  }
+
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        marginLeft: space[2],
+        padding: `2px 6px`,
+        background: color.surface,
+        border: `1px solid ${color.borderStrong}`,
+        borderRadius: radius.sm,
+      }}
+    >
+      <span style={{ fontSize: text.xs, color: color.textMuted, fontWeight: weight.medium }}>
+        US$
+      </span>
+      <input
+        ref={inputRef}
+        type="number"
+        min={1}
+        step="any"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+          if (e.key === 'Escape') setEditing(false);
+        }}
+        onBlur={commit}
+        style={{
+          width: 70,
+          background: 'transparent',
+          border: 'none',
+          outline: 'none',
+          fontSize: text.sm,
+          fontWeight: weight.semibold,
+          color: color.text,
+          padding: 0,
+        }}
+      />
+    </span>
   );
 }
 

@@ -29,7 +29,9 @@ export async function create(
 
 export async function update(
   id: string,
-  updates: Partial<Pick<Workspace, "name" | "emoji" | "color" | "plan">>,
+  updates: Partial<
+    Pick<Workspace, "name" | "emoji" | "color" | "plan" | "daily_goal" | "daily_goal_currency">
+  >,
 ): Promise<void> {
   const fields = Object.keys(updates)
     .map((k) => `${k} = ?`)

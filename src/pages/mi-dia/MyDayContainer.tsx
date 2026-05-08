@@ -12,6 +12,7 @@ import { followupsDb } from "../../lib/db/followups";
 import { salesDb } from "../../lib/db/sales";
 import { customersDb } from "../../lib/db/customers";
 import { scoreDb } from "../../lib/db/score";
+import { workspaceDb } from "../../lib/db/workspace";
 import { getTodayISO } from "../../lib/hooks";
 import {
   greetingForHour,
@@ -99,6 +100,30 @@ export function MyDayContainer() {
 
   const recordContactMut = useRecordContact();
 
+  // Setear el objetivo del día desde el Hero. Update workspace.daily_goal y
+  // refresh del store para que el Hero re-renderice con el nuevo valor.
+  const setGoalMut = useMutation({
+    mutationFn: async (amountUsd: number) => {
+      if (!activeWorkspace) throw new Error("Sin workspace activo");
+      await workspaceDb.update(activeWorkspace.id, {
+        daily_goal: amountUsd,
+        daily_goal_currency: "USD",
+      });
+      // Refrescar el store de workspaces para que activeWorkspace.daily_goal
+      // refleje el cambio sin que tengas que reabrir la app.
+      const all = await workspaceDb.getAll();
+      const updated = all.find((w) => w.id === activeWorkspace.id);
+      if (updated) useWorkspaceStore.setState({ workspaces: all, activeWorkspace: updated });
+    },
+    onSuccess: () => {
+      showToast("Objetivo actualizado", "success");
+      qc.invalidateQueries({ queryKey: qk.dayScore(wid) });
+    },
+    onError: (err) => {
+      showToast(err instanceof Error ? err.message : "Error al guardar", "error");
+    },
+  });
+
   const data: MyDayData = useMemo(() => {
     const tasks = (tasksQ.data ?? []).map(dbTaskToDomain);
     const followUps = (followupsQ.data ?? [])
@@ -154,6 +179,7 @@ export function MyDayContainer() {
     <MyDay
       data={data}
       onNewSale={() => setNewSaleOpen(true)}
+      onSetGoal={(amount) => setGoalMut.mutate(amount)}
       onToggleTask={(id) => toggleTaskMut.mutate(id)}
       onMarkPaid={(id) => markPaidMut.mutate(id)}
       onWhatsApp={(clientId, opts) => {

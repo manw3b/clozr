@@ -19,6 +19,7 @@ interface MyDayProps {
   onSaleClick?: (saleId: string) => void;
   onClientClick?: (clientId: string) => void;
   onNewSale?: () => void;
+  onSetGoal?: (amountUsd: number) => void;
   onCreateTask?: () => void;
   onNavigate?: (page: string) => void;
 }
@@ -42,6 +43,7 @@ export function MyDay({
   onSaleClick = () => {},
   onClientClick = () => {},
   onNewSale = () => {},
+  onSetGoal,
   onCreateTask = () => {},
   onNavigate = () => {},
 }: MyDayProps) {
@@ -70,6 +72,7 @@ export function MyDay({
         goal={data.goal}
         score={data.score}
         onNewSale={onNewSale}
+        onSetGoal={onSetGoal}
       />
 
       {/* GRID — 2 columnas en desktop, 1 en pantallas chicas */}

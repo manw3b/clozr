@@ -54,9 +54,18 @@ export function Topbar({ workspace, onSearchClick, onNewAction, onNotificationCl
         flexShrink: 0,
       }}
     >
-      {/* IZQUIERDA — Business switcher + cotización */}
+      {/* IZQUIERDA — Business switcher (primary) + cotización (secondary) */}
       <div style={{ display: "flex", alignItems: "center", gap: space[3] }}>
         <BusinessSwitcher />
+        <span
+          style={{
+            width: 1,
+            height: 22,
+            background: color.border,
+            display: "inline-block",
+          }}
+          aria-hidden
+        />
         <ExchangeRateChip variant="compact" />
       </div>
 
@@ -390,23 +399,24 @@ function BusinessSwitcher() {
             display: 'flex',
             alignItems: 'center',
             gap: space[2],
-            padding: `${space[1]} ${space[2]} ${space[1]} ${space[1]}`,
+            padding: `6px ${space[3]} 6px 6px`,
             borderRadius: radius.md,
             background: hover || open ? color.surfaceHover : 'transparent',
-            transition: `background ${duration.fast} ${ease}`,
+            border: `1px solid ${hover || open ? color.borderStrong : color.border}`,
+            transition: `background ${duration.fast} ${ease}, border-color ${duration.fast} ${ease}`,
             cursor: 'pointer',
           }}
         >
           <span
             style={{
-              width: 28,
-              height: 28,
-              borderRadius: radius.md,
+              width: 26,
+              height: 26,
+              borderRadius: radius.sm,
               background: color.surface2,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 16,
+              fontSize: 15,
               flexShrink: 0,
             }}
           >

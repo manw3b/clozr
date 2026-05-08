@@ -82,14 +82,14 @@ export function Sidebar({ active, onNavigate, collapsed, onToggleCollapse, user,
         position: 'relative',
       }}
     >
-      {/* Logo + collapse button */}
+      {/* Logo + collapse button — alineado con la altura del topbar */}
       <div
         style={{
           height: layout.topbarH,
           display: 'flex',
           alignItems: 'center',
           justifyContent: collapsed ? 'center' : 'space-between',
-          padding: collapsed ? 0 : `0 ${space[4]}`,
+          padding: collapsed ? 0 : `0 ${space[5]}`,
           borderBottom: `1px solid ${color.border}`,
         }}
       >
@@ -119,8 +119,8 @@ export function Sidebar({ active, onNavigate, collapsed, onToggleCollapse, user,
             aria-label="Colapsar sidebar"
             title="Colapsar (Cmd+B)"
             style={{
-              width: 24,
-              height: 24,
+              width: 28,
+              height: 28,
               borderRadius: radius.sm,
               color: color.textDim,
               display: 'inline-flex',
@@ -354,6 +354,9 @@ function NavButton({
 
 /* ===== Logo Clozr (inline SVG, sin dependencia de archivo) ===== */
 function ClozrLogo({ collapsed }: { collapsed: boolean }) {
+  // Cuando está expandido, sólo wordmark — el isotipo + texto al lado era
+  // doble branding redundante para una pantalla interna. Cuando está
+  // colapsado, sólo isotipo (no hay espacio para texto).
   if (collapsed) {
     return (
       <div
@@ -369,19 +372,17 @@ function ClozrLogo({ collapsed }: { collapsed: boolean }) {
     );
   }
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: space[2] }}>
-      <IsotipoSVG size={26} />
-      <span
-        style={{
-          fontSize: text.lg,
-          fontWeight: weight.black,
-          color: color.text,
-          letterSpacing: '-0.5px',
-        }}
-      >
-        Clozr
-      </span>
-    </div>
+    <span
+      style={{
+        fontSize: text.xl,
+        fontWeight: weight.black,
+        color: color.text,
+        letterSpacing: '-0.6px',
+        lineHeight: 1,
+      }}
+    >
+      Clozr
+    </span>
   );
 }
 

@@ -40,13 +40,15 @@ export interface ColorOption {
   color_hex: string | null;
 }
 
+export type StockItemStatus = "available" | "sold" | "reserved";
+
 export interface StockItem {
   id: string;
   workspace_id: string;
   variant_id: string;
   catalog_item_id: string | null;
   imei: string;
-  status: string;
+  status: StockItemStatus;
   notes: string | null;
   created_at: string;
   sold_at: string | null;

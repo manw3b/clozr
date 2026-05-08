@@ -93,6 +93,7 @@ export type CustomerStatus = "activo" | "potencial" | "dormido" | "perdido";
 export type TaskType = "rutina" | "puntual";
 export type TaskFrequency = "diaria" | "semanal" | "mensual" | "anual" | "custom";
 export type PipelineStatus = "open" | "won" | "lost";
+export type PipelinePriority = "low" | "medium" | "high" | "hot";
 export type ActivityResult = "positivo" | "neutro" | "negativo";
 export type CatalogFieldType = "text" | "number" | "imei" | "select" | "date";
 
@@ -187,7 +188,7 @@ export interface PipelineItem {
   owner_id: string | null;
   owner_name: string | null;
   short_note: string | null;
-  priority: string | null;
+  priority: PipelinePriority | null;
   position: number | null;
 }
 
@@ -363,7 +364,7 @@ export interface CreatePipelineItemInput {
   currency?: "ARS" | "USD";
   created_by?: string | null;
   product?: string | null;
-  priority?: "low" | "medium" | "high" | "hot" | null;
+  priority?: PipelinePriority | null;
   next_action_at?: string | null;
   next_action_label?: string | null;
   short_note?: string | null;

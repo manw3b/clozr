@@ -94,3 +94,15 @@ export const layout = {
   topbarH: 'var(--topbar-h)',
   drawerW: 'var(--drawer-w)',
 } as const;
+
+/** Style helpers — combinaciones de flex repetidas que ahora se importan
+ *  en lugar de inlinearse. Tipados como CSSProperties para que sean
+ *  spreadeables directamente: `style={{ ...flex.center, height: 100 }}`. */
+import type { CSSProperties } from 'react';
+export const flex: Record<string, CSSProperties> = {
+  center: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  centerY: { display: 'flex', alignItems: 'center' },
+  between: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  col: { display: 'flex', flexDirection: 'column' },
+  colCenter: { display: 'flex', flexDirection: 'column', alignItems: 'center' },
+};

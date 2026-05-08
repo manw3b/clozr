@@ -22,11 +22,6 @@ export async function getAll(workspaceId: string): Promise<CatalogItemWithImeis[
      ORDER BY c.sort_order ASC, c.name ASC`,
     [workspaceId],
   );
-  for (const item of rows) {
-    if (item.condition_details_json) {
-      try { item.conditionDetails = JSON.parse(item.condition_details_json); } catch { /* ignore */ }
-    }
-  }
   return rows;
 }
 
@@ -300,11 +295,6 @@ export async function getWithUnitCount(workspaceId: string): Promise<CatalogItem
      ORDER BY ci.sort_order ASC, ci.name ASC`,
     [workspaceId],
   );
-  for (const item of rows) {
-    if (item.condition_details_json) {
-      try { item.conditionDetails = JSON.parse(item.condition_details_json); } catch { /* ignore */ }
-    }
-  }
   return rows;
 }
 

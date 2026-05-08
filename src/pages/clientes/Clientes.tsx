@@ -104,6 +104,16 @@ export function Clientes() {
     return () => window.removeEventListener('clozr:open-new-client', handler);
   }, []);
 
+  // Open client drawer when triggered from CommandPalette
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ id: string }>).detail;
+      if (detail?.id) setOpenClientId(detail.id);
+    };
+    window.addEventListener('clozr:open-client', handler);
+    return () => window.removeEventListener('clozr:open-client', handler);
+  }, []);
+
   /* ---------- Filtrado ---------- */
   const filtered = useMemo(() => {
     return clientsData.filter((c) => {

@@ -302,16 +302,6 @@ export interface SalePayment {
   is_deposit: number;
 }
 
-export interface ProductConditionDetails {
-  color?: string;
-  storage?: string;
-  battery_percent?: number;
-  battery_cycles?: number;
-  grade?: string;
-  notes?: string;
-  purchase_date?: string;
-}
-
 export interface CatalogItem {
   id: string;
   workspace_id: string;
@@ -329,7 +319,6 @@ export interface CatalogItem {
   image_path: string | null;
   condition: 'new' | 'used' | 'refurbished';
   condition_details_json: string | null;
-  conditionDetails?: ProductConditionDetails;
   /** Migration 024: costo en USD del producto */
   cost_usd?: number;
   created_at: string;

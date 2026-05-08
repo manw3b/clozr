@@ -145,7 +145,13 @@ export function CommandPalette() {
           subtitle: [c.phone, c.email].filter(Boolean).join(" · ") || c.type,
           action: () => {
             setActiveScreen("customers");
-            // TODO: open client drawer with that id
+            // Diferimos el evento un tick para que la pantalla Clientes
+            // esté montada y haya registrado el listener.
+            setTimeout(() => {
+              window.dispatchEvent(
+                new CustomEvent("clozr:open-client", { detail: { id: c.id } }),
+              );
+            }, 0);
             setOpen(false);
           },
         });

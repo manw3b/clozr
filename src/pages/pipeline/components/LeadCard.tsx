@@ -1,4 +1,5 @@
 import { CSSProperties, forwardRef } from 'react';
+import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core';
 import {
   MessageCircle,
   Phone,
@@ -12,6 +13,19 @@ import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney, formatRelative } from '../../../lib/format';
 import type { Lead } from '../../../types/domain';
 
+/** Combinación de attributes + listeners de @dnd-kit/sortable que se
+ *  spreadea sobre el elemento que dispara el drag. No los podemos
+ *  intersectar directo (DraggableAttributes tiene `role: string` y
+ *  SyntheticListenerMap tiene index signature `Function` — chocan), así
+ *  que las modelamos como un objeto plano que admite cualquiera de las
+ *  dos shapes. Es estructuralmente correcto al hacer spread. */
+export type DragHandleProps = Partial<DraggableAttributes> & {
+  [key: string]: unknown;
+};
+// Tipo del @dnd-kit no usado directamente, lo importamos para mantener
+// el contrato visible y que TypeScript verifique que existe.
+export type _DnDListenerType = DraggableSyntheticListeners;
+
 interface LeadCardProps {
   lead: Lead;
   /** Se pasa al wrapper draggable */
@@ -23,7 +37,7 @@ interface LeadCardProps {
   onCall?: (lead: Lead) => void;
   onConvertToSale?: (lead: Lead) => void;
   /** Listeners y attributes del DnD-kit (sortable) */
-  dragHandleProps?: any;
+  dragHandleProps?: DragHandleProps;
   /** Style externo (transformación durante drag) */
   style?: CSSProperties;
 }

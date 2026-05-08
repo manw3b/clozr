@@ -311,6 +311,12 @@ function Row({
         cursor: onClick ? 'pointer' : 'default',
         transition: 'background 100ms',
         position: 'relative',
+        // Skip rendering off-screen rows. Es ~70% del beneficio de
+        // virtualización con cero código JS — el browser hace lazy
+        // layout. contain-intrinsic-size le da una altura provisional
+        // para que el scroll no salte cuando una fila entra al viewport.
+        contentVisibility: 'auto',
+        containIntrinsicSize: `auto ${height}px`,
       }}
     >
       {/* Indicador izquierdo cuando la row está activa (drawer abierto) */}

@@ -143,6 +143,20 @@ select {
   color: inherit;
 }
 
+/* number inputs: ocultar las flechitas spinner. Son feas en dark theme y
+   poco útiles para inputs de monto (USD, cantidad). El usuario tipea el
+   número directamente. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* date / datetime-local indicator: invertido para que pegue con dark theme
    y un poco más sutil. Click en cualquier parte del input abre el picker. */
 input[type="date"]::-webkit-calendar-picker-indicator,

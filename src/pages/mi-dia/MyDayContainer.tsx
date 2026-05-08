@@ -100,17 +100,24 @@ export function MyDayContainer() {
 
   const recordContactMut = useRecordContact();
 
-  // Setear el objetivo del día desde el Hero. Update workspace.daily_goal y
-  // refresh del store para que el Hero re-renderice con el nuevo valor.
+  // Setear el objetivo del día desde el Hero. Acepta tanto monto como
+  // cantidad de ventas (parcial — sólo se actualiza lo que se pasa).
+  // Refresh del store para que el Hero re-renderice con el nuevo valor.
   const setGoalMut = useMutation({
-    mutationFn: async (amountUsd: number) => {
+    mutationFn: async (
+      patch: { amountUsd?: number; salesCount?: number },
+    ) => {
       if (!activeWorkspace) throw new Error("Sin workspace activo");
-      await workspaceDb.update(activeWorkspace.id, {
-        daily_goal: amountUsd,
-        daily_goal_currency: "USD",
-      });
-      // Refrescar el store de workspaces para que activeWorkspace.daily_goal
-      // refleje el cambio sin que tengas que reabrir la app.
+      const updates: Parameters<typeof workspaceDb.update>[1] = {};
+      if (patch.amountUsd !== undefined) {
+        updates.daily_goal = patch.amountUsd;
+        updates.daily_goal_currency = "USD";
+      }
+      if (patch.salesCount !== undefined) {
+        updates.daily_goal_count = patch.salesCount;
+      }
+      if (Object.keys(updates).length === 0) return;
+      await workspaceDb.update(activeWorkspace.id, updates);
       const all = await workspaceDb.getAll();
       const updated = all.find((w) => w.id === activeWorkspace.id);
       if (updated) useWorkspaceStore.setState({ workspaces: all, activeWorkspace: updated });
@@ -142,6 +149,7 @@ export function MyDayContainer() {
       });
 
     const goalAmount = activeWorkspace?.daily_goal ?? 0;
+    const goalSalesCount = activeWorkspace?.daily_goal_count ?? 0;
     const todayRevenue = todaySales.reduce((sum, s) => sum + s.amount, 0);
 
     return {
@@ -153,7 +161,7 @@ export function MyDayContainer() {
         amount: goalAmount,
         current: todayRevenue,
         salesCount: todaySales.length,
-        salesGoal: undefined,
+        salesGoal: goalSalesCount > 0 ? goalSalesCount : undefined,
       },
       tasks,
       followUps,
@@ -179,7 +187,8 @@ export function MyDayContainer() {
     <MyDay
       data={data}
       onNewSale={() => setNewSaleOpen(true)}
-      onSetGoal={(amount) => setGoalMut.mutate(amount)}
+      onSetGoal={(amount) => setGoalMut.mutate({ amountUsd: amount })}
+      onSetSalesGoal={(count) => setGoalMut.mutate({ salesCount: count })}
       onToggleTask={(id) => toggleTaskMut.mutate(id)}
       onMarkPaid={(id) => markPaidMut.mutate(id)}
       onWhatsApp={(clientId, opts) => {

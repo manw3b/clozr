@@ -198,16 +198,25 @@ export function NewLeadModal({ open, onClose, initialStage = "prospecto" }: Prop
         </ModalField>
       </div>
 
-      {/* PRIORIDAD */}
+      {/* PRIORIDAD — segmented control con peso visual consistente */}
       <ModalField label="Prioridad">
-        <div style={{ display: "flex", gap: space[2], flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "inline-flex",
+            background: color.surface2,
+            border: `1px solid ${color.border}`,
+            borderRadius: radius.md,
+            padding: 3,
+            gap: 2,
+          }}
+        >
           {(["low", "medium", "high", "hot"] as LeadPriority[]).map((p) => {
             const active = priority === p;
             const labels: Record<LeadPriority, string> = {
               low: "Baja",
               medium: "Media",
               high: "Alta",
-              hot: "🔥 Caliente",
+              hot: "Caliente",
             };
             return (
               <button
@@ -215,20 +224,32 @@ export function NewLeadModal({ open, onClose, initialStage = "prospecto" }: Prop
                 onClick={() => setPriority(p)}
                 style={{
                   padding: `6px ${space[3]}`,
-                  borderRadius: radius.full,
-                  border: `1px solid ${active ? color.primary : color.border}`,
+                  borderRadius: radius.sm,
+                  border: "none",
                   background: active ? color.primary : "transparent",
-                  color: active ? "#fff" : color.text,
-                  fontSize: text.xs,
-                  fontWeight: weight.semibold,
+                  color: active ? "#fff" : color.textMuted,
+                  fontSize: text.sm,
+                  fontWeight: active ? weight.semibold : weight.medium,
                   cursor: "pointer",
-                  transition: "all 100ms",
+                  transition: "all 120ms",
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: 4,
+                  gap: 5,
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) e.currentTarget.style.color = color.text;
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) e.currentTarget.style.color = color.textMuted;
                 }}
               >
-                {p === "hot" && !active && <Flame size={11} color={color.primary} />}
+                {p === "hot" && (
+                  <Flame
+                    size={12}
+                    color={active ? "#fff" : color.primary}
+                    fill={active ? "#fff" : color.primary}
+                  />
+                )}
                 {labels[p]}
               </button>
             );
@@ -361,28 +382,65 @@ function SelectedClientCard({
         display: "flex",
         alignItems: "center",
         gap: space[3],
-        padding: space[3],
+        padding: `10px ${space[3]}`,
         background: color.surface2,
         border: `1px solid ${color.border}`,
         borderRadius: radius.md,
       }}
     >
       <Avatar name={client.name} size={36} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text }}>
-          {client.name}
-        </div>
-        <div style={{ fontSize: text.xs, color: color.textMuted }}>
-          {client.phone ?? "—"}
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: space[2],
+            minWidth: 0,
+          }}
+        >
+          <span
+            style={{
+              fontSize: text.sm,
+              fontWeight: weight.semibold,
+              color: color.text,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {client.name}
+          </span>
           {client.type && (
-            <>
-              {" · "}
-              <Badge tone="info">{client.type}</Badge>
-            </>
+            <Badge tone="info" size="sm">
+              {client.type}
+            </Badge>
           )}
         </div>
+        {client.phone && (
+          <span style={{ fontSize: text.xs, color: color.textMuted }}>
+            {client.phone}
+          </span>
+        )}
       </div>
-      <button onClick={onClear} style={{ color: color.textMuted, fontSize: text.xs }}>
+      <button
+        onClick={onClear}
+        style={{
+          color: color.textMuted,
+          fontSize: text.xs,
+          fontWeight: weight.medium,
+          padding: `4px ${space[2]}`,
+          borderRadius: radius.sm,
+          transition: "color 100ms, background 100ms",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = color.text;
+          e.currentTarget.style.background = color.surfaceHover;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = color.textMuted;
+          e.currentTarget.style.background = "transparent";
+        }}
+      >
         Cambiar
       </button>
     </div>

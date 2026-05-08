@@ -24,13 +24,13 @@ export async function create(
     "INSERT INTO workspaces (id, name, emoji, color, created_at) VALUES (?, ?, ?, ?, ?)",
     [id, name, emoji, color, now],
   );
-  return { id, name, emoji, color, plan: "free", logo_path: null, daily_goal: 0, daily_goal_currency: "USD", created_at: now };
+  return { id, name, emoji, color, plan: "free", logo_path: null, daily_goal: 0, daily_goal_currency: "USD", daily_goal_count: 0, created_at: now };
 }
 
 export async function update(
   id: string,
   updates: Partial<
-    Pick<Workspace, "name" | "emoji" | "color" | "plan" | "daily_goal" | "daily_goal_currency">
+    Pick<Workspace, "name" | "emoji" | "color" | "plan" | "daily_goal" | "daily_goal_currency" | "daily_goal_count">
   >,
 ): Promise<void> {
   const fields = Object.keys(updates)

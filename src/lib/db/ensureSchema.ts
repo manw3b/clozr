@@ -598,6 +598,11 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
   await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_followups_workspace_due ON followups(workspace_id, business_id, completed, due_date)`));
   await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)`));
   await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_sale_payments_sale ON sale_payments(sale_id)`));
+
+  // ════════════════════════════════════════════════════════════
+  // 029 — daily_goal_count (cantidad de ventas objetivo del día)
+  // ════════════════════════════════════════════════════════════
+  await safe(() => dbExecute(`ALTER TABLE workspaces ADD COLUMN daily_goal_count INTEGER DEFAULT 0`));
 }
 
 async function safe(fn: () => Promise<unknown>) {

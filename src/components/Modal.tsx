@@ -263,24 +263,26 @@ interface ModalFieldProps {
 
 export function ModalField({ label, required, hint, children }: ModalFieldProps) {
   return (
-    <div style={{ marginBottom: space[4] }}>
+    <div style={{ marginBottom: space[5] }}>
       <label
         style={{
           display: 'block',
-          fontSize: text.xs,
-          fontWeight: weight.semibold,
+          fontSize: text.sm,
+          fontWeight: weight.medium,
           color: color.textMuted,
-          textTransform: 'uppercase',
-          letterSpacing: '0.6px',
-          marginBottom: 6,
+          marginBottom: 8,
         }}
       >
         {label}
-        {required && <span style={{ color: color.danger, marginLeft: 4 }}>*</span>}
+        {required && (
+          <span style={{ color: color.danger, marginLeft: 4 }} aria-hidden>
+            *
+          </span>
+        )}
       </label>
       {children}
       {hint && (
-        <div style={{ marginTop: 4, fontSize: text.xs, color: color.textDim }}>{hint}</div>
+        <div style={{ marginTop: 6, fontSize: text.xs, color: color.textDim }}>{hint}</div>
       )}
     </div>
   );

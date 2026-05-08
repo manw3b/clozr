@@ -106,6 +106,8 @@ export interface Workspace {
   logo_path: string | null;
   daily_goal: number;
   daily_goal_currency: string;
+  /** Migration 029: objetivo de cantidad de ventas del día (0 = sin objetivo) */
+  daily_goal_count: number;
   created_at: string;
 }
 

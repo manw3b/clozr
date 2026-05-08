@@ -16,6 +16,8 @@ interface MyDayHeroProps {
   /** Setea el objetivo en USD del workspace activo. Si no se pasa, se oculta
    *  el control de edición (defensivo para previews/storybook). */
   onSetGoal?: (amountUsd: number) => void;
+  /** Setea el objetivo de cantidad de ventas del workspace activo. */
+  onSetSalesGoal?: (count: number) => void;
 }
 
 /**
@@ -33,11 +35,13 @@ export function MyDayHero({
   score,
   onNewSale,
   onSetGoal,
+  onSetSalesGoal,
 }: MyDayHeroProps) {
   const progress = goal.amount > 0 ? Math.min(100, (goal.current / goal.amount) * 100) : 0;
   const remaining = Math.max(0, goal.amount - goal.current);
   const hasGoal = goal.amount > 0;
   const canEdit = !!onSetGoal;
+  const canEditSalesGoal = !!onSetSalesGoal;
 
   return (
     <div
@@ -128,18 +132,11 @@ export function MyDayHero({
                   >
                     Objetivo del día
                   </span>
-                  {goal.salesGoal ? (
-                    <span
-                      style={{
-                        fontSize: text.xs,
-                        fontWeight: weight.semibold,
-                        color: color.textDim,
-                      }}
-                    >
-                      {goal.salesCount} de {goal.salesGoal}{' '}
-                      {plural(goal.salesGoal, 'venta', 'ventas')}
-                    </span>
-                  ) : null}
+                  <SalesGoalChip
+                    salesCount={goal.salesCount}
+                    salesGoal={goal.salesGoal}
+                    onSave={canEditSalesGoal ? onSetSalesGoal : undefined}
+                  />
                 </div>
                 <span
                   style={{
@@ -237,6 +234,131 @@ export function MyDayHero({
         </Button>
       </div>
     </div>
+  );
+}
+
+/* ============================================================
+ *  SalesGoalChip — pill que muestra "X de Y ventas" y se edita inline
+ * ============================================================ */
+
+function SalesGoalChip({
+  salesCount,
+  salesGoal,
+  onSave,
+}: {
+  salesCount: number;
+  salesGoal?: number | null;
+  onSave?: (count: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(salesGoal ?? ''));
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (editing) {
+      setDraft(salesGoal ? String(salesGoal) : '');
+      requestAnimationFrame(() => inputRef.current?.select());
+    }
+  }, [editing, salesGoal]);
+
+  function commit() {
+    const n = parseInt(draft, 10);
+    setEditing(false);
+    if (!Number.isFinite(n) || n < 0) return;
+    if (n === (salesGoal ?? 0)) return;
+    onSave?.(n);
+  }
+
+  if (editing) {
+    return (
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 3,
+          padding: '2px 6px',
+          background: color.surface,
+          border: `1px solid ${color.borderStrong}`,
+          borderRadius: radius.sm,
+        }}
+      >
+        <span style={{ fontSize: text.xs, color: color.textDim, fontWeight: weight.semibold }}>
+          {salesCount} de
+        </span>
+        <input
+          ref={inputRef}
+          type="number"
+          min={0}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit();
+            if (e.key === 'Escape') setEditing(false);
+          }}
+          onBlur={commit}
+          placeholder="0"
+          style={{
+            width: 36,
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            fontSize: text.xs,
+            fontWeight: weight.semibold,
+            color: color.text,
+            padding: 0,
+            textAlign: 'center',
+          }}
+        />
+        <span style={{ fontSize: text.xs, color: color.textDim, fontWeight: weight.semibold }}>
+          ventas
+        </span>
+      </span>
+    );
+  }
+
+  // Display mode: compact pill, click para editar
+  const isClickable = !!onSave;
+  return (
+    <button
+      type="button"
+      onClick={isClickable ? () => setEditing(true) : undefined}
+      disabled={!isClickable}
+      style={{
+        fontSize: text.xs,
+        fontWeight: weight.semibold,
+        color: color.textDim,
+        background: 'transparent',
+        cursor: isClickable ? 'pointer' : 'default',
+        padding: '2px 6px',
+        borderRadius: radius.sm,
+        border: `1px dashed ${salesGoal ? 'transparent' : color.border}`,
+        transition: 'background 100ms, color 100ms, border-color 100ms',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 3,
+      }}
+      onMouseEnter={(e) => {
+        if (isClickable) {
+          e.currentTarget.style.color = color.text;
+          e.currentTarget.style.background = color.surfaceHover;
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (isClickable) {
+          e.currentTarget.style.color = color.textDim;
+          e.currentTarget.style.background = 'transparent';
+        }
+      }}
+      title={isClickable ? 'Editar objetivo de ventas' : undefined}
+    >
+      {salesGoal ? (
+        <>
+          {salesCount} de {salesGoal} {plural(salesGoal, 'venta', 'ventas')}
+        </>
+      ) : (
+        <>+ objetivo de ventas</>
+      )}
+    </button>
   );
 }
 

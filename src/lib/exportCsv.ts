@@ -48,13 +48,34 @@ export function timestamp(): string {
  * ──────────────────────────────────────────────────────────── */
 
 /**
- * Parser CSV minimalista que maneja comillas dobles, escape "" → ", BOM,
- * CRLF/LF. Cubre el 99% de los CSVs que salen de Excel, Google Sheets,
- * contactos exportados de iPhone/Android.
+ * Parser delimited (CSV o TSV) minimalista que maneja comillas dobles,
+ * escape "" → ", BOM, CRLF/LF. Cubre el 99% de los archivos que salen
+ * de Excel, Google Sheets, contactos exportados de iPhone/Android.
+ *
+ * Detecta automáticamente si es TSV (tab-separated) si la primera línea
+ * tiene tabs y no comas. Si no, usa coma como separador.
  *
  * Returns: array de filas, cada fila es array de strings.
  */
 export function parseCsv(text: string): string[][] {
+  return parseDelimited(text, autoDetectDelimiter(text));
+}
+
+/** Mismo parser, pero con delimitador explícito (',' o '\t'). */
+export function parseTsv(text: string): string[][] {
+  return parseDelimited(text, "\t");
+}
+
+function autoDetectDelimiter(text: string): "," | "\t" {
+  // Mirar la primera línea no-vacía
+  const sample = text.replace(/^﻿/, "").split(/\r?\n/).find((l) => l.trim().length > 0) ?? "";
+  const tabs = (sample.match(/\t/g) ?? []).length;
+  const commas = (sample.match(/,/g) ?? []).length;
+  // Si hay tabs y no comas (o más tabs que comas), es TSV
+  return tabs > 0 && tabs >= commas ? "\t" : ",";
+}
+
+function parseDelimited(text: string, delim: "," | "\t"): string[][] {
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
 
   const rows: string[][] = [];
@@ -81,7 +102,7 @@ export function parseCsv(text: string): string[][] {
       continue;
     }
     if (c === '"') { inQuotes = true; i++; continue; }
-    if (c === ",") { row.push(cell); cell = ""; i++; continue; }
+    if (c === delim) { row.push(cell); cell = ""; i++; continue; }
     if (c === "\r") { i++; continue; }
     if (c === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; i++; continue; }
     cell += c;

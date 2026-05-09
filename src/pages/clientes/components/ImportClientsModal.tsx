@@ -6,6 +6,7 @@ import { Button } from '../../../components/Button';
 import { Select } from '../../../components/Input';
 import { customersDb } from '../../../lib/db/customers';
 import { parseCsv } from '../../../lib/exportCsv';
+import { parseVCard } from '../../../lib/parseVCard';
 import { useUIStore } from '../../../store/uiStore';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
 import { color, radius, space, text, weight } from '../../../tokens';
@@ -71,13 +72,34 @@ export function ImportClientsModal({ open, onClose }: Props) {
     setParsing(true);
     try {
       const text = await file.text();
+      const ext = (file.name.split('.').pop() ?? '').toLowerCase();
+      const looksLikeVcard = ext === 'vcf' || /^\s*BEGIN:VCARD/im.test(text);
+
+      if (looksLikeVcard) {
+        // vCard: convertimos cada contacto a una "fila" con columnas
+        // fijas y mapping pre-resuelto. Saltea el paso de mapeo manual.
+        const contacts = parseVCard(text);
+        const synthetic: string[][] = [
+          ['Nombre', 'Teléfono', 'Email', 'Notas'], // header
+          ...contacts.map((c) => [
+            c.name,
+            c.phones[0] ?? '',
+            c.emails[0] ?? '',
+            c.notes ?? '',
+          ]),
+        ];
+        setRows(synthetic);
+        setHasHeader(true);
+        setMappings(['name', 'phone', 'email', 'notes']);
+        return;
+      }
+
+      // CSV / TSV (auto-detect en parseCsv)
       const parsed = parseCsv(text);
       setRows(parsed);
-      // Auto-mapeo de la primera fila si parece header
       const first = parsed[0] ?? [];
       const cols = first.length;
       const auto: FieldMapping[] = first.map((cell) => guessField(cell));
-      // Si no detectamos ninguno, default a "ignore"
       while (auto.length < cols) auto.push('ignore');
       setMappings(auto);
       setHasHeader(looksLikeHeader(first));
@@ -163,8 +185,8 @@ export function ImportClientsModal({ open, onClose }: Props) {
     <Modal
       open={open}
       onClose={onClose}
-      title="Importar clientes desde CSV"
-      subtitle="Subí un archivo .csv (Excel, Google Sheets, contactos del celular)"
+      title="Importar clientes"
+      subtitle="Acepta CSV, TSV o vCard (.vcf) — exportá tus contactos del celular y subilos acá"
       maxWidth={680}
       footer={
         <>
@@ -185,7 +207,7 @@ export function ImportClientsModal({ open, onClose }: Props) {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".csv,text/csv"
+        accept=".csv,.tsv,.vcf,text/csv,text/tab-separated-values,text/vcard,text/x-vcard"
         style={{ display: 'none' }}
         onChange={(e) => {
           const f = e.target.files?.[0];
@@ -228,11 +250,12 @@ export function ImportClientsModal({ open, onClose }: Props) {
         >
           <Upload size={32} color={color.textMuted} strokeWidth={1.6} />
           <div style={{ fontSize: text.base, fontWeight: weight.semibold, color: color.text }}>
-            {parsing ? 'Procesando…' : 'Arrastrá tu CSV o hacé click'}
+            {parsing ? 'Procesando…' : 'Arrastrá un archivo o hacé click'}
           </div>
-          <div style={{ fontSize: text.xs, color: color.textMuted, maxWidth: 380 }}>
-            Soporta archivos exportados de Excel, Google Sheets, contactos
-            de iPhone/Android. Después podés mapear las columnas.
+          <div style={{ fontSize: text.xs, color: color.textMuted, maxWidth: 420 }}>
+            Acepta <strong>.csv</strong> (Excel, Google Sheets), <strong>.tsv</strong> y{' '}
+            <strong>.vcf</strong> (contactos exportados de iPhone, Android, Gmail).
+            Para vCard el mapeo se hace solo.
           </div>
         </div>
       ) : (

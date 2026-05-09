@@ -309,7 +309,11 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
         </span>
 
         <div style={{ display: 'flex', gap: 2 }}>
-          {onConvertToSale && (
+          {/* Convertir a venta: solo etapas tardías (presupuestado, negociando)
+              donde el lead está cerca del cierre. En etapas tempranas el botón
+              es ruido — el vendedor todavía está calificando, no cobrando. */}
+          {onConvertToSale &&
+            (lead.stage === 'presupuestado' || lead.stage === 'negociando') && (
             <CardActionBtn
               tone="primary"
               ariaLabel="Convertir a venta"

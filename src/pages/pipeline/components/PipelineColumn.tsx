@@ -47,112 +47,109 @@ export function PipelineColumn({
         background: isOver ? `${accent.bg}` : color.surface2,
         border: `1px solid ${isOver ? accent.bar : color.border}`,
         borderRadius: radius.lg,
-        minWidth: 280,
-        maxWidth: 320,
-        flex: '0 0 300px',
+        minWidth: 240,
+        maxWidth: 280,
+        flex: '0 0 256px',
         height: '100%',
         overflow: 'hidden',
         transition: 'border-color 150ms, background 150ms',
       }}
     >
-      {/* Header */}
+      {/* Header — todo en una línea cuando hay espacio */}
       <header
         style={{
-          padding: `${space[3]} ${space[3]}`,
+          padding: `10px ${space[3]}`,
           borderBottom: `1px solid ${color.border}`,
           flexShrink: 0,
           background: color.surface2,
+          display: 'flex',
+          alignItems: 'center',
+          gap: space[2],
         }}
       >
-        <div
+        {/* Color dot */}
+        <span
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: space[2],
-            marginBottom: space[1],
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: accent.bar,
+            flexShrink: 0,
+          }}
+        />
+        <h3
+          style={{
+            margin: 0,
+            fontSize: text.sm,
+            fontWeight: weight.semibold,
+            color: color.text,
+            letterSpacing: '-0.1px',
+            minWidth: 0,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
           }}
         >
-          {/* Color dot */}
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              background: accent.bar,
-              flexShrink: 0,
-            }}
-          />
-          <h3
-            style={{
-              margin: 0,
-              fontSize: text.sm,
-              fontWeight: weight.semibold,
-              color: color.text,
-              letterSpacing: '-0.1px',
-              flex: 1,
-              minWidth: 0,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {stage.label}
-          </h3>
-          <span
-            style={{
-              fontSize: text.xs,
-              fontWeight: weight.bold,
-              padding: '2px 7px',
-              borderRadius: radius.full,
-              background: color.surface,
-              color: color.textMuted,
-              minWidth: 22,
-              textAlign: 'center',
-            }}
-          >
-            {count}
-          </span>
-          {onAddLead && !isTerminal && (
-            <button
-              onClick={onAddLead}
-              aria-label={`Agregar lead a ${stage.label}`}
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: radius.sm,
-                background: 'transparent',
-                color: color.textMuted,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 100ms',
-                flexShrink: 0,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = color.surfaceHover;
-                e.currentTarget.style.color = color.text;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = color.textMuted;
-              }}
-            >
-              <Plus size={14} strokeWidth={2.4} />
-            </button>
-          )}
-        </div>
-
+          {stage.label}
+        </h3>
+        {/* Monto inline — sólo si > 0, en color muted, alineado al label */}
         {totalAmount > 0 && (
-          <div
+          <span
             style={{
               fontSize: text.xs,
-              color: color.textMuted,
+              color: color.textDim,
               fontVariantNumeric: 'tabular-nums',
               fontWeight: weight.medium,
+              whiteSpace: 'nowrap',
             }}
           >
-            {formatMoney(totalAmount)}
-          </div>
+            · {formatMoney(totalAmount)}
+          </span>
+        )}
+        {/* Spacer empuja count + add a la derecha */}
+        <span style={{ flex: 1 }} />
+        <span
+          style={{
+            fontSize: text.xs,
+            fontWeight: weight.bold,
+            padding: '2px 7px',
+            borderRadius: radius.full,
+            background: color.surface,
+            color: color.textMuted,
+            minWidth: 22,
+            textAlign: 'center',
+            flexShrink: 0,
+          }}
+        >
+          {count}
+        </span>
+        {onAddLead && !isTerminal && (
+          <button
+            onClick={onAddLead}
+            aria-label={`Agregar lead a ${stage.label}`}
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: radius.sm,
+              background: 'transparent',
+              color: color.textMuted,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 100ms',
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = color.surfaceHover;
+              e.currentTarget.style.color = color.text;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.color = color.textMuted;
+            }}
+          >
+            <Plus size={14} strokeWidth={2.4} />
+          </button>
         )}
       </header>
 
@@ -200,6 +197,8 @@ function stageAccent(c: StageConfig['color']) {
  * ============================================================ */
 
 export function ColumnEmpty({ message }: { message?: string }) {
+  // Empty state mínimo: solo se ve cuando arrastrás algo o pasás el cursor.
+  // En reposo, deja la columna casi en blanco para no distraer.
   return (
     <div
       style={{
@@ -207,16 +206,15 @@ export function ColumnEmpty({ message }: { message?: string }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: space[6],
+        padding: space[3],
         textAlign: 'center',
         color: color.textDim,
         fontSize: text.xs,
-        border: `1px dashed ${color.border}`,
-        borderRadius: radius.md,
-        minHeight: 80,
+        opacity: 0.5,
+        minHeight: 60,
       }}
     >
-      {message || 'Soltá una card acá'}
+      {message || '—'}
     </div>
   );
 }

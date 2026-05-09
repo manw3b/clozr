@@ -57,7 +57,7 @@ export function PipelineMetrics({ leads }: PipelineMetricsProps) {
         }}
       >
         <Metric
-          icon={<TrendingUp size={16} strokeWidth={2.4} />}
+          icon={<TrendingUp size={14} strokeWidth={2.4} />}
           iconTone="info"
           label="Pipeline activo"
           value={formatMoney(totalPipeline)}
@@ -73,21 +73,21 @@ export function PipelineMetrics({ leads }: PipelineMetricsProps) {
           }
         />
         <Metric
-          icon={<Target size={16} strokeWidth={2.4} />}
+          icon={<Target size={14} strokeWidth={2.4} />}
           iconTone="warning"
           label="Pondera­do"
           value={formatMoney(weighted)}
           sub="Por probabilidad"
         />
         <Metric
-          icon={<DollarSign size={16} strokeWidth={2.4} />}
+          icon={<DollarSign size={14} strokeWidth={2.4} />}
           iconTone="success"
           label="Cerrado este mes"
           value={formatMoney(monthClosed)}
           sub={`${closed.length} ${closed.length === 1 ? 'venta' : 'ventas'}`}
         />
         <Metric
-          icon={<Trophy size={16} strokeWidth={2.4} />}
+          icon={<Trophy size={14} strokeWidth={2.4} />}
           iconTone="primary"
           label="Win rate"
           value={`${winRate.toFixed(0)}%`}
@@ -157,6 +157,7 @@ function StagePill({
   avgDays: number;
   last: boolean;
 }) {
+  const isEmpty = count === 0;
   return (
     <>
       <div
@@ -167,8 +168,13 @@ function StagePill({
           minWidth: 0,
           flex: 1,
           padding: `4px ${space[2]}`,
+          opacity: isEmpty ? 0.45 : 1,
         }}
-        title={`${label}: ${count} ${count === 1 ? 'lead' : 'leads'}, promedio ${avgDays} ${avgDays === 1 ? 'día' : 'días'} en etapa`}
+        title={
+          isEmpty
+            ? `${label}: sin leads`
+            : `${label}: ${count} ${count === 1 ? 'lead' : 'leads'}, promedio ${avgDays} ${avgDays === 1 ? 'día' : 'días'} en etapa`
+        }
       >
         <span
           style={{
@@ -195,9 +201,11 @@ function StagePill({
           >
             {count}
           </span>
-          <span style={{ fontSize: text.xs, color: color.textMuted }}>
-            · {avgDays}d prom.
-          </span>
+          {!isEmpty && (
+            <span style={{ fontSize: text.xs, color: color.textMuted }}>
+              · {avgDays}d prom.
+            </span>
+          )}
         </span>
       </div>
       {!last && (
@@ -244,8 +252,8 @@ function Metric({
       style={{
         background: color.surface,
         border: `1px solid ${color.border}`,
-        borderRadius: radius.lg,
-        padding: `${space[3]} ${space[4]}`,
+        borderRadius: radius.md,
+        padding: `${space[2]} ${space[3]}`,
         display: 'flex',
         alignItems: 'center',
         gap: space[3],
@@ -253,9 +261,9 @@ function Metric({
     >
       <div
         style={{
-          width: 36,
-          height: 36,
-          borderRadius: radius.md,
+          width: 28,
+          height: 28,
+          borderRadius: radius.sm,
           background: t.bg,
           color: t.fg,
           display: 'inline-flex',
@@ -269,21 +277,22 @@ function Metric({
       <div style={{ minWidth: 0, flex: 1 }}>
         <div
           style={{
-            fontSize: text.xs,
+            fontSize: 10,
             color: color.textMuted,
-            fontWeight: weight.medium,
+            fontWeight: weight.semibold,
             textTransform: 'uppercase',
-            letterSpacing: '0.5px',
+            letterSpacing: '0.6px',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            marginBottom: 1,
           }}
         >
           {label}
         </div>
         <div
           style={{
-            fontSize: text.lg,
+            fontSize: text.base,
             fontWeight: weight.bold,
             color: color.text,
             letterSpacing: '-0.3px',

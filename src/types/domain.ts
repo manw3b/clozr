@@ -67,6 +67,10 @@ export interface Lead {
   ownerId?: string;
   ownerName?: string;
   shortNote?: string;
+  /** Hora exacta de la visita (sólo cuando stage = visita-agendada). */
+  visitAt?: string;
+  /** Código mayorista asignado al agendar (ej "B1202"). */
+  wholesaleCode?: string;
 }
 
 /* ============================================================

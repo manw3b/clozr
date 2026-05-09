@@ -25,7 +25,16 @@ import { SortableLeadCard } from './components/SortableLeadCard';
 import { PipelineColumn, ColumnEmpty } from './components/PipelineColumn';
 import { PipelineMetrics } from './components/PipelineMetrics';
 import { groupLeadsByStage } from '../../lib/groupings';
-import { usePipelineLeads, useMoveLead, useSnoozeLead, useAddLeadNote } from './usePipelineData';
+import { usePipelineLeads, useMoveLead, useSnoozeLead, useAddLeadNote, useScheduleVisit } from './usePipelineData';
+import { ScheduleVisitModal, type ScheduleVisitFormData } from './components/ScheduleVisitModal';
+import { workspaceSettings } from '../../lib/db/workspaceSettings';
+import {
+  VISIT_TEMPLATE_KEYS,
+  DEFAULT_VISIT_TEMPLATES,
+  applyVisitTemplate,
+  formatVisitDay,
+  formatVisitTime,
+} from '../../lib/visitTemplates';
 import { useClientDetail, useRecordContact, useClientsList } from '../clientes/useClientsData';
 import { useUIStore } from '../../store/uiStore';
 import { useBusinessStore } from '../../store/businessStore';
@@ -40,7 +49,7 @@ import {
   ContextMenuLabel,
   useContextMenu,
 } from '../../components/ContextMenu';
-import { ArrowRight, Trophy, XCircle, Clock3, ShoppingCart, Phone } from 'lucide-react';
+import { ArrowRight, Trophy, XCircle, Clock3, ShoppingCart, Phone, CalendarPlus } from 'lucide-react';
 import { WhatsAppIcon } from '../../components/icons/WhatsAppIcon';
 import { space } from '../../tokens';
 import { STAGES } from '../../types/domain';
@@ -75,6 +84,7 @@ export function Pipeline() {
   const { data: dbLeads = [] } = usePipelineLeads();
   const moveLeadMut = useMoveLead();
   const snoozeLeadMut = useSnoozeLead();
+  const scheduleVisitMut = useScheduleVisit();
   const addNoteMut = useAddLeadNote();
   const { setActiveScreen, showToast } = useUIStore();
   const { activeBusiness } = useBusinessStore();
@@ -93,6 +103,9 @@ export function Pipeline() {
   // Estado para "Nuevo lead"
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [newLeadStage, setNewLeadStage] = useState<LeadStage>('prospecto');
+
+  // Estado para "Agendar visita"
+  const [scheduleLead, setScheduleLead] = useState<Lead | null>(null);
 
   function startConvertToSale(lead: Lead) {
     const fullClient = allClients.find((c) => c.id === lead.clientId);
@@ -125,6 +138,55 @@ export function Pipeline() {
     }
     openWhatsApp(phone, body);
     recordContactMut.mutate({ customerId, kind: 'whatsapp' });
+  }
+
+  /**
+   * Persiste la visita y arma el body de WhatsApp con la plantilla del
+   * workspace (final o mayorista según el tipo de cliente). Devuelve
+   * mensaje + código para que el modal lo muestre en la pantalla de
+   * confirmación.
+   */
+  async function handleScheduleSubmit(
+    lead: Lead,
+    isMayorista: boolean,
+    data: ScheduleVisitFormData,
+  ): Promise<{ waMessage: string; wholesaleCode: string | null }> {
+    const wid = activeWorkspace?.id ?? '';
+    const { wholesaleCode } = await scheduleVisitMut.mutateAsync({
+      leadId: lead.id,
+      visitAt: data.visitAt,
+      product: data.product || null,
+      isMayorista,
+    });
+
+    // Cargar plantilla + dirección del workspace; fallback a defaults.
+    const settings = await workspaceSettings.getMany(wid, [
+      VISIT_TEMPLATE_KEYS.final,
+      VISIT_TEMPLATE_KEYS.mayorista,
+      VISIT_TEMPLATE_KEYS.address,
+    ]);
+    const body = isMayorista
+      ? settings[VISIT_TEMPLATE_KEYS.mayorista] ?? DEFAULT_VISIT_TEMPLATES.mayorista
+      : settings[VISIT_TEMPLATE_KEYS.final] ?? DEFAULT_VISIT_TEMPLATES.final;
+
+    const waMessage = applyVisitTemplate(body, {
+      nombre: lead.clientName,
+      equipo: data.product || lead.product,
+      dia: formatVisitDay(data.visitAt),
+      hora: formatVisitTime(data.visitAt),
+      direccion: settings[VISIT_TEMPLATE_KEYS.address] ?? DEFAULT_VISIT_TEMPLATES.address,
+      codigo: wholesaleCode,
+      negocio: businessName,
+    });
+
+    showToast(
+      isMayorista && wholesaleCode
+        ? `Visita agendada · código ${wholesaleCode}`
+        : 'Visita agendada',
+      'success',
+    );
+
+    return { waMessage, wholesaleCode };
   }
 
   function callCustomer(phone: string | null | undefined, customerId: string) {
@@ -630,6 +692,15 @@ export function Pipeline() {
               </ContextMenuItem>
             )}
             <ContextMenuItem
+              icon={<CalendarPlus size={14} />}
+              onClick={() => {
+                setScheduleLead(lead);
+                close();
+              }}
+            >
+              Agendar visita
+            </ContextMenuItem>
+            <ContextMenuItem
               icon={<ShoppingCart size={14} />}
               onClick={() => {
                 startConvertToSale(lead);
@@ -664,6 +735,29 @@ export function Pipeline() {
           </ContextMenu>
         );
       })()}
+
+      {/* Agendar visita — modal con preview de WA */}
+      <ScheduleVisitModal
+        open={!!scheduleLead}
+        lead={scheduleLead}
+        isMayorista={(() => {
+          if (!scheduleLead) return false;
+          const c = allClients.find((x) => x.id === scheduleLead.clientId);
+          return c?.type === 'mayorista';
+        })()}
+        onClose={() => setScheduleLead(null)}
+        onSubmit={async (data) => {
+          if (!scheduleLead) throw new Error('no lead');
+          const c = allClients.find((x) => x.id === scheduleLead.clientId);
+          const isMayorista = c?.type === 'mayorista';
+          return handleScheduleSubmit(scheduleLead, isMayorista, data);
+        }}
+        onSendWhatsApp={(message) => {
+          if (!scheduleLead) return;
+          const c = allClients.find((x) => x.id === scheduleLead.clientId);
+          whatsappCustomer(c?.phone ?? null, scheduleLead.clientId, message);
+        }}
+      />
     </div>
   );
 }

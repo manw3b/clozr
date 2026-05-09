@@ -97,6 +97,66 @@ export function useSnoozeLead() {
   });
 }
 
+/**
+ * Agenda una visita: mueve el lead a "visita-agendada", graba la hora,
+ * y si el cliente es mayorista incrementa el contador y devuelve el
+ * código asignado. Devuelve el mismo lead con los campos actualizados
+ * para que la UI pueda armar el mensaje de WhatsApp en el acto.
+ */
+export function useScheduleVisit() {
+  const qc = useQueryClient();
+  const { activeWorkspace } = useWorkspaceStore();
+  const wid = activeWorkspace?.id ?? "";
+
+  return useMutation({
+    mutationFn: async ({
+      leadId,
+      visitAt,
+      product,
+      isMayorista,
+    }: {
+      leadId: string;
+      /** ISO local sin TZ: "YYYY-MM-DDTHH:mm" */
+      visitAt: string;
+      product?: string | null;
+      isMayorista: boolean;
+    }) => {
+      const stageCfg = STAGES.find((s) => s.id === "visita-agendada");
+      const stageOrder = STAGES.findIndex((s) => s.id === "visita-agendada");
+      if (!stageCfg) throw new Error("Etapa visita-agendada no configurada");
+
+      // Si es mayorista, generamos el código antes de persistir.
+      let wholesaleCode: string | null = null;
+      if (isMayorista) {
+        const { workspaceSettings } = await import("../../lib/db/workspaceSettings");
+        const { VISIT_TEMPLATE_KEYS, DEFAULT_VISIT_TEMPLATES, formatWholesaleCode } =
+          await import("../../lib/visitTemplates");
+        const prefix =
+          (await workspaceSettings.get(wid, VISIT_TEMPLATE_KEYS.codePrefix)) ??
+          DEFAULT_VISIT_TEMPLATES.codePrefix;
+        const next = await workspaceSettings.bumpCounter(
+          wid,
+          VISIT_TEMPLATE_KEYS.codeCounter,
+          1200,
+        );
+        wholesaleCode = formatWholesaleCode(prefix, next);
+      }
+
+      await pipelineDb.scheduleVisit(leadId, {
+        visitAt,
+        product: product ?? null,
+        wholesaleCode,
+        stageId: stageCfg.id,
+        stageName: stageCfg.label,
+        stageOrder,
+      });
+
+      return { wholesaleCode };
+    },
+    onSettled: () => invalidate.afterLeadChange(qc),
+  });
+}
+
 /** Agrega una nota como activity al pipeline_item. */
 export function useAddLeadNote() {
   const qc = useQueryClient();

@@ -96,6 +96,8 @@ export async function create(
     short_note: data.short_note ?? null,
     priority: data.priority ?? null,
     position: null,
+    wholesale_code: null,
+    visit_at: null,
   };
 }
 
@@ -127,6 +129,49 @@ export async function snooze(id: string, nextActionAt: string): Promise<void> {
   await dbExecute(
     "UPDATE pipeline_items SET next_action_at = ?, updated_at = ? WHERE id = ?",
     [nextActionAt, now, id],
+  );
+}
+
+/**
+ * Agenda una visita: mueve el lead a la etapa "visita-agendada", graba
+ * `visit_at`, opcionalmente actualiza producto, y si recibió un
+ * `wholesaleCode` (ya generado afuera) lo persiste. También copia el
+ * timestamp a `next_action_at` para que la card siga ordenándose por
+ * próxima acción.
+ */
+export async function scheduleVisit(
+  id: string,
+  data: {
+    visitAt: string;
+    product?: string | null;
+    wholesaleCode?: string | null;
+    /** stage del workspace; lo pasamos desde afuera por si el negocio renombró las etapas */
+    stageId: string;
+    stageName: string;
+    stageOrder: number;
+  },
+): Promise<void> {
+  const now = new Date().toISOString();
+  await dbExecute(
+    `UPDATE pipeline_items SET
+       stage_id = ?, stage_name = ?, stage_order = ?,
+       visit_at = ?, next_action_at = ?, next_action_label = ?,
+       product = COALESCE(?, product),
+       wholesale_code = COALESCE(?, wholesale_code),
+       updated_at = ?
+     WHERE id = ?`,
+    [
+      data.stageId,
+      data.stageName,
+      data.stageOrder,
+      data.visitAt,
+      data.visitAt,
+      "Visita agendada",
+      data.product ?? null,
+      data.wholesaleCode ?? null,
+      now,
+      id,
+    ],
   );
 }
 
@@ -208,6 +253,7 @@ export const pipelineDb = {
   updateStage,
   closeItem,
   snooze,
+  scheduleVisit,
   addActivity,
   getActivities,
   getUrgent,

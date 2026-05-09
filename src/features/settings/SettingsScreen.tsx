@@ -12,6 +12,7 @@ import { PaymentMethodsSection } from "./PaymentMethodsSection";
 import { CatalogPricingSection } from "./CatalogPricingSection";
 import { FeaturedModelsSection } from "./FeaturedModelsSection";
 import { CustomerTagsSection } from "./CustomerTagsSection";
+import { WhatsAppTemplatesSection } from "./WhatsAppTemplatesSection";
 import type { PipelineStage, CustomerTypeRow } from "../../lib/db/types";
 // Paleta unificada — la misma que usa el kanban del pipeline para el
 // color de cada etapa. Cualquier cambio acá se refleja allá.
@@ -19,7 +20,7 @@ import { PALETTE_LIST as COLORS, colorCss } from "../../lib/colorPalette";
 
 // ── Shared ────────────────────────────────────────────────────────
 
-type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "data";
+type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "wa-templates" | "data";
 
 const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "general", label: "General" },
@@ -30,6 +31,7 @@ const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "payment-methods", label: "Métodos de pago" },
   { id: "catalog-pricing", label: "Precios del catálogo" },
   { id: "catalog-featured", label: "Productos destacados" },
+  { id: "wa-templates", label: "Plantillas WhatsApp" },
   { id: "data", label: "Datos y backup" },
 ];
 
@@ -1012,6 +1014,7 @@ export default function SettingsScreen() {
       case "payment-methods": return <PaymentMethodsSection wid={wid} />;
       case "catalog-pricing": return <CatalogPricingSection wid={wid} />;
       case "catalog-featured": return <FeaturedModelsSection wid={wid} />;
+      case "wa-templates": return <WhatsAppTemplatesSection wid={wid} />;
       case "data": return <DataSection wid={wid} />;
     }
   };

@@ -256,6 +256,8 @@ export function dbItemToLead(p: DbPipelineItem): Lead {
     ownerId: p.owner_id ?? undefined,
     ownerName: p.owner_name ?? undefined,
     shortNote: p.short_note ?? undefined,
+    visitAt: p.visit_at ?? undefined,
+    wholesaleCode: p.wholesale_code ?? undefined,
     createdAt: p.created_at,
     stageChangedAt: p.updated_at,
   };

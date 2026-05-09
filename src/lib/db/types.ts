@@ -198,6 +198,17 @@ export interface PipelineItem {
   short_note: string | null;
   priority: PipelinePriority | null;
   position: number | null;
+  /** Migration 031 */
+  wholesale_code: string | null;
+  visit_at: string | null;
+}
+
+/** KV de configuración por workspace (migration 031). */
+export interface WorkspaceSettingRow {
+  workspace_id: string;
+  key: string;
+  value: string | null;
+  updated_at: string;
 }
 
 export interface PipelineActivity {

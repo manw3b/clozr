@@ -626,6 +626,27 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
     )`));
   await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_cust_tag_assign_customer ON customer_tag_assignments (customer_id)`));
   await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_cust_tag_assign_tag ON customer_tag_assignments (tag_id)`));
+
+  // ════════════════════════════════════════════════════════════
+  // 031 — workspace_settings (KV) + wholesale code en pipeline
+  // ════════════════════════════════════════════════════════════
+  // KV genérico por workspace: plantillas WhatsApp, contadores, etc.
+  // Lo usamos en lugar de columnas en `workspaces` para evitar migraciones
+  // por cada nuevo ajuste configurable.
+  await safe(() => dbExecute(`
+    CREATE TABLE IF NOT EXISTS workspace_settings (
+      workspace_id TEXT NOT NULL,
+      key          TEXT NOT NULL,
+      value        TEXT,
+      updated_at   TEXT NOT NULL,
+      PRIMARY KEY (workspace_id, key)
+    )`));
+  // Código mayorista asignado al agendar la visita (ej: "B1202").
+  // Se genera incrementando el contador KV `wa_wholesale_code_counter`.
+  await safe(() => dbExecute(`ALTER TABLE pipeline_items ADD COLUMN wholesale_code TEXT`));
+  // Hora puntual de la visita (separada de next_action_at, que puede ser
+  // cualquier follow-up). Si está, gana sobre next_action_at para WA.
+  await safe(() => dbExecute(`ALTER TABLE pipeline_items ADD COLUMN visit_at TEXT`));
 }
 
 async function safe(fn: () => Promise<unknown>) {

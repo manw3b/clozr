@@ -8,7 +8,18 @@
     "sql:allow-select",
     "sql:allow-load",
     "sql:allow-close",
-    "opener:allow-open-url",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://wa.me/*" },
+        { "url": "https://api.whatsapp.com/*" },
+        { "url": "https://web.whatsapp.com/*" },
+        { "url": "https://*" },
+        { "url": "http://*" },
+        { "url": "mailto:*" },
+        { "url": "tel:*" }
+      ]
+    },
     "fs:allow-exists",
     "fs:allow-mkdir",
     "fs:allow-copy-file",

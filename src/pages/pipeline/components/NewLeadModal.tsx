@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, UserPlus, Flame, Calendar } from "lucide-react";
+import { Search, UserPlus, Flame } from "lucide-react";
 import { Modal, ModalField } from "../../../components/Modal";
 import { Button } from "../../../components/Button";
 import { Input, Select } from "../../../components/Input";
+import { DateTimePicker } from "../../../components/DateTimePicker";
 import { Avatar } from "../../../components/Avatar";
 import { Badge } from "../../../components/Badge";
 import { customersDb } from "../../../lib/db/customers";
@@ -259,17 +260,16 @@ export function NewLeadModal({ open, onClose, initialStage = "prospecto" }: Prop
 
       {/* PRÓXIMA ACCIÓN */}
       <ModalField label="Próxima acción" hint="Opcional — qué tenés que hacer y cuándo">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 180px", gap: space[2] }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 200px", gap: space[2] }}>
           <Input
             value={nextActionLabel}
             onChange={(e) => setNextActionLabel(e.target.value)}
             placeholder='Ej: "Llamar para confirmar"'
           />
-          <Input
-            type="datetime-local"
+          <DateTimePicker
             value={nextActionAt}
-            onChange={(e) => setNextActionAt(e.target.value)}
-            iconLeft={<Calendar size={14} />}
+            onChange={setNextActionAt}
+            placeholder="Programar"
           />
         </div>
       </ModalField>

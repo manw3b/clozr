@@ -451,41 +451,65 @@ export function Pipeline() {
     }
 
     // ── Reorder/move de leads ───────────────────────────────────
+    // Derivamos el targetStage del `over` actual, NO desde leads[].stage
+    // (las setLeads previas pueden no haber flusheado todavía y el closure
+    // de leads acá vendría stale, haciendo que moveLeadMut se dispare con
+    // la etapa vieja — bug observado al soltar en zona vacía de columna).
+    const overData = over.data?.current as
+      | { type?: 'lead' | 'column'; lead?: Lead; stageId?: string }
+      | undefined;
+    let targetStage: LeadStage | null = null;
+    if (overData?.type === 'lead' && overData.lead) {
+      targetStage = overData.lead.stage;
+    } else if (overData?.type === 'column' && overData.stageId) {
+      targetStage = overData.stageId;
+    } else {
+      // Fallback por id: con prefijo "col:" es columna; sin prefijo, es
+      // un lead id y buscamos en el state.
+      if (overId.startsWith('col:')) {
+        targetStage = stageIdFromDragId(overId);
+      } else {
+        targetStage = leads.find((l) => l.id === overId)?.stage ?? null;
+      }
+    }
+    if (!targetStage) return;
+
     setLeads((prev) => {
       const activeIdx = prev.findIndex((l) => l.id === activeId);
-      const overIdx = prev.findIndex((l) => l.id === overId);
-      if (activeIdx === -1 || overIdx === -1) return prev;
-
+      if (activeIdx === -1) return prev;
       const activeLead = prev[activeIdx];
-      const overLead = prev[overIdx];
-      if (!activeLead || !overLead) return prev;
+      if (!activeLead) return prev;
 
-      // Si están en la misma stage, reordenamos
-      if (activeLead.stage === overLead.stage) {
+      const overIdx = prev.findIndex((l) => l.id === overId);
+      const overLead = overIdx >= 0 ? prev[overIdx] : null;
+
+      // Si soltamos sobre otra card de la MISMA stage → reorder local.
+      if (overLead && activeLead.stage === overLead.stage) {
         return arrayMove(prev, activeIdx, overIdx);
       }
-
-      // Si no, ya se actualizó la stage en handleDragOver — devolvemos el estado actual
+      // Si no, asegurar que el lead quede asignado a targetStage (handleDragOver
+      // ya lo hace cuando hay cambio entre columnas, pero al soltar sobre el
+      // área vacía de la misma columna o sobre la columna misma sin overLead,
+      // nos defendemos también acá).
+      if (activeLead.stage !== targetStage) {
+        return prev.map((l) => (l.id === activeId ? { ...l, stage: targetStage as LeadStage } : l));
+      }
       return prev;
     });
 
-    // Persist stage change to SQLite. Confirm si se mueve a "perdido"
-    // — fácil hacerlo por accidente con el drag.
-    const movedLead = leads.find((l) => l.id === activeId);
-    if (movedLead) {
-      if (lostStage && movedLead.stage === lostStage.id) {
-        const ok = window.confirm(
-          `¿Marcar el lead de ${movedLead.clientName} como perdido?`,
-        );
-        if (!ok) {
-          // Revertir el optimistic update local — descartamos los cambios
-          // visuales del drag y dejamos que el próximo render use dbLeads.
-          setLocalLeads(null);
-          return;
-        }
+    // Persist stage change a SQLite. Confirm si va a "perdido" — fácil de
+    // pegar por accidente con el drag.
+    if (lostStage && targetStage === lostStage.id) {
+      const movedLead = leads.find((l) => l.id === activeId);
+      const ok = window.confirm(
+        `¿Marcar el lead de ${movedLead?.clientName ?? 'este cliente'} como perdido?`,
+      );
+      if (!ok) {
+        setLocalLeads(null);
+        return;
       }
-      moveLeadMut.mutate({ leadId: activeId, newStage: movedLead.stage });
     }
+    moveLeadMut.mutate({ leadId: activeId, newStage: targetStage });
   }
 
   /* ---------- Drawer del cliente (real DB) ---------- */

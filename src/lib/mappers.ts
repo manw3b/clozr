@@ -256,9 +256,11 @@ export function dbItemToLead(p: DbPipelineItem): Lead {
     clientId: p.customer_id,
     clientName: p.customer_name ?? "Sin cliente",
     clientInitials: nameInitials(p.customer_name),
-    // Preferimos stage_id (fuente de verdad de pipeline_stages.id); sólo
-    // caemos a stage_name si llegó vacío (DBs muy viejas pre-stage_id).
-    stage: p.stage_id ? leadStageFromDb(p.stage_id) : leadStageFromDb(p.stage_name ?? ""),
+    // stage_id es la fuente de verdad de pipeline_stages.id — pasa como
+    // está (los ids custom como UUID o "visita_agendada" con guion bajo
+    // tienen que sobrevivir al round-trip sin que el mapper legacy los
+    // transforme). Sólo si no hay stage_id caemos al label legacy.
+    stage: p.stage_id || leadStageFromDb(p.stage_name ?? ""),
     amount: p.estimated_value ?? undefined,
     currency: (p.currency as "ARS" | "USD") ?? "ARS",
     priority,

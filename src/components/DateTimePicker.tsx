@@ -1,13 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Calendar, Clock, X } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Clock, X } from 'lucide-react';
 import { Button } from './Button';
 import { color, radius, space, text, weight, duration, ease } from '../tokens';
 
 /** Tamaño nominal del popover — usado para decidir flip up/down y left/right.
  *  Conviene mantener sincronizado con el contenido real (margen de error ~30px). */
 const POPOVER_W = 320;
-const POPOVER_H = 380;
+const POPOVER_H = 480;
 
 /**
  * DateTimePicker — popover propio con presets + tiempo + confirm.
@@ -237,27 +237,8 @@ export function DateTimePicker({
             </div>
           </div>
 
-          {/* Fecha */}
-          <div>
-            <SectionLabel>Fecha</SectionLabel>
-            <input
-              type="date"
-              value={draftDate}
-              onChange={(e) => setDraftDate(e.target.value)}
-              style={{
-                width: '100%',
-                marginTop: 6,
-                height: 36,
-                padding: `0 ${space[3]}`,
-                background: color.surface2,
-                border: `1px solid ${color.border}`,
-                borderRadius: radius.md,
-                color: color.text,
-                fontSize: text.base,
-                outline: 'none',
-              }}
-            />
-          </div>
+          {/* Calendario inline */}
+          <MiniCalendar value={draftDate} onChange={setDraftDate} />
 
           {/* Hora */}
           <div>
@@ -316,6 +297,207 @@ export function DateTimePicker({
       )}
     </div>
   );
+}
+
+/* ============================================================
+ *  MiniCalendar — grid de mes con navegación, dark theme
+ * ============================================================ */
+
+const MONTH_NAMES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+const DAY_NAMES_SHORT = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+
+function MiniCalendar({
+  value,
+  onChange,
+}: {
+  value: string; // YYYY-MM-DD
+  onChange: (next: string) => void;
+}) {
+  // Mes que estamos viendo. Inicia en el mes del valor o en el actual.
+  const [viewYear, viewMonth] = useMemo(() => {
+    if (value) {
+      const [y, m] = value.split('-').map(Number);
+      if (y && m) return [y, m - 1] as const;
+    }
+    const now = new Date();
+    return [now.getFullYear(), now.getMonth()] as const;
+  }, [value]);
+
+  const [year, setYear] = useState(viewYear);
+  const [month, setMonth] = useState(viewMonth);
+
+  // Resyncar si el value cambia desde afuera (preset chip)
+  useEffect(() => {
+    setYear(viewYear);
+    setMonth(viewMonth);
+  }, [viewYear, viewMonth]);
+
+  const today = new Date();
+  const todayKey = isoDateOf(today);
+
+  // Generar 6 filas × 7 días empezando desde el lunes anterior al día 1
+  const cells = useMemo(() => {
+    const firstOfMonth = new Date(year, month, 1);
+    // getDay(): 0=Dom, 1=Lun ... 6=Sáb. Queremos 0=Lun ... 6=Dom.
+    const weekdayOfFirst = (firstOfMonth.getDay() + 6) % 7;
+    const start = new Date(year, month, 1 - weekdayOfFirst);
+    const out: Array<{ date: Date; key: string; inMonth: boolean }> = [];
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      out.push({ date: d, key: isoDateOf(d), inMonth: d.getMonth() === month });
+    }
+    return out;
+  }, [year, month]);
+
+  function prev() {
+    if (month === 0) {
+      setYear((y) => y - 1);
+      setMonth(11);
+    } else {
+      setMonth((m) => m - 1);
+    }
+  }
+  function next() {
+    if (month === 11) {
+      setYear((y) => y + 1);
+      setMonth(0);
+    } else {
+      setMonth((m) => m + 1);
+    }
+  }
+
+  return (
+    <div>
+      {/* Header: navegación + mes actual */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: space[2],
+        }}
+      >
+        <button
+          type="button"
+          onClick={prev}
+          aria-label="Mes anterior"
+          style={iconBtnStyle()}
+          onMouseEnter={(e) => (e.currentTarget.style.background = color.surfaceHover)}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+        >
+          <ChevronLeft size={14} />
+        </button>
+        <span
+          style={{
+            fontSize: text.sm,
+            fontWeight: weight.semibold,
+            color: color.text,
+            letterSpacing: '-0.2px',
+          }}
+        >
+          {MONTH_NAMES[month]} {year}
+        </span>
+        <button
+          type="button"
+          onClick={next}
+          aria-label="Mes siguiente"
+          style={iconBtnStyle()}
+          onMouseEnter={(e) => (e.currentTarget.style.background = color.surfaceHover)}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+        >
+          <ChevronRight size={14} />
+        </button>
+      </div>
+
+      {/* Header de días de la semana */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
+        {DAY_NAMES_SHORT.map((d, i) => (
+          <div
+            key={i}
+            style={{
+              fontSize: 10,
+              fontWeight: weight.semibold,
+              color: color.textDim,
+              textAlign: 'center',
+              padding: '4px 0',
+            }}
+          >
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Grid de días */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+        {cells.map(({ date, key, inMonth }) => {
+          const isSelected = key === value;
+          const isToday = key === todayKey;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onChange(key)}
+              style={{
+                aspectRatio: '1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: text.xs,
+                fontWeight: isToday || isSelected ? weight.semibold : weight.medium,
+                color: isSelected
+                  ? '#fff'
+                  : !inMonth
+                  ? color.textDim
+                  : isToday
+                  ? color.primary
+                  : color.text,
+                background: isSelected ? color.primary : 'transparent',
+                border: isToday && !isSelected ? `1px solid ${color.primary}` : '1px solid transparent',
+                borderRadius: radius.sm,
+                cursor: 'pointer',
+                transition: 'all 80ms',
+                opacity: !inMonth ? 0.45 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!isSelected) e.currentTarget.style.background = color.surfaceHover;
+              }}
+              onMouseLeave={(e) => {
+                if (!isSelected) e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              {date.getDate()}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function iconBtnStyle(): React.CSSProperties {
+  return {
+    width: 26,
+    height: 26,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    color: color.textMuted,
+    background: 'transparent',
+    cursor: 'pointer',
+    transition: `background ${duration.fast} ${ease}`,
+  };
+}
+
+function isoDateOf(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 /* ── Helpers ───────────────────────────────────────────────── */

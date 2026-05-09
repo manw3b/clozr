@@ -6,7 +6,8 @@ import type { Lead, LeadStage } from '../../../types/domain';
 interface SortableLeadCardProps {
   lead: Lead;
   onClick?: (lead: Lead) => void;
-  onWhatsApp?: (lead: Lead) => void;
+  onWhatsApp?: (lead: Lead, body?: string) => void;
+  businessName?: string | null;
   onCall?: (lead: Lead) => void;
   onConvertToSale?: (lead: Lead) => void;
   onChangeStage?: (lead: Lead, newStage: LeadStage) => void;
@@ -26,7 +27,7 @@ interface SortableLeadCardProps {
  * El componente DragOverlay (en Pipeline.tsx) renderiza el preview que
  * sigue al cursor — eso es lo que el usuario ve nítido durante el drag.
  */
-export function SortableLeadCard({ lead, onClick, onWhatsApp, onCall, onConvertToSale, onChangeStage, onSnooze, onAddNote }: SortableLeadCardProps) {
+export function SortableLeadCard({ lead, onClick, onWhatsApp, businessName, onCall, onConvertToSale, onChangeStage, onSnooze, onAddNote }: SortableLeadCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: lead.id,
     data: { type: 'lead', lead },
@@ -44,6 +45,7 @@ export function SortableLeadCard({ lead, onClick, onWhatsApp, onCall, onConvertT
       isDragging={isDragging}
       onClick={onClick}
       onWhatsApp={onWhatsApp}
+      businessName={businessName}
       onCall={onCall}
       onConvertToSale={onConvertToSale}
       onChangeStage={onChangeStage}

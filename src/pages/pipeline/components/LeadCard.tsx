@@ -15,7 +15,7 @@ import {
   Check,
   X as XIcon,
 } from 'lucide-react';
-import { WhatsAppIcon } from '../../../components/icons/WhatsAppIcon';
+import { WaQuickPicker } from '../../../components/WaQuickPicker';
 import { Avatar } from '../../../components/Avatar';
 import { color, radius, space, text, weight, duration, ease } from '../../../tokens';
 import { formatMoney, formatRelative } from '../../../lib/format';
@@ -42,7 +42,10 @@ interface LeadCardProps {
   /** Se aplica al "ghost" overlay durante drag */
   isOverlay?: boolean;
   onClick?: (lead: Lead) => void;
-  onWhatsApp?: (lead: Lead) => void;
+  /** body opcional: si viene, se manda como query `?text=` a wa.me. */
+  onWhatsApp?: (lead: Lead, body?: string) => void;
+  /** Nombre del negocio para reemplazar `{negocio}` en plantillas WA. */
+  businessName?: string | null;
   onCall?: (lead: Lead) => void;
   onConvertToSale?: (lead: Lead) => void;
   /** Mover el lead a otra etapa sin drag (alternativa táctil/teclado). */
@@ -66,7 +69,7 @@ interface LeadCardProps {
  * - El "isOverlay" se usa para el preview que sigue al cursor — se ve más sólido
  */
 export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadCard(
-  { lead, isDragging, isOverlay, onClick, onWhatsApp, onCall, onConvertToSale, onChangeStage, onSnooze, onAddNote, dragHandleProps, style },
+  { lead, isDragging, isOverlay, onClick, onWhatsApp, businessName, onCall, onConvertToSale, onChangeStage, onSnooze, onAddNote, dragHandleProps, style },
   ref
 ) {
   const stuckDays = lead.stageChangedAt
@@ -258,16 +261,15 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
               <ShoppingCart size={13} strokeWidth={2.2} />
             </CardActionBtn>
           )}
-          <CardActionBtn
-            tone="success"
-            ariaLabel="WhatsApp"
-            onClick={(e) => {
-              e.stopPropagation();
-              onWhatsApp?.(lead);
-            }}
-          >
-            <WhatsAppIcon size={13} />
-          </CardActionBtn>
+          {onWhatsApp && (
+            <WaQuickPicker
+              lead={lead}
+              businessName={businessName}
+              iconSize={13}
+              variant="small"
+              onSend={(l, body) => onWhatsApp(l, body)}
+            />
+          )}
           <CardActionBtn
             ariaLabel="Llamar"
             onClick={(e) => {

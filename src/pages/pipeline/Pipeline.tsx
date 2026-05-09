@@ -25,6 +25,8 @@ import { groupLeadsByStage } from '../../lib/groupings';
 import { usePipelineLeads, useMoveLead, useSnoozeLead, useAddLeadNote } from './usePipelineData';
 import { useClientDetail, useRecordContact, useClientsList } from '../clientes/useClientsData';
 import { useUIStore } from '../../store/uiStore';
+import { useBusinessStore } from '../../store/businessStore';
+import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useExchangeRateStore } from '../../store/exchangeRateStore';
 import { space } from '../../tokens';
 import { STAGES } from '../../types/domain';
@@ -46,6 +48,9 @@ export function Pipeline() {
   const snoozeLeadMut = useSnoozeLead();
   const addNoteMut = useAddLeadNote();
   const { setActiveScreen, showToast } = useUIStore();
+  const { activeBusiness } = useBusinessStore();
+  const { activeWorkspace } = useWorkspaceStore();
+  const businessName = activeBusiness?.name ?? activeWorkspace?.name ?? null;
   const recordContactMut = useRecordContact();
   const { data: allClients = [] } = useClientsList();
   const { usdToArs } = useExchangeRateStore();
@@ -79,14 +84,21 @@ export function Pipeline() {
     });
   }
 
-  function whatsappCustomer(phone: string | null | undefined, customerId: string) {
+  function whatsappCustomer(
+    phone: string | null | undefined,
+    customerId: string,
+    body?: string,
+  ) {
     if (!phone) {
       showToast('Este cliente no tiene teléfono registrado');
       return;
     }
     const num = phone.replace(/\D/g, '');
     const final = num.startsWith('54') ? num : `54${num}`;
-    window.open(`https://wa.me/${final}`, '_blank');
+    const url = body
+      ? `https://wa.me/${final}?text=${encodeURIComponent(body)}`
+      : `https://wa.me/${final}`;
+    window.open(url, '_blank');
     recordContactMut.mutate({ customerId, kind: 'whatsapp' });
   }
 
@@ -332,10 +344,11 @@ export function Pipeline() {
                         key={lead.id}
                         lead={lead}
                         onClick={(l) => setOpenClientId(l.clientId)}
-                        onWhatsApp={(l) => {
+                        onWhatsApp={(l, body) => {
                           const c = allClients.find((x) => x.id === l.clientId);
-                          whatsappCustomer(c?.phone ?? null, l.clientId);
+                          whatsappCustomer(c?.phone ?? null, l.clientId, body);
                         }}
+                        businessName={businessName}
                         onCall={(l) => {
                           const c = allClients.find((x) => x.id === l.clientId);
                           callCustomer(c?.phone ?? null, l.clientId);

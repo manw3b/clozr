@@ -1,7 +1,13 @@
-import { ReactNode } from 'react';
-import { useSortable } from '@dnd-kit/sortable';
+import { ReactNode, useState } from 'react';
+import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Plus, GripVertical } from 'lucide-react';
+
+// Curva "easeOutQuint" — arranca rápido y desacelera al final, da
+// sensación de "suelta natural". La usamos para resize y reorder de
+// columnas; los cards conservan el default de @dnd-kit para no
+// sobre-animar el movimiento interno.
+const SMOOTH_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney } from '../../../lib/format';
 import { colorCss, colorBg } from '../../../lib/colorPalette';
@@ -49,12 +55,14 @@ export function PipelineColumn({
   const accentBar = colorCss(stage.color);
   const accentBg = colorBg(stage.color, 0.08);
 
+  // Activo mientras el usuario arrastra el resize handle. Se usa para
+  // desactivar la transición de width (sin esto, la columna laggea
+  // detrás del cursor con un easing visible).
+  const [isResizing, setIsResizing] = useState(false);
+
   // Sortable de la columna entera. id = "col:<stage.id>" para que el
   // dispatcher de Pipeline.handleDragEnd diferencie sin colisionar con los
-  // ids de leads. data.type = 'column' identifica el drag para los handlers.
-  // useSortable ya internamente provee setNodeRef + droppable, así que
-  // usamos este mismo nodo como drop target de cards también — el hook
-  // useDroppable que tenía antes era redundante.
+  // ids de leads.
   const {
     setNodeRef,
     attributes,
@@ -66,7 +74,33 @@ export function PipelineColumn({
   } = useSortable({
     id: `col:${stage.id}`,
     data: { type: 'column', stageId: stage.id },
+    // Animar siempre el layout shift cuando otra columna se mueve para
+    // hacer lugar (el default solo lo hace en algunos casos).
+    animateLayoutChanges: (args) => defaultAnimateLayoutChanges({ ...args, wasDragging: true }),
+    // Tomamos el easing de @dnd-kit pero con una duración más larga y
+    // una curva "ease-out-quint" → desacelera al final, sensación natural.
+    transition: { duration: 260, easing: SMOOTH_EASE },
   });
+
+  // Compongo el transform: cuando la columna está siendo arrastrada,
+  // le agrego un pequeño tilt + scale para que se sienta "levantada".
+  const baseTransform = CSS.Translate.toString(transform);
+  const dragTransform = isDragging
+    ? `${baseTransform ?? ''} scale(1.02) rotate(-0.6deg)`
+    : baseTransform;
+
+  // Transition compuesto:
+  //  - el de @dnd-kit (transform durante reorder)
+  //  - width animada SOLO cuando no está siendo redimensionada (para que
+  //    "snap" al soltar y para reflejar cambios externos suaves)
+  //  - estilos visuales (border, background, shadow) con duración corta
+  const composedTransition = [
+    transition,
+    isResizing ? null : `width 220ms ${SMOOTH_EASE}, flex-basis 220ms ${SMOOTH_EASE}`,
+    `border-color 160ms ${SMOOTH_EASE}, background 160ms ${SMOOTH_EASE}, box-shadow 200ms ${SMOOTH_EASE}, opacity 160ms ${SMOOTH_EASE}`,
+  ]
+    .filter(Boolean)
+    .join(', ');
 
   return (
     <div
@@ -85,9 +119,15 @@ export function PipelineColumn({
         height: '100%',
         overflow: 'hidden',
         position: 'relative',
-        transform: CSS.Transform.toString(transform),
-        transition: transition ?? 'border-color 150ms, background 150ms',
-        opacity: isDragging ? 0.4 : 1,
+        transform: dragTransform,
+        transition: composedTransition,
+        opacity: isDragging ? 0.92 : 1,
+        boxShadow: isDragging
+          ? '0 16px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04)'
+          : 'none',
+        zIndex: isDragging ? 20 : 1,
+        // Mientras se arrastra, queremos cursor "grabbing" en toda la columna.
+        cursor: isDragging ? 'grabbing' : undefined,
       }}
     >
       {/* Header — todo en una línea cuando hay espacio */}
@@ -235,6 +275,7 @@ export function PipelineColumn({
         <ResizeHandle
           currentWidth={width}
           onResize={onResize}
+          onResizeStateChange={setIsResizing}
           accentColor={accentBar}
         />
       )}
@@ -245,10 +286,12 @@ export function PipelineColumn({
 function ResizeHandle({
   currentWidth,
   onResize,
+  onResizeStateChange,
   accentColor,
 }: {
   currentWidth: number;
   onResize: (newWidth: number) => void;
+  onResizeStateChange?: (resizing: boolean) => void;
   accentColor: string;
 }) {
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -256,20 +299,32 @@ function ResizeHandle({
     e.stopPropagation();
     const startX = e.clientX;
     const startWidth = currentWidth;
+    let frame = 0;
+
+    onResizeStateChange?.(true);
 
     const onMove = (ev: MouseEvent) => {
-      const delta = ev.clientX - startX;
-      const next = Math.max(
-        COL_MIN_WIDTH,
-        Math.min(COL_MAX_WIDTH, startWidth + delta),
-      );
-      onResize(next);
+      // Throttle a animation frames: el setState por mousemove dispara
+      // re-renders muy seguido y el resize se siente "tembloroso". Con
+      // rAF garantizamos un sólo update por frame visible.
+      if (frame) cancelAnimationFrame(frame);
+      const clientX = ev.clientX;
+      frame = requestAnimationFrame(() => {
+        const delta = clientX - startX;
+        const next = Math.max(
+          COL_MIN_WIDTH,
+          Math.min(COL_MAX_WIDTH, startWidth + delta),
+        );
+        onResize(next);
+      });
     };
     const onUp = () => {
+      if (frame) cancelAnimationFrame(frame);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      onResizeStateChange?.(false);
     };
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
@@ -283,26 +338,39 @@ function ResizeHandle({
       style={{
         position: 'absolute',
         top: 0,
-        right: -2,
-        width: 6,
+        right: -3,
+        width: 8,
         height: '100%',
         cursor: 'col-resize',
         zIndex: 5,
-        // Hover bar visual — sólo aparece al hover.
-        background: 'transparent',
-        transition: 'background 100ms',
+        // Pintamos una barra fina centrada que se hace visible en hover.
+        // El elemento exterior es más ancho (8px) para hit area cómoda;
+        // el inner div es la línea que el usuario "ve".
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'stretch',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = accentColor;
-        e.currentTarget.style.opacity = '0.5';
+        const inner = e.currentTarget.firstElementChild as HTMLDivElement | null;
+        if (inner) inner.style.opacity = '0.55';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.opacity = '1';
+        const inner = e.currentTarget.firstElementChild as HTMLDivElement | null;
+        if (inner) inner.style.opacity = '0';
       }}
       aria-label="Redimensionar columna"
       role="separator"
-    />
+    >
+      <div
+        style={{
+          width: 2,
+          background: accentColor,
+          opacity: 0,
+          transition: `opacity 140ms ${SMOOTH_EASE}`,
+          borderRadius: 2,
+        }}
+      />
+    </div>
   );
 }
 

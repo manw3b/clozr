@@ -37,7 +37,14 @@ export async function openExternal(url: string): Promise<void> {
   }
 }
 
-/** Abre WhatsApp con un teléfono argentino. Normaliza a formato internacional. */
+/**
+ * Abre WhatsApp con un teléfono argentino. Normaliza a formato internacional.
+ *
+ * Estrategia: intenta primero el deep link `whatsapp://send?...` que abre
+ * WhatsApp Desktop directo si está instalado. Si la app no está registrada
+ * como URL handler (ej: usuario sin WhatsApp Desktop), cae a `wa.me/<num>`
+ * que sí abre en navegador → WhatsApp Web.
+ */
 export async function openWhatsApp(
   phone: string,
   message?: string,
@@ -45,10 +52,26 @@ export async function openWhatsApp(
   const num = phone.replace(/\D/g, "");
   // Argentina: si no arranca con 54, lo prepended
   const final = num.startsWith("54") ? num : `54${num}`;
-  const url = message
+  const textParam = message ? `&text=${encodeURIComponent(message)}` : "";
+
+  // 1) Deep link a la app
+  const deepLink = `whatsapp://send?phone=${final}${textParam}`;
+  try {
+    await openUrl(deepLink);
+    return;
+  } catch (err) {
+    log.warn("WhatsApp Desktop no está disponible, abriendo wa.me", {
+      scope: "opener",
+      data: { deepLink },
+      err,
+    });
+  }
+
+  // 2) Fallback: navegador → WhatsApp Web
+  const webUrl = message
     ? `https://wa.me/${final}?text=${encodeURIComponent(message)}`
     : `https://wa.me/${final}`;
-  await openExternal(url);
+  await openExternal(webUrl);
 }
 
 /** Discador del SO. */

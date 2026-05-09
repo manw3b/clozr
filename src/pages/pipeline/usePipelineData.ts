@@ -47,3 +47,49 @@ export function useMoveLead() {
     onSettled: () => invalidate.afterLeadChange(qc),
   });
 }
+
+/** Pospone la próxima acción de un lead. Acepta días desde ahora. La hora
+ *  se mantiene si ya había una; si no, default 10:00. */
+export function useSnoozeLead() {
+  const qc = useQueryClient();
+  const { activeWorkspace } = useWorkspaceStore();
+  const wid = activeWorkspace?.id ?? "";
+  return useMutation({
+    mutationFn: async ({ leadId, days }: { leadId: string; days: number }) => {
+      // Lead actual (para preservar la hora si ya había)
+      const cur = qc.getQueryData<Lead[]>(qk.pipelineLeads(wid))?.find((l) => l.id === leadId);
+      const target = new Date();
+      if (cur?.nextActionAt) {
+        const prev = new Date(cur.nextActionAt);
+        target.setHours(prev.getHours(), prev.getMinutes(), 0, 0);
+      } else {
+        target.setHours(10, 0, 0, 0);
+      }
+      target.setDate(target.getDate() + days);
+      // ISO sin segundos ni TZ — formato compatible con next_action_at del schema
+      const yyyy = target.getFullYear();
+      const mm = String(target.getMonth() + 1).padStart(2, "0");
+      const dd = String(target.getDate()).padStart(2, "0");
+      const hh = String(target.getHours()).padStart(2, "0");
+      const mi = String(target.getMinutes()).padStart(2, "0");
+      const iso = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+      await pipelineDb.snooze(leadId, iso);
+      return iso;
+    },
+    onSettled: () => invalidate.afterLeadChange(qc),
+  });
+}
+
+/** Agrega una nota como activity al pipeline_item. */
+export function useAddLeadNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ leadId, text }: { leadId: string; text: string }) => {
+      await pipelineDb.addActivity(leadId, {
+        type: "note",
+        description: text,
+      });
+    },
+    onSettled: () => invalidate.afterLeadChange(qc),
+  });
+}

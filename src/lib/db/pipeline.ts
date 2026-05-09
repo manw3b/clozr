@@ -120,6 +120,16 @@ export async function closeItem(id: string, status: "won" | "lost"): Promise<voi
   );
 }
 
+/** Pospone la próxima acción del lead a `nextActionAt` (ISO string). Si
+ *  ya había un label de próxima acción, se mantiene. */
+export async function snooze(id: string, nextActionAt: string): Promise<void> {
+  const now = new Date().toISOString();
+  await dbExecute(
+    "UPDATE pipeline_items SET next_action_at = ?, updated_at = ? WHERE id = ?",
+    [nextActionAt, now, id],
+  );
+}
+
 export async function addActivity(
   itemId: string,
   data: CreateActivityInput,
@@ -197,6 +207,7 @@ export const pipelineDb = {
   create,
   updateStage,
   closeItem,
+  snooze,
   addActivity,
   getActivities,
   getUrgent,

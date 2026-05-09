@@ -22,7 +22,7 @@ import { SortableLeadCard } from './components/SortableLeadCard';
 import { PipelineColumn, ColumnEmpty } from './components/PipelineColumn';
 import { PipelineMetrics } from './components/PipelineMetrics';
 import { groupLeadsByStage } from '../../lib/groupings';
-import { usePipelineLeads, useMoveLead } from './usePipelineData';
+import { usePipelineLeads, useMoveLead, useSnoozeLead, useAddLeadNote } from './usePipelineData';
 import { useClientDetail, useRecordContact, useClientsList } from '../clientes/useClientsData';
 import { useUIStore } from '../../store/uiStore';
 import { useExchangeRateStore } from '../../store/exchangeRateStore';
@@ -43,6 +43,8 @@ const priorityFilters = [
 export function Pipeline() {
   const { data: dbLeads = [] } = usePipelineLeads();
   const moveLeadMut = useMoveLead();
+  const snoozeLeadMut = useSnoozeLead();
+  const addNoteMut = useAddLeadNote();
   const { setActiveScreen, showToast } = useUIStore();
   const recordContactMut = useRecordContact();
   const { data: allClients = [] } = useClientsList();
@@ -203,9 +205,21 @@ export function Pipeline() {
       return prev;
     });
 
-    // Persist stage change to SQLite
+    // Persist stage change to SQLite. Confirm si se mueve a "perdido"
+    // — fácil hacerlo por accidente con el drag.
     const movedLead = leads.find((l) => l.id === activeId);
     if (movedLead) {
+      if (movedLead.stage === 'perdido') {
+        const ok = window.confirm(
+          `¿Marcar el lead de ${movedLead.clientName} como perdido?`,
+        );
+        if (!ok) {
+          // Revertir el optimistic update local — descartamos los cambios
+          // visuales del drag y dejamos que el próximo render use dbLeads.
+          setLocalLeads(null);
+          return;
+        }
+      }
       moveLeadMut.mutate({ leadId: activeId, newStage: movedLead.stage });
     }
   }
@@ -329,6 +343,20 @@ export function Pipeline() {
                         onConvertToSale={startConvertToSale}
                         onChangeStage={(l, newStage) => {
                           moveLeadMut.mutate({ leadId: l.id, newStage });
+                          if (newStage === 'cerrado') {
+                            showToast(`${l.clientName} marcado como ganado 🎯`, 'success');
+                          } else if (newStage === 'perdido') {
+                            showToast(`${l.clientName} marcado como perdido`);
+                          }
+                        }}
+                        onSnooze={(l, days) => {
+                          snoozeLeadMut.mutate({ leadId: l.id, days });
+                          const labels: Record<number, string> = { 1: 'mañana', 3: 'en 3 días', 7: 'en 1 semana' };
+                          showToast(`Pospuesto ${labels[days] ?? `+${days} días`}`, 'success');
+                        }}
+                        onAddNote={(l, text) => {
+                          addNoteMut.mutate({ leadId: l.id, text });
+                          showToast('Nota agregada', 'success');
                         }}
                       />
                     ))

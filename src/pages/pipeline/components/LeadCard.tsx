@@ -10,6 +10,10 @@ import {
   ArrowRight,
   Trophy,
   XCircle,
+  Clock3,
+  StickyNote,
+  Check,
+  X as XIcon,
 } from 'lucide-react';
 import { WhatsAppIcon } from '../../../components/icons/WhatsAppIcon';
 import { Avatar } from '../../../components/Avatar';
@@ -43,6 +47,10 @@ interface LeadCardProps {
   onConvertToSale?: (lead: Lead) => void;
   /** Mover el lead a otra etapa sin drag (alternativa táctil/teclado). */
   onChangeStage?: (lead: Lead, newStage: LeadStage) => void;
+  /** Pospone la próxima acción del lead `days` días desde ahora. */
+  onSnooze?: (lead: Lead, days: number) => void;
+  /** Agrega una nota libre al activity log del lead. */
+  onAddNote?: (lead: Lead, text: string) => void;
   /** Listeners y attributes del DnD-kit (sortable) */
   dragHandleProps?: DragHandleProps;
   /** Style externo (transformación durante drag) */
@@ -58,7 +66,7 @@ interface LeadCardProps {
  * - El "isOverlay" se usa para el preview que sigue al cursor — se ve más sólido
  */
 export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadCard(
-  { lead, isDragging, isOverlay, onClick, onWhatsApp, onCall, onConvertToSale, onChangeStage, dragHandleProps, style },
+  { lead, isDragging, isOverlay, onClick, onWhatsApp, onCall, onConvertToSale, onChangeStage, onSnooze, onAddNote, dragHandleProps, style },
   ref
 ) {
   const stuckDays = lead.stageChangedAt
@@ -76,8 +84,12 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
       style={{
         background: color.surface,
         border: `1px solid ${isHot ? color.primary : color.border}`,
+        // Indicador stuck: borde izquierdo grueso warning para que llame
+        // la atención sin romper la grid de la card
+        borderLeft: isStuck && !isHot ? `3px solid ${color.warning}` : `1px solid ${color.border}`,
         borderRadius: radius.md,
         padding: space[3],
+        paddingLeft: isStuck && !isHot ? `calc(${space[3]} - 2px)` : space[3],
         display: 'flex',
         flexDirection: 'column',
         gap: space[2],
@@ -226,8 +238,8 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
         <span
           style={{
             fontSize: text.xs,
-            color: color.textDim,
-            fontWeight: weight.medium,
+            color: isStuck ? color.warning : color.textDim,
+            fontWeight: isStuck ? weight.semibold : weight.medium,
           }}
         >
           {stuckDays === 0 ? 'hoy' : `${stuckDays}d en etapa`}
@@ -265,8 +277,13 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
           >
             <Phone size={13} strokeWidth={2.2} />
           </CardActionBtn>
-          {onChangeStage && (
-            <QuickActionsMenu lead={lead} onChangeStage={onChangeStage} />
+          {(onChangeStage || onSnooze || onAddNote) && (
+            <QuickActionsMenu
+              lead={lead}
+              onChangeStage={onChangeStage}
+              onSnooze={onSnooze}
+              onAddNote={onAddNote}
+            />
           )}
         </div>
       </div>
@@ -282,11 +299,16 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
 function QuickActionsMenu({
   lead,
   onChangeStage,
+  onSnooze,
+  onAddNote,
 }: {
   lead: Lead;
-  onChangeStage: (lead: Lead, stage: LeadStage) => void;
+  onChangeStage?: (lead: Lead, stage: LeadStage) => void;
+  onSnooze?: (lead: Lead, days: number) => void;
+  onAddNote?: (lead: Lead, text: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [noteInput, setNoteInput] = useState<string | null>(null); // null = no abierto
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -294,10 +316,14 @@ function QuickActionsMenu({
     function onClickOutside(e: MouseEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
         setOpen(false);
+        setNoteInput(null);
       }
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        setNoteInput(null);
+      }
     }
     document.addEventListener('mousedown', onClickOutside);
     document.addEventListener('keydown', onKey);
@@ -308,14 +334,29 @@ function QuickActionsMenu({
   }, [open]);
 
   function moveTo(stage: LeadStage) {
-    if (stage !== lead.stage) onChangeStage(lead, stage);
+    if (stage === 'perdido') {
+      // Confirm para evitar perder un lead por accidente (cubre tanto drag
+      // como acceso por menú — el drag-confirm va en Pipeline.tsx)
+      if (!window.confirm(`¿Marcar el lead de ${lead.clientName} como perdido?`)) return;
+    }
+    if (onChangeStage && stage !== lead.stage) onChangeStage(lead, stage);
+    setOpen(false);
+  }
+
+  function snooze(days: number) {
+    onSnooze?.(lead, days);
+    setOpen(false);
+  }
+
+  function commitNote() {
+    const t = (noteInput ?? '').trim();
+    if (t.length > 0) onAddNote?.(lead, t);
+    setNoteInput(null);
     setOpen(false);
   }
 
   // Stages disponibles para mover (excluye la actual)
   const moveOptions = STAGES.filter((s) => !s.terminal && s.id !== lead.stage);
-  const wonStage = STAGES.find((s) => s.id === 'cerrado');
-  const lostStage = STAGES.find((s) => s.id === 'perdido');
 
   return (
     <div ref={wrapRef} style={{ position: 'relative' }}>
@@ -324,6 +365,7 @@ function QuickActionsMenu({
         onClick={(e) => {
           e.stopPropagation();
           setOpen((v) => !v);
+          setNoteInput(null);
         }}
       >
         <MoreVertical size={13} strokeWidth={2.2} />
@@ -338,7 +380,7 @@ function QuickActionsMenu({
             top: 'calc(100% + 4px)',
             right: 0,
             zIndex: 30,
-            minWidth: 200,
+            minWidth: 220,
             background: color.surface,
             border: `1px solid ${color.borderStrong}`,
             borderRadius: radius.md,
@@ -348,31 +390,124 @@ function QuickActionsMenu({
             flexDirection: 'column',
           }}
         >
-          {moveOptions.length > 0 && (
+          {/* Add note inline (cuando se abre, reemplaza el menú normal) */}
+          {noteInput !== null ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 6 }}>
+              <textarea
+                autoFocus
+                value={noteInput}
+                onChange={(e) => setNoteInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) commitNote();
+                }}
+                placeholder="Agregar nota… (Cmd+Enter para guardar)"
+                style={{
+                  width: '100%',
+                  minHeight: 64,
+                  padding: space[2],
+                  background: color.surface2,
+                  border: `1px solid ${color.border}`,
+                  borderRadius: radius.sm,
+                  color: color.text,
+                  fontSize: text.sm,
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                  resize: 'vertical',
+                }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
+                <button
+                  onClick={() => setNoteInput(null)}
+                  style={{
+                    padding: `4px 8px`,
+                    fontSize: text.xs,
+                    color: color.textMuted,
+                    background: 'transparent',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <XIcon size={12} />
+                </button>
+                <button
+                  onClick={commitNote}
+                  disabled={(noteInput ?? '').trim().length === 0}
+                  style={{
+                    padding: `4px 10px`,
+                    fontSize: text.xs,
+                    fontWeight: weight.semibold,
+                    color: '#fff',
+                    background: color.primary,
+                    borderRadius: radius.sm,
+                    cursor: 'pointer',
+                    opacity: (noteInput ?? '').trim().length === 0 ? 0.5 : 1,
+                  }}
+                >
+                  <Check size={12} />
+                </button>
+              </div>
+            </div>
+          ) : (
             <>
-              <MenuLabel>Mover a</MenuLabel>
-              {moveOptions.map((s) => (
-                <MenuItem key={s.id} onClick={() => moveTo(s.id)}>
-                  <ArrowRight size={12} color={color.textDim} />
-                  {s.label}
-                </MenuItem>
-              ))}
-            </>
-          )}
-          {(wonStage || lostStage) && (
-            <>
-              <Divider />
-              {lead.stage !== 'cerrado' && wonStage && (
-                <MenuItem tone="success" onClick={() => moveTo('cerrado')}>
-                  <Trophy size={12} />
-                  Marcar como ganado
-                </MenuItem>
+              {/* Quick actions */}
+              {(onAddNote || onSnooze) && (
+                <>
+                  {onAddNote && (
+                    <MenuItem onClick={() => setNoteInput('')}>
+                      <StickyNote size={12} />
+                      Agregar nota
+                    </MenuItem>
+                  )}
+                  {onSnooze && (
+                    <>
+                      <MenuLabel>Posponer</MenuLabel>
+                      <MenuItem onClick={() => snooze(1)}>
+                        <Clock3 size={12} color={color.textDim} />
+                        +1 día
+                      </MenuItem>
+                      <MenuItem onClick={() => snooze(3)}>
+                        <Clock3 size={12} color={color.textDim} />
+                        +3 días
+                      </MenuItem>
+                      <MenuItem onClick={() => snooze(7)}>
+                        <Clock3 size={12} color={color.textDim} />
+                        +1 semana
+                      </MenuItem>
+                    </>
+                  )}
+                </>
               )}
-              {lead.stage !== 'perdido' && lostStage && (
-                <MenuItem tone="danger" onClick={() => moveTo('perdido')}>
-                  <XCircle size={12} />
-                  Marcar como perdido
-                </MenuItem>
+
+              {/* Mover a */}
+              {onChangeStage && moveOptions.length > 0 && (
+                <>
+                  <Divider />
+                  <MenuLabel>Mover a</MenuLabel>
+                  {moveOptions.map((s) => (
+                    <MenuItem key={s.id} onClick={() => moveTo(s.id)}>
+                      <ArrowRight size={12} color={color.textDim} />
+                      {s.label}
+                    </MenuItem>
+                  ))}
+                </>
+              )}
+
+              {/* Marcar como ganado/perdido */}
+              {onChangeStage && (
+                <>
+                  <Divider />
+                  {lead.stage !== 'cerrado' && (
+                    <MenuItem tone="success" onClick={() => moveTo('cerrado')}>
+                      <Trophy size={12} />
+                      Marcar como ganado
+                    </MenuItem>
+                  )}
+                  {lead.stage !== 'perdido' && (
+                    <MenuItem tone="danger" onClick={() => moveTo('perdido')}>
+                      <XCircle size={12} />
+                      Marcar como perdido
+                    </MenuItem>
+                  )}
+                </>
               )}
             </>
           )}

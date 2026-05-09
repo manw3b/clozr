@@ -484,8 +484,36 @@ function PipelineSection({ wid }: { wid: string }) {
     update(arr.map((s, i) => ({ ...s, stage_order: i })));
   };
 
-  const handleDelete = (id: string) =>
+  const handleDelete = (id: string) => {
+    const target = stages.find((s) => s.id === id);
+    if (!target) return;
+    // Protección: no podés quedarte sin etapa "ganado" o "perdido", porque
+    // luego no hay UI para marcar una etapa con esos flags más allá de este
+    // panel — y desde acá no sabrías cómo recrearla con el flag correcto.
+    if (target.is_won === 1 && stages.filter((s) => s.is_won === 1).length === 1) {
+      showToast("Necesitás al menos una etapa marcada como ‘Ganado’", "error");
+      return;
+    }
+    if (target.is_lost === 1 && stages.filter((s) => s.is_lost === 1).length === 1) {
+      showToast("Necesitás al menos una etapa marcada como ‘Perdido’", "error");
+      return;
+    }
     update(stages.filter((s) => s.id !== id).map((s, i) => ({ ...s, stage_order: i })));
+  };
+
+  /**
+   * Cicla una etapa entre normal → ganado → perdido → normal.
+   * Mutuamente excluyente: si pasás a ganado, le sacamos lost (y viceversa).
+   */
+  const handleToggleResult = (id: string) =>
+    update(
+      stages.map((s) => {
+        if (s.id !== id) return s;
+        if (s.is_won === 0 && s.is_lost === 0) return { ...s, is_won: 1, is_lost: 0 };
+        if (s.is_won === 1) return { ...s, is_won: 0, is_lost: 1 };
+        return { ...s, is_won: 0, is_lost: 0 };
+      }),
+    );
 
   const handleAdd = () =>
     update([
@@ -586,16 +614,36 @@ function PipelineSection({ wid }: { wid: string }) {
               }}
             />
 
-            {/* Won/lost badge */}
-            {(stage.is_won === 1 || stage.is_lost === 1) && (
-              <span style={{
-                fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 4, flexShrink: 0,
-                background: stage.is_won ? "rgba(48,209,88,0.15)" : "rgba(232,0,29,0.15)",
-                color: stage.is_won ? "var(--success)" : "var(--primary)",
-              }}>
-                {stage.is_won ? "Ganado" : "Perdido"}
-              </span>
-            )}
+            {/* Won/lost toggle — click cicla normal → ganado → perdido → normal */}
+            <button
+              onClick={() => handleToggleResult(stage.id)}
+              title="Marcar como etapa de cierre (ganado/perdido)"
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                padding: "3px 8px",
+                borderRadius: 4,
+                flexShrink: 0,
+                cursor: "pointer",
+                minWidth: 64,
+                textAlign: "center",
+                background:
+                  stage.is_won === 1
+                    ? "rgba(48,209,88,0.15)"
+                    : stage.is_lost === 1
+                    ? "rgba(232,0,29,0.15)"
+                    : "var(--surface-2)",
+                color:
+                  stage.is_won === 1
+                    ? "var(--success)"
+                    : stage.is_lost === 1
+                    ? "var(--primary)"
+                    : "var(--text-dim)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              {stage.is_won === 1 ? "Ganado" : stage.is_lost === 1 ? "Perdido" : "Normal"}
+            </button>
 
             {/* Delete */}
             <button

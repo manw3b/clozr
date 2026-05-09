@@ -1,4 +1,4 @@
-import { dbSelect, dbExecute, getDb } from "./index";
+import { dbSelect, dbExecute, getDb, withDbRetry } from "./index";
 import type { PipelineStage, CustomerTypeRow, CatalogCategoryRow } from "./types";
 
 // ── Pipeline stages ──────────────────────────────────────────────────
@@ -37,31 +37,33 @@ export async function getPipelineStages(workspaceId: string): Promise<PipelineSt
 }
 
 export async function savePipelineStages(workspaceId: string, stages: PipelineStage[]): Promise<void> {
-  const db = await getDb();
-  try {
-    await db.execute("BEGIN", []);
-    for (const s of stages) {
-      await db.execute(
-        `INSERT OR REPLACE INTO pipeline_stages
-         (id, workspace_id, name, stage_order, color, is_won, is_lost, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-        [s.id, workspaceId, s.name, s.stage_order, s.color, s.is_won, s.is_lost],
-      );
+  await withDbRetry(async () => {
+    const db = await getDb();
+    try {
+      await db.execute("BEGIN IMMEDIATE", []);
+      for (const s of stages) {
+        await db.execute(
+          `INSERT OR REPLACE INTO pipeline_stages
+           (id, workspace_id, name, stage_order, color, is_won, is_lost, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+          [s.id, workspaceId, s.name, s.stage_order, s.color, s.is_won, s.is_lost],
+        );
+      }
+      if (stages.length > 0) {
+        const placeholders = stages.map(() => "?").join(",");
+        await db.execute(
+          `DELETE FROM pipeline_stages WHERE workspace_id = ? AND id NOT IN (${placeholders})`,
+          [workspaceId, ...stages.map((s) => s.id)],
+        );
+      } else {
+        await db.execute("DELETE FROM pipeline_stages WHERE workspace_id = ?", [workspaceId]);
+      }
+      await db.execute("COMMIT", []);
+    } catch (e) {
+      await db.execute("ROLLBACK", []).catch(() => {});
+      throw new Error(`Error al guardar etapas: ${e instanceof Error ? e.message : String(e)}`);
     }
-    if (stages.length > 0) {
-      const placeholders = stages.map(() => "?").join(",");
-      await db.execute(
-        `DELETE FROM pipeline_stages WHERE workspace_id = ? AND id NOT IN (${placeholders})`,
-        [workspaceId, ...stages.map((s) => s.id)],
-      );
-    } else {
-      await db.execute("DELETE FROM pipeline_stages WHERE workspace_id = ?", [workspaceId]);
-    }
-    await db.execute("COMMIT", []);
-  } catch (e) {
-    await db.execute("ROLLBACK", []).catch(() => {});
-    throw new Error(`Error al guardar etapas: ${e instanceof Error ? e.message : String(e)}`);
-  }
+  });
 }
 
 // ── Customer types ──────────────────────────────────────────────────

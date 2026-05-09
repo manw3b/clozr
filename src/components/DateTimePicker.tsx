@@ -1,7 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar, Clock, X } from 'lucide-react';
 import { Button } from './Button';
 import { color, radius, space, text, weight, duration, ease } from '../tokens';
+
+/** Tamaño nominal del popover — usado para decidir flip up/down y left/right.
+ *  Conviene mantener sincronizado con el contenido real (margen de error ~30px). */
+const POPOVER_W = 320;
+const POPOVER_H = 380;
 
 /**
  * DateTimePicker — popover propio con presets + tiempo + confirm.
@@ -39,6 +45,9 @@ export function DateTimePicker({
   const [draftHour, setDraftHour] = useState(defaultHour);
   const [draftMinute, setDraftMinute] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; placement: 'top' | 'bottom' } | null>(null);
 
   // Sincronizar drafts cuando se abre el popover
   useEffect(() => {
@@ -56,13 +65,54 @@ export function DateTimePicker({
     }
   }, [open, value, defaultHour]);
 
+  // Calcular posición del popover según el rect del trigger y el viewport.
+  // Flip vertical (top vs bottom) si no entra abajo, y clamp horizontal a
+  // los bordes del viewport.
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    function reposition() {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const margin = 8;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const placement: 'top' | 'bottom' =
+        spaceBelow < POPOVER_H + margin && spaceAbove > spaceBelow ? 'top' : 'bottom';
+
+      let top =
+        placement === 'bottom' ? rect.bottom + margin : rect.top - POPOVER_H - margin;
+      // Clamp vertical para no salirse del viewport
+      top = Math.max(8, Math.min(top, window.innerHeight - POPOVER_H - 8));
+
+      let left = rect.left;
+      // Si no entra a la derecha, alineamos el borde derecho del popover al
+      // borde derecho del trigger (típico cuando el trigger está cerca del
+      // borde derecho de la pantalla).
+      if (left + POPOVER_W > window.innerWidth - 8) {
+        left = rect.right - POPOVER_W;
+      }
+      left = Math.max(8, left);
+
+      setPos({ top, left, placement });
+    }
+    reposition();
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true); // capture: scroll en cualquier ancestor
+    return () => {
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+    };
+  }, [open]);
+
   // Click outside / Esc cierra
   useEffect(() => {
     if (!open) return;
     function onClickOutside(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      const inTrigger = wrapRef.current?.contains(target);
+      const inPopover = popoverRef.current?.contains(target);
+      if (!inTrigger && !inPopover) setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false);
@@ -106,6 +156,7 @@ export function DateTimePicker({
     <div ref={wrapRef} style={{ position: 'relative' }}>
       {/* Trigger — estilo Input */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         style={{
@@ -152,16 +203,18 @@ export function DateTimePicker({
         )}
       </button>
 
-      {/* Popover */}
-      {open && (
+      {/* Popover — renderizado por portal a document.body para escapar
+          el overflow del modal. Posición calculada en layout effect. */}
+      {open && pos && createPortal(
         <div
+          ref={popoverRef}
           role="dialog"
           style={{
-            position: 'absolute',
-            top: 'calc(100% + 6px)',
-            left: 0,
-            zIndex: 60,
-            width: 320,
+            position: 'fixed',
+            top: pos.top,
+            left: pos.left,
+            zIndex: 1000,
+            width: POPOVER_W,
             background: color.surface,
             border: `1px solid ${color.borderStrong}`,
             borderRadius: radius.md,
@@ -258,7 +311,8 @@ export function DateTimePicker({
               </Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

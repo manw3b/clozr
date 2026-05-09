@@ -12,28 +12,27 @@
  * en navegador puro durante dev sin tauri dev).
  */
 
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { log } from "./logger";
 
-let openerCache: Promise<typeof import("@tauri-apps/plugin-opener")> | null = null;
-
-async function getOpener() {
-  if (!openerCache) {
-    openerCache = import("@tauri-apps/plugin-opener");
-  }
-  return openerCache;
-}
-
-/** Abre cualquier URL externa con la app default del SO. */
+/** Abre cualquier URL externa con la app default del SO.
+ *  Si el plugin falla (ej: corriendo en navegador puro), cae a window.open
+ *  como fallback — en Tauri esto NO va a abrir realmente la URL externa,
+ *  pero al menos loggeamos el error con detalle. */
 export async function openExternal(url: string): Promise<void> {
   try {
-    const { openUrl } = await getOpener();
     await openUrl(url);
   } catch (err) {
-    log.warn("openUrl failed, falling back to window.open", { scope: "opener", err });
+    log.error("openUrl falló — la URL no se va a abrir", {
+      scope: "opener",
+      data: { url },
+      err,
+    });
+    // Fallback (solo útil fuera de Tauri):
     try {
       window.open(url, "_blank");
     } catch {
-      /* ignore — no podemos hacer más */
+      /* ignore */
     }
   }
 }

@@ -150,6 +150,46 @@ export async function scanInactiveCustomers(
   return created;
 }
 
+/**
+ * Crea un followup automático cuando un lead cambia de etapa en el pipeline.
+ * Idempotente por (customer_id + same-day): si ya hay un auto-stage hoy
+ * para ese cliente, se skipea — evita ráfaga de followups si el vendedor
+ * mueve el lead varias veces seguidas.
+ */
+export async function createStageFollowup(
+  workspaceId: string,
+  businessId: string,
+  customerId: string,
+  customerName: string,
+  text: string,
+  daysAfter: number,
+): Promise<void> {
+  if (!customerId) return;
+  const existing = await dbSelect<{ id: string }>(
+    `SELECT id FROM followups
+     WHERE workspace_id = ?
+       AND customer_id = ?
+       AND kind = 'auto-stage'
+       AND completed = 0
+       AND date(created_at) = date('now')
+     LIMIT 1`,
+    [workspaceId, customerId],
+  ).catch(() => [] as Array<{ id: string }>);
+  if (existing.length > 0) return;
+
+  const due = new Date();
+  due.setDate(due.getDate() + daysAfter);
+  const dueIso = due.toISOString().slice(0, 10);
+
+  await create(workspaceId, businessId, {
+    customer_id: customerId,
+    customer_name: customerName,
+    text,
+    due_date: dueIso,
+    kind: "auto-stage",
+  });
+}
+
 export const followupsDb = {
   getForDay,
   getAll,
@@ -157,5 +197,6 @@ export const followupsDb = {
   toggleComplete,
   remove,
   createPostSaleFollowup,
+  createStageFollowup,
   scanInactiveCustomers,
 };

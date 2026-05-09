@@ -33,7 +33,13 @@ export interface CashMovement {
   created_at: string;
 }
 
-export type FollowupKind = "manual" | "auto-postsale" | "auto-inactive" | "cobro-pendiente";
+export type FollowupKind =
+  | "manual"
+  | "auto-postsale"
+  | "auto-inactive"
+  | "cobro-pendiente"
+  /** Generado automáticamente cuando un lead cambia de etapa en el pipeline. */
+  | "auto-stage";
 
 export interface Followup {
   id: string;

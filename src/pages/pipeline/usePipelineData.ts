@@ -1,9 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceStore } from "../../store/workspaceStore";
+import { useBusinessStore } from "../../store/businessStore";
 import { pipelineDb } from "../../lib/db/pipeline";
+import { followupsDb } from "../../lib/db/followups";
 import { dbItemToLead } from "../../lib/mappers";
 import { qk, invalidate } from "../../lib/queryKeys";
 import { STAGES } from "../../types/domain";
+import { followupForStage } from "../../lib/stageFollowups";
 import type { Lead, LeadStage } from "../../types/domain";
 
 export function usePipelineLeads() {
@@ -22,7 +25,9 @@ export function usePipelineLeads() {
 export function useMoveLead() {
   const qc = useQueryClient();
   const { activeWorkspace } = useWorkspaceStore();
+  const { activeBusiness } = useBusinessStore();
   const wid = activeWorkspace?.id ?? "";
+  const bid = activeBusiness?.id ?? "";
 
   return useMutation({
     mutationFn: async ({ leadId, newStage }: { leadId: string; newStage: LeadStage }) => {
@@ -30,6 +35,18 @@ export function useMoveLead() {
       const stageOrder = STAGES.findIndex((s) => s.id === newStage);
       if (!stageConfig) return;
       await pipelineDb.updateStage(leadId, newStage, stageConfig.label, stageOrder);
+
+      // Auto-followup según la nueva etapa. Best-effort: si falla no
+      // queremos romper el move (la persistencia del stage ya está hecha).
+      const lead = qc.getQueryData<Lead[]>(qk.pipelineLeads(wid))?.find((l) => l.id === leadId);
+      if (lead && lead.clientId && bid) {
+        const cfg = followupForStage(newStage, lead.clientName);
+        if (cfg) {
+          await followupsDb
+            .createStageFollowup(wid, bid, lead.clientId, lead.clientName, cfg.text, cfg.days)
+            .catch(() => {});
+        }
+      }
     },
     onMutate: async ({ leadId, newStage }) => {
       await qc.cancelQueries({ queryKey: qk.pipelineLeads(wid) });

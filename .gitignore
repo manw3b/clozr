@@ -40,3 +40,23 @@ assets_generales/
 
 # Test coverage
 coverage/
+
+# ─── DATOS DE USUARIO — NUNCA en el repo ─────────────────────────────
+# Los datos de cada negocio (clientes, ventas, deudas, inventario) viven
+# en clozr.db en el AppData del SO de cada usuario. Esos datos son del
+# DUEÑO del negocio, no del repositorio de código. Clozr (la app) es
+# independiente de los datos que cada usuario carga.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+# Backups generados por la propia app (Settings → Datos y backup)
+backups/
+*.bak
+# CSV / vCard exports que el user puede generar para llevarse su data
+clientes-*.csv
+ventas-*.csv
+deudas-*.csv
+*.vcf

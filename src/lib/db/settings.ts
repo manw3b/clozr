@@ -1,4 +1,4 @@
-import { dbSelect, dbExecute, getDb, withDbRetry } from "./index";
+import { dbSelect, dbExecute, runWrite } from "./index";
 import type { PipelineStage, CustomerTypeRow, CatalogCategoryRow } from "./types";
 
 // ── Pipeline stages ──────────────────────────────────────────────────
@@ -36,13 +36,15 @@ export async function getPipelineStages(workspaceId: string): Promise<PipelineSt
   );
 }
 
+// Sin BEGIN/COMMIT manuales: tauri-plugin-sql envuelve cada execute en su
+// propia tx (ver `sales.ts` BUG 2 FIX). El runWrite serializa la secuencia
+// completa para que dos guardados no se pisen y que el upsert + delete
+// orphan corran en orden previsible.
 export async function savePipelineStages(workspaceId: string, stages: PipelineStage[]): Promise<void> {
-  await withDbRetry(async () => {
-    const db = await getDb();
+  await runWrite(async () => {
     try {
-      await db.execute("BEGIN IMMEDIATE", []);
       for (const s of stages) {
-        await db.execute(
+        await dbExecute(
           `INSERT OR REPLACE INTO pipeline_stages
            (id, workspace_id, name, stage_order, color, is_won, is_lost, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
@@ -51,16 +53,14 @@ export async function savePipelineStages(workspaceId: string, stages: PipelineSt
       }
       if (stages.length > 0) {
         const placeholders = stages.map(() => "?").join(",");
-        await db.execute(
+        await dbExecute(
           `DELETE FROM pipeline_stages WHERE workspace_id = ? AND id NOT IN (${placeholders})`,
           [workspaceId, ...stages.map((s) => s.id)],
         );
       } else {
-        await db.execute("DELETE FROM pipeline_stages WHERE workspace_id = ?", [workspaceId]);
+        await dbExecute("DELETE FROM pipeline_stages WHERE workspace_id = ?", [workspaceId]);
       }
-      await db.execute("COMMIT", []);
     } catch (e) {
-      await db.execute("ROLLBACK", []).catch(() => {});
       throw new Error(`Error al guardar etapas: ${e instanceof Error ? e.message : String(e)}`);
     }
   });
@@ -95,31 +95,29 @@ export async function getCustomerTypes(workspaceId: string): Promise<CustomerTyp
 }
 
 export async function saveCustomerTypes(workspaceId: string, types: CustomerTypeRow[]): Promise<void> {
-  const db = await getDb();
-  try {
-    await db.execute("BEGIN", []);
-    for (const t of types) {
-      await db.execute(
-        `INSERT OR REPLACE INTO customer_types
-         (id, workspace_id, name, description, color, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [t.id, workspaceId, t.name, t.description ?? null, t.color, t.sort_order],
-      );
+  await runWrite(async () => {
+    try {
+      for (const t of types) {
+        await dbExecute(
+          `INSERT OR REPLACE INTO customer_types
+           (id, workspace_id, name, description, color, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [t.id, workspaceId, t.name, t.description ?? null, t.color, t.sort_order],
+        );
+      }
+      if (types.length > 0) {
+        const placeholders = types.map(() => "?").join(",");
+        await dbExecute(
+          `DELETE FROM customer_types WHERE workspace_id = ? AND id NOT IN (${placeholders})`,
+          [workspaceId, ...types.map((t) => t.id)],
+        );
+      } else {
+        await dbExecute("DELETE FROM customer_types WHERE workspace_id = ?", [workspaceId]);
+      }
+    } catch (e) {
+      throw new Error(`Error al guardar tipos: ${e instanceof Error ? e.message : String(e)}`);
     }
-    if (types.length > 0) {
-      const placeholders = types.map(() => "?").join(",");
-      await db.execute(
-        `DELETE FROM customer_types WHERE workspace_id = ? AND id NOT IN (${placeholders})`,
-        [workspaceId, ...types.map((t) => t.id)],
-      );
-    } else {
-      await db.execute("DELETE FROM customer_types WHERE workspace_id = ?", [workspaceId]);
-    }
-    await db.execute("COMMIT", []);
-  } catch (e) {
-    await db.execute("ROLLBACK", []).catch(() => {});
-    throw new Error(`Error al guardar tipos: ${e instanceof Error ? e.message : String(e)}`);
-  }
+  });
 }
 
 // ── Catalog categories ──────────────────────────────────────────────
@@ -132,21 +130,19 @@ export async function getCatalogCategories(workspaceId: string): Promise<Catalog
 }
 
 export async function saveCatalogCategories(workspaceId: string, categories: CatalogCategoryRow[]): Promise<void> {
-  const db = await getDb();
-  try {
-    await db.execute("BEGIN", []);
-    await db.execute("DELETE FROM catalog_categories WHERE workspace_id = ?", [workspaceId]);
-    for (const c of categories) {
-      await db.execute(
-        "INSERT INTO catalog_categories (id, workspace_id, name, sort_order) VALUES (?, ?, ?, ?)",
-        [c.id, workspaceId, c.name, c.sort_order],
-      );
+  await runWrite(async () => {
+    try {
+      await dbExecute("DELETE FROM catalog_categories WHERE workspace_id = ?", [workspaceId]);
+      for (const c of categories) {
+        await dbExecute(
+          "INSERT INTO catalog_categories (id, workspace_id, name, sort_order) VALUES (?, ?, ?, ?)",
+          [c.id, workspaceId, c.name, c.sort_order],
+        );
+      }
+    } catch (e) {
+      throw new Error(`Error al guardar categorías: ${e instanceof Error ? e.message : String(e)}`);
     }
-    await db.execute("COMMIT", []);
-  } catch (e) {
-    await db.execute("ROLLBACK", []).catch(() => {});
-    throw new Error(`Error al guardar categorías: ${e instanceof Error ? e.message : String(e)}`);
-  }
+  });
 }
 
 // ── Workspace ─────────────────────────────────────────────────────

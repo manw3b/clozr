@@ -12,6 +12,13 @@ async function bootstrapDb(): Promise<Database> {
   //    Con 5s de timeout SQLite reintenta internamente y casi nunca falla.
   //  - foreign_keys: defensivo (si en el futuro agregamos FK reales).
   try {
+    // journal_mode=WAL es PERSISTENTE (se guarda en el archivo SQLite),
+    // así que aunque tauri-plugin-sql use pool de conexiones, todas
+    // las conexiones lo respetan. Resuelve el lock entre lectores y un
+    // único escritor: lectores no se bloquean nunca.
+    await db.execute("PRAGMA journal_mode = WAL", []);
+    // busy_timeout es por-conexión; lo seteamos defensivo en la conexión
+    // del singleton + serializamos writes desde JS (ver runWrite abajo).
     await db.execute("PRAGMA busy_timeout = 5000", []);
     await db.execute("PRAGMA foreign_keys = ON", []);
   } catch {
@@ -52,8 +59,7 @@ export async function dbExecute(
 
 /**
  * Reintenta una operación si el error es "database is locked" de SQLite.
- * El busy_timeout del bootstrap cubre el 99% de los casos, pero queda como
- * red de seguridad para transacciones largas (ej: importar muchos clientes).
+ * Backoff suave: 50ms, 150ms, 450ms.
  */
 export async function withDbRetry<T>(
   op: () => Promise<T>,
@@ -67,9 +73,34 @@ export async function withDbRetry<T>(
       lastErr = e;
       const msg = e instanceof Error ? e.message : String(e);
       if (!/database is locked|locked/i.test(msg)) throw e;
-      // Backoff suave: 50ms, 150ms, 450ms…
       await new Promise((r) => setTimeout(r, 50 * Math.pow(3, i)));
     }
   }
   throw lastErr;
+}
+
+/**
+ * Mutex de escritura: SQLite permite N readers + 1 writer. Si dos partes
+ * de la app inician transacciones (BEGIN/COMMIT) concurrentemente, una se
+ * encuentra el lock y falla con "database is locked" antes de que el
+ * busy_timeout las pueda salvar (porque BEGIN IMMEDIATE no espera).
+ *
+ * Esta cola garantiza que las transacciones críticas se serialicen del
+ * lado de JS, sin importar cuántas conexiones use el plugin internamente.
+ *
+ * Uso:
+ *   await runWrite(async () => {
+ *     await dbExecute("BEGIN IMMEDIATE");
+ *     ...
+ *     await dbExecute("COMMIT");
+ *   });
+ *
+ * Sólo envolver writes transaccionales — un INSERT individual no necesita.
+ */
+let _writeQueue: Promise<unknown> = Promise.resolve();
+export function runWrite<T>(op: () => Promise<T>): Promise<T> {
+  const next = _writeQueue.then(() => withDbRetry(op));
+  // Mantenemos la cola viva incluso si una falla, para no romper toda la app.
+  _writeQueue = next.catch(() => undefined);
+  return next;
 }

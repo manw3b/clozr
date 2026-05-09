@@ -7,7 +7,7 @@
  * estructurado (ej: lista de plantillas), se le crea su propia tabla.
  */
 
-import { dbSelect, dbExecute, getDb } from "./index";
+import { dbSelect, dbExecute, runWrite } from "./index";
 import type { WorkspaceSettingRow } from "./types";
 
 export async function get(workspaceId: string, key: string): Promise<string | null> {
@@ -55,11 +55,11 @@ export async function setMany(
 ): Promise<void> {
   const entries = Object.entries(values);
   if (entries.length === 0) return;
-  const db = await getDb();
-  await db.execute("BEGIN", []);
-  try {
+  // Sin BEGIN/COMMIT manual — el plugin ya envuelve cada execute en su tx.
+  // runWrite serializa la secuencia para evitar lock entre setMany y otros writes.
+  await runWrite(async () => {
     for (const [k, v] of entries) {
-      await db.execute(
+      await dbExecute(
         `INSERT INTO workspace_settings (workspace_id, key, value, updated_at)
          VALUES (?, ?, ?, datetime('now'))
          ON CONFLICT(workspace_id, key) DO UPDATE SET
@@ -68,11 +68,7 @@ export async function setMany(
         [workspaceId, k, v],
       );
     }
-    await db.execute("COMMIT", []);
-  } catch (e) {
-    await db.execute("ROLLBACK", []).catch(() => {});
-    throw e;
-  }
+  });
 }
 
 /**
@@ -88,16 +84,17 @@ export async function bumpCounter(
   key: string,
   start = 1,
 ): Promise<number> {
-  const db = await getDb();
-  await db.execute("BEGIN", []);
-  try {
-    const rows = await db.select<Array<{ value: string | null }>>(
+  // Atomicidad: runWrite serializa esta operación. El SELECT + UPSERT
+  // corren en orden sin que otra llamada a bumpCounter se cuele entre
+  // medio (el plugin auto-tx por execute alcanza para la durabilidad).
+  return runWrite(async () => {
+    const rows = await dbSelect<{ value: string | null }>(
       "SELECT value FROM workspace_settings WHERE workspace_id = ? AND key = ?",
       [workspaceId, key],
     );
     const current = rows[0]?.value ? parseInt(rows[0].value, 10) : null;
     const next = Number.isFinite(current as number) ? (current as number) + 1 : start;
-    await db.execute(
+    await dbExecute(
       `INSERT INTO workspace_settings (workspace_id, key, value, updated_at)
        VALUES (?, ?, ?, datetime('now'))
        ON CONFLICT(workspace_id, key) DO UPDATE SET
@@ -105,12 +102,8 @@ export async function bumpCounter(
          updated_at = excluded.updated_at`,
       [workspaceId, key, String(next)],
     );
-    await db.execute("COMMIT", []);
     return next;
-  } catch (e) {
-    await db.execute("ROLLBACK", []).catch(() => {});
-    throw e;
-  }
+  });
 }
 
 export const workspaceSettings = {

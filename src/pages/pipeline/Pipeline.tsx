@@ -8,7 +8,10 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  closestCorners,
+  pointerWithin,
+  rectIntersection,
+  closestCenter,
+  type CollisionDetection,
 } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { Search, Plus, Filter } from 'lucide-react';
@@ -186,6 +189,34 @@ export function Pipeline() {
       activationConstraint: { distance: 6 },
     })
   );
+
+  /**
+   * Estrategia de detección de colisión específica para kanban:
+   *
+   * 1. pointerWithin → si el cursor está literalmente dentro de algún
+   *    droppable, ése gana. Lo más preciso posible.
+   * 2. rectIntersection → si no hay match con el pointer (ej: el cursor
+   *    está en el gap entre columnas), buscamos qué droppables se
+   *    superponen con el rect del item arrastrado.
+   * 3. closestCenter sólo entre columnas → fallback final cuando no hay
+   *    intersección clara. Restringimos a columnas (no cards) para que
+   *    al estar en zona ambigua se elija "la columna más cerca", no
+   *    "la card cuyo centro queda más cerca" (que puede saltar erráticamente
+   *    entre columnas distintas).
+   */
+  const collisionDetection: CollisionDetection = (args) => {
+    const pointer = pointerWithin(args);
+    if (pointer.length > 0) return pointer;
+
+    const rect = rectIntersection(args);
+    if (rect.length > 0) return rect;
+
+    // Fallback restringido a columnas (stage ids son las claves de STAGES).
+    const columnContainers = args.droppableContainers.filter((c) =>
+      STAGES.some((s) => s.id === c.id),
+    );
+    return closestCenter({ ...args, droppableContainers: columnContainers });
+  };
 
   /* ---------- Filtrado ---------- */
   const filteredLeads = useMemo(() => {
@@ -376,7 +407,7 @@ export function Pipeline() {
       {/* Kanban */}
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={collisionDetection}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}

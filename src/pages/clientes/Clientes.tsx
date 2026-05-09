@@ -6,6 +6,7 @@ import { Input } from '../../components/Input';
 import { Tabs } from '../../components/Tabs';
 import { Badge } from '../../components/Badge';
 import { Avatar } from '../../components/Avatar';
+import { TagChip } from '../../components/TagChip';
 import { EmptyState } from '../../components/EmptyState';
 import { DataTable, applySort, ColumnDef } from '../../components/data-table';
 import { RowActions } from '../../components/data-table/RowActions';
@@ -347,16 +348,27 @@ const columns: ColumnDef<Client>[] = [
     id: 'type',
     header: 'Tipo',
     sortable: true,
-    width: '140px',
+    width: 'minmax(160px, 1fr)',
     cell: (c) => (
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
         <Badge tone={typeBadgeTone(c.type)} size="sm">
           {typeLabels[c.type]}
         </Badge>
-        {c.tags?.includes('VIP') && (
-          <Badge tone="primary" size="sm">
-            VIP
-          </Badge>
+        {c.tags?.slice(0, 3).map((t) => (
+          <TagChip key={t.id} tag={t} />
+        ))}
+        {c.tags && c.tags.length > 3 && (
+          <span
+            style={{
+              fontSize: 10,
+              color: 'var(--text-dim)',
+              padding: '2px 6px',
+              fontWeight: 600,
+            }}
+            title={c.tags.slice(3).map((t) => t.name).join(', ')}
+          >
+            +{c.tags.length - 3}
+          </span>
         )}
       </div>
     ),

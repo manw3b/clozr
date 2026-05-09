@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Phone,
   Mail,
@@ -10,6 +10,8 @@ import {
   CircleDot,
   CheckCircle2,
   Clock,
+  Tag,
+  Check,
 } from 'lucide-react';
 import { WhatsAppIcon } from '../../../components/icons/WhatsAppIcon';
 import { DrawerPanel } from '../../../components/Drawer';
@@ -17,7 +19,10 @@ import { Button } from '../../../components/Button';
 import { Badge } from '../../../components/Badge';
 import { Avatar } from '../../../components/Avatar';
 import { Tabs } from '../../../components/Tabs';
+import { TagChip } from '../../../components/TagChip';
 import { EmptyState } from '../../../components/EmptyState';
+import { useCustomerTags, useSetCustomerTags } from '../useClientsData';
+import type { ClientTag } from '../../../types/domain';
 import { color, radius, space, text, weight } from '../../../tokens';
 import {
   formatMoney,
@@ -226,11 +231,7 @@ function ClientHeader({
             <Badge tone={typeTones[client.type]} size="sm">
               {typeLabels[client.type]}
             </Badge>
-            {client.tags?.map((tag) => (
-              <Badge key={tag} tone="primary" size="sm">
-                {tag}
-              </Badge>
-            ))}
+            <ClientTagsEditor clientId={client.id} tags={client.tags ?? []} />
             {client.lastContactAt && (
               <span style={{ fontSize: text.xs, color: color.textMuted }}>
                 Último contacto {formatRelative(client.lastContactAt)}
@@ -858,6 +859,163 @@ function HistoryTab({ activity }: { activity: ActivityItem[] }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/* ============================================================
+ *  ClientTagsEditor — chips inline + dropdown para asignar/quitar tags
+ * ============================================================ */
+
+function ClientTagsEditor({
+  clientId,
+  tags,
+}: {
+  clientId: string;
+  tags: ClientTag[];
+}) {
+  const { data: allTags = [] } = useCustomerTags();
+  const setTagsMut = useSetCustomerTags();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const assignedIds = new Set(tags.map((t) => t.id));
+
+  function toggle(tagId: string) {
+    const next = new Set(assignedIds);
+    if (next.has(tagId)) next.delete(tagId);
+    else next.add(tagId);
+    setTagsMut.mutate({ customerId: clientId, tagIds: Array.from(next) });
+  }
+
+  function removeTag(tagId: string) {
+    const next = new Set(assignedIds);
+    next.delete(tagId);
+    setTagsMut.mutate({ customerId: clientId, tagIds: Array.from(next) });
+  }
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+      {tags.map((t) => (
+        <TagChip key={t.id} tag={t} size="sm" onRemove={() => removeTag(t.id)} />
+      ))}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 3,
+          padding: '2px 8px',
+          background: 'transparent',
+          border: `1px dashed ${color.border}`,
+          borderRadius: radius.sm,
+          color: color.textMuted,
+          fontSize: 11,
+          fontWeight: weight.semibold,
+          cursor: 'pointer',
+          transition: 'all 100ms',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = color.borderStrong;
+          e.currentTarget.style.color = color.text;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = color.border;
+          e.currentTarget.style.color = color.textMuted;
+        }}
+      >
+        {tags.length === 0 ? (
+          <>
+            <Plus size={11} /> Etiqueta
+          </>
+        ) : (
+          <>
+            <Tag size={10} /> Editar
+          </>
+        )}
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            left: 0,
+            zIndex: 30,
+            minWidth: 220,
+            maxHeight: 300,
+            overflowY: 'auto',
+            background: color.surface,
+            border: `1px solid ${color.borderStrong}`,
+            borderRadius: radius.md,
+            boxShadow: 'var(--shadow-lg)',
+            padding: 4,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+          }}
+        >
+          {allTags.length === 0 ? (
+            <div style={{ padding: `${space[3]} ${space[4]}`, fontSize: text.xs, color: color.textMuted, textAlign: 'center' }}>
+              No hay etiquetas configuradas.
+              <br />
+              Creá algunas en Ajustes → Etiquetas de clientes.
+            </div>
+          ) : (
+            allTags.map((t) => {
+              const assigned = assignedIds.has(t.id);
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => toggle(t.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: space[2],
+                    padding: `6px ${space[3]}`,
+                    background: 'transparent',
+                    color: color.text,
+                    fontSize: text.sm,
+                    fontWeight: weight.medium,
+                    textAlign: 'left',
+                    borderRadius: radius.sm,
+                    cursor: 'pointer',
+                    transition: 'background 100ms',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = color.surfaceHover)}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <TagChip tag={t} size="sm" />
+                  </span>
+                  {assigned && <Check size={14} color={color.success} />}
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 }

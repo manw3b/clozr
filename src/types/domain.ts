@@ -6,6 +6,15 @@
 export type ClientType = 'final' | 'revendedor' | 'mayorista' | 'empresa';
 export type ClientStatus = 'active' | 'inactive' | 'risk' | 'new';
 
+/** Etiqueta visual asignable a un cliente. Coincide con la fila de la
+ *  tabla customer_tags (resumen — sólo los campos que el front necesita
+ *  para renderizar). */
+export interface ClientTag {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface Client {
   id: string;
   name: string;
@@ -20,7 +29,8 @@ export interface Client {
   totalPurchases?: number;
   notes?: string;
   createdAt?: string;
-  tags?: string[];
+  /** Etiquetas asignadas. Configurables desde Settings → Etiquetas. */
+  tags?: ClientTag[];
 }
 
 /* ============================================================

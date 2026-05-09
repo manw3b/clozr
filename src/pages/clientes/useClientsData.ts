@@ -4,6 +4,7 @@ import { useAuthStore } from "../../store/authStore";
 import { customersDb } from "../../lib/db/customers";
 import { salesDb } from "../../lib/db/sales";
 import { customerContactsDb, type ContactKind } from "../../lib/db/customerContacts";
+import { customerTagsDb, type CustomerTag } from "../../lib/db/customerTags";
 import { dbCustomerToClient, dbSaleToDomain } from "../../lib/mappers";
 import { qk, invalidate } from "../../lib/queryKeys";
 import type { Client, ClientDetail, ActivityItem } from "../../types/domain";
@@ -18,6 +19,8 @@ export function useClientsList() {
         customersDb.getAll(wid),
         customerContactsDb.lastContactByCustomer(wid),
       ]);
+      const ids = dbCustomers.map((c) => c.id);
+      const tagsMap = await customerTagsDb.getForCustomerIds(ids);
       return dbCustomers.map((c): Client => {
         const base = dbCustomerToClient(c);
         return {
@@ -25,6 +28,7 @@ export function useClientsList() {
           lastContactAt: lastContactMap.get(c.id) ?? c.updated_at,
           lastPurchaseAt: c.updated_at,
           balanceDue: 0, // computed only in detail
+          tags: tagsMap.get(c.id) ?? [],
         };
       });
     },
@@ -32,6 +36,34 @@ export function useClientsList() {
     staleTime: 30_000,
   });
 }
+
+/** Lista de tags configurados en el workspace activo. */
+export function useCustomerTags() {
+  const { activeWorkspace } = useWorkspaceStore();
+  const wid = activeWorkspace?.id ?? "";
+  return useQuery({
+    queryKey: ["customer-tags", wid],
+    queryFn: () => customerTagsDb.getAll(wid),
+    enabled: !!wid,
+    staleTime: 60_000,
+  });
+}
+
+/** Setea atómicamente los tags de un cliente. */
+export function useSetCustomerTags() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ customerId, tagIds }: { customerId: string; tagIds: string[] }) =>
+      customerTagsDb.setForCustomer(customerId, tagIds),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["clients"] });
+      qc.invalidateQueries({ queryKey: ["clients-list"] });
+      qc.invalidateQueries({ queryKey: ["customer-tags-with-count"] });
+    },
+  });
+}
+
+export type { CustomerTag };
 
 export function useClientDetail(clientId: string | null) {
   const { activeWorkspace } = useWorkspaceStore();

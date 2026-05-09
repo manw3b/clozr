@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { MessageSquare, Zap } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { MessageSquare, Sparkles } from 'lucide-react';
 import { WhatsAppIcon } from './icons/WhatsAppIcon';
 import { color, radius, space, text, weight, duration, ease } from '../tokens';
 import { applyTemplate, templatesForStage } from '../lib/waTemplates';
@@ -12,11 +13,13 @@ import type { Lead } from '../types/domain';
  *   - "Mensaje libre" → abre wa.me sin texto pre-cargado
  *   - Lista de plantillas filtradas por la etapa del lead, con preview
  *
- * Cada plantilla aplica los placeholders ({nombre}, {producto}, {monto},
- * {negocio}) usando los datos del lead. Cuando el usuario elige una,
- * llama a onSend(lead, body?) — el container es responsable de abrir
- * wa.me/<phone>?text=<body>.
+ * El popover se renderiza por portal a document.body con smart placement
+ * para escapar el overflow del contenedor (columna del kanban, modal, etc.)
+ * y reposicionarse automáticamente si no entra abajo o a la derecha.
  */
+
+const POPOVER_W = 320;
+const POPOVER_H_MAX = 440;
 
 interface Props {
   lead: Lead;
@@ -45,13 +48,59 @@ export function WaQuickPicker({
 }: Props) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
+  // Smart placement vs viewport
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    function reposition() {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const margin = 8;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+
+      // Vertical: prefer below if hay espacio, sino arriba.
+      const popH = Math.min(POPOVER_H_MAX, window.innerHeight - 16);
+      let top = rect.bottom + margin;
+      if (spaceBelow < popH + margin && spaceAbove > spaceBelow) {
+        top = rect.top - popH - margin;
+      }
+      top = Math.max(8, Math.min(top, window.innerHeight - popH - 8));
+
+      // Horizontal: por defecto alineamos el borde DERECHO del popover al
+      // borde derecho del trigger (el botón está al final de la fila de
+      // acciones, así que abrir hacia la izquierda es lo más cómodo).
+      let left = rect.right - POPOVER_W;
+      // Si por hacer eso se sale por la izquierda, alineamos a la
+      // izquierda del trigger.
+      if (left < 8) left = rect.left;
+      // Y si tampoco entra a la derecha, clamp al borde del viewport.
+      left = Math.min(left, window.innerWidth - POPOVER_W - 8);
+      left = Math.max(8, left);
+
+      setPos({ top, left });
+    }
+    reposition();
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    return () => {
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+    };
+  }, [open]);
+
+  // Click outside / Esc
   useEffect(() => {
     if (!open) return;
     function onClickOutside(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      const inTrigger = wrapRef.current?.contains(target);
+      const inPopover = popoverRef.current?.contains(target);
+      if (!inTrigger && !inPopover) setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false);
@@ -85,7 +134,9 @@ export function WaQuickPicker({
     <div ref={wrapRef} style={{ position: 'relative', display: 'inline-flex' }}>
       {variant === 'small' ? (
         <SmallTrigger
+          ref={triggerRef}
           ariaLabel="WhatsApp"
+          active={open}
           onClick={(e) => {
             e.stopPropagation();
             if (!disabled) setOpen((v) => !v);
@@ -96,6 +147,8 @@ export function WaQuickPicker({
         </SmallTrigger>
       ) : (
         <FullTrigger
+          ref={triggerRef}
+          active={open}
           onClick={(e) => {
             e.stopPropagation();
             if (!disabled) setOpen((v) => !v);
@@ -107,31 +160,64 @@ export function WaQuickPicker({
         </FullTrigger>
       )}
 
-      {open && (
+      {open && pos && createPortal(
         <div
+          ref={popoverRef}
           role="menu"
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           style={{
-            position: 'absolute',
-            top: 'calc(100% + 4px)',
-            right: 0,
-            zIndex: 30,
-            width: 280,
-            maxHeight: 360,
+            position: 'fixed',
+            top: pos.top,
+            left: pos.left,
+            zIndex: 1000,
+            width: POPOVER_W,
+            maxHeight: POPOVER_H_MAX,
             overflowY: 'auto',
             background: color.surface,
             border: `1px solid ${color.borderStrong}`,
             borderRadius: radius.md,
             boxShadow: 'var(--shadow-lg)',
-            padding: 4,
+            padding: 6,
             display: 'flex',
             flexDirection: 'column',
+            gap: 2,
           }}
         >
+          {/* Header con avatar + cliente para contexto visual */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: space[2],
+              padding: `8px ${space[3]} 10px`,
+              borderBottom: `1px solid ${color.border}`,
+              marginBottom: 4,
+            }}
+          >
+            <WhatsAppIcon size={16} color="var(--success)" />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div
+                style={{
+                  fontSize: text.sm,
+                  fontWeight: weight.semibold,
+                  color: color.text,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                Mensaje a {lead.clientName.split(/\s+/)[0]}
+              </div>
+              <div style={{ fontSize: text.xs, color: color.textDim, marginTop: 1 }}>
+                Elegí qué mandar
+              </div>
+            </div>
+          </div>
+
           {/* Mensaje libre */}
           <TemplateRow
-            icon={<MessageSquare size={12} color={color.textDim} />}
+            icon={<MessageSquare size={13} color={color.textDim} />}
             title="Mensaje libre"
             preview="Abrir WhatsApp sin texto pre-cargado"
             onClick={() => send()}
@@ -139,8 +225,7 @@ export function WaQuickPicker({
 
           {templates.length > 0 && (
             <>
-              <Divider />
-              <Label>Plantillas para esta etapa</Label>
+              <Label>Plantillas</Label>
               {templates.map((t) => {
                 const preview = applyTemplate(t.body, {
                   nombre: firstName(lead.clientName),
@@ -151,7 +236,7 @@ export function WaQuickPicker({
                 return (
                   <TemplateRow
                     key={t.id}
-                    icon={<Zap size={12} color={color.primary} />}
+                    icon={<Sparkles size={13} color={color.primary} />}
                     title={t.name}
                     preview={preview}
                     onClick={() => send(t.body)}
@@ -160,7 +245,8 @@ export function WaQuickPicker({
               })}
             </>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -168,19 +254,24 @@ export function WaQuickPicker({
 
 /* ── Sub-componentes ─────────────────────────────────────── */
 
-function SmallTrigger({
+const SmallTrigger = ({
   children,
   ariaLabel,
+  active,
   onClick,
   disabled,
+  ref,
 }: {
   children: React.ReactNode;
   ariaLabel: string;
+  active?: boolean;
   onClick: (e: React.MouseEvent) => void;
   disabled?: boolean;
-}) {
+  ref?: React.Ref<HTMLButtonElement>;
+}) => {
   return (
     <button
+      ref={ref}
       type="button"
       aria-label={ariaLabel}
       onClick={onClick}
@@ -193,34 +284,39 @@ function SmallTrigger({
         justifyContent: 'center',
         borderRadius: radius.sm,
         color: color.success,
-        background: 'transparent',
+        background: active ? color.successBg : 'transparent',
         cursor: disabled ? 'not-allowed' : 'pointer',
         transition: `background ${duration.fast} ${ease}`,
         opacity: disabled ? 0.4 : 1,
       }}
       onMouseEnter={(e) => {
-        if (!disabled) e.currentTarget.style.background = color.successBg;
+        if (!disabled && !active) e.currentTarget.style.background = color.successBg;
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
+        if (!active) e.currentTarget.style.background = 'transparent';
       }}
     >
       {children}
     </button>
   );
-}
+};
 
-function FullTrigger({
+const FullTrigger = ({
   children,
+  active,
   onClick,
   disabled,
+  ref,
 }: {
   children: React.ReactNode;
+  active?: boolean;
   onClick: (e: React.MouseEvent) => void;
   disabled?: boolean;
-}) {
+  ref?: React.Ref<HTMLButtonElement>;
+}) => {
   return (
     <button
+      ref={ref}
       type="button"
       onClick={onClick}
       disabled={disabled}
@@ -231,8 +327,8 @@ function FullTrigger({
         alignItems: 'center',
         gap: space[2],
         borderRadius: radius.md,
-        background: color.surface2,
-        border: `1px solid ${color.border}`,
+        background: active ? color.surfaceHover : color.surface2,
+        border: `1px solid ${active ? color.borderStrong : color.border}`,
         color: color.text,
         fontSize: text.sm,
         fontWeight: weight.semibold,
@@ -247,14 +343,16 @@ function FullTrigger({
         }
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = color.surface2;
-        e.currentTarget.style.borderColor = color.border;
+        if (!active) {
+          e.currentTarget.style.background = color.surface2;
+          e.currentTarget.style.borderColor = color.border;
+        }
       }}
     >
       {children}
     </button>
   );
-}
+};
 
 function TemplateRow({
   icon,
@@ -274,7 +372,7 @@ function TemplateRow({
         display: 'flex',
         alignItems: 'flex-start',
         gap: space[2],
-        padding: `7px ${space[3]}`,
+        padding: `8px ${space[3]}`,
         background: 'transparent',
         textAlign: 'left',
         borderRadius: radius.sm,
@@ -284,7 +382,17 @@ function TemplateRow({
       onMouseEnter={(e) => (e.currentTarget.style.background = color.surfaceHover)}
       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
-      <span style={{ marginTop: 2, flexShrink: 0 }}>{icon}</span>
+      <span
+        style={{
+          marginTop: 2,
+          flexShrink: 0,
+          width: 18,
+          display: 'inline-flex',
+          justifyContent: 'center',
+        }}
+      >
+        {icon}
+      </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
@@ -304,7 +412,7 @@ function TemplateRow({
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
-            lineHeight: 1.3,
+            lineHeight: 1.4,
           }}
         >
           {preview}
@@ -323,16 +431,12 @@ function Label({ children }: { children: React.ReactNode }) {
         color: color.textDim,
         textTransform: 'uppercase',
         letterSpacing: '0.6px',
-        padding: `${space[2]} ${space[3]} 4px`,
+        padding: `${space[3]} ${space[3]} 4px`,
       }}
     >
       {children}
     </div>
   );
-}
-
-function Divider() {
-  return <div style={{ height: 1, background: color.border, margin: '4px 0' }} />;
 }
 
 function firstName(full: string): string {

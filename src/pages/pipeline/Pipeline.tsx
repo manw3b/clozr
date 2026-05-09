@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { settingsDb } from '../../lib/db/settings';
 import {
   DndContext,
   DragEndEvent,
@@ -13,7 +15,7 @@ import {
   closestCenter,
   type CollisionDetection,
 } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { SortableContext, verticalListSortingStrategy, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { Search, Plus, Filter } from 'lucide-react';
 import { PageHeader } from '../../components/PageHeader';
 import { Button } from '../../components/Button';
@@ -22,7 +24,7 @@ import { Tabs } from '../../components/Tabs';
 import { ClientDrawer } from '../clientes/components/ClientDrawer';
 import { LeadCard } from './components/LeadCard';
 import { SortableLeadCard } from './components/SortableLeadCard';
-import { PipelineColumn, ColumnEmpty } from './components/PipelineColumn';
+import { PipelineColumn, ColumnEmpty, COLUMN_DEFAULT_WIDTH } from './components/PipelineColumn';
 import { PipelineMetrics } from './components/PipelineMetrics';
 import { groupLeadsByStage } from '../../lib/groupings';
 import { usePipelineLeads, useMoveLead, useSnoozeLead, useAddLeadNote, useScheduleVisit } from './usePipelineData';
@@ -87,6 +89,24 @@ export function Pipeline() {
   const scheduleVisitMut = useScheduleVisit();
   // Etapas dinámicas del workspace (configurables desde Ajustes).
   const { stages: STAGES } = usePipelineStages();
+  const qcGlobal = useQueryClient();
+
+  // Ancho de columna persistido en localStorage (un valor global, aplica
+  // a todas las columnas — el usuario lo arrastra desde cualquiera).
+  const [columnWidth, setColumnWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return COLUMN_DEFAULT_WIDTH;
+    const saved = window.localStorage.getItem('clozr:pipeline:columnWidth');
+    const n = saved ? parseInt(saved, 10) : NaN;
+    return Number.isFinite(n) ? n : COLUMN_DEFAULT_WIDTH;
+  });
+  function persistColumnWidth(w: number) {
+    setColumnWidth(w);
+    try {
+      window.localStorage.setItem('clozr:pipeline:columnWidth', String(w));
+    } catch {
+      /* localStorage puede fallar en modo privado — best-effort */
+    }
+  }
   // Helpers para acciones que necesitan saber qué etapa cuenta como
   // "ganado" o "perdido" — útil porque el usuario pudo renombrar/agregar.
   const wonStage: StageConfig | undefined = STAGES.find((s) => s.isWon);
@@ -286,9 +306,9 @@ export function Pipeline() {
     const rect = rectIntersection(args);
     if (rect.length > 0) return rect;
 
-    // Fallback restringido a columnas (stage ids son las claves de STAGES).
+    // Fallback restringido a columnas (ids con prefijo "col:").
     const columnContainers = args.droppableContainers.filter((c) =>
-      STAGES.some((s) => s.id === c.id),
+      typeof c.id === 'string' && c.id.startsWith('col:'),
     );
     return closestCenter({ ...args, droppableContainers: columnContainers });
   };
@@ -342,6 +362,13 @@ export function Pipeline() {
   const activeLead = activeId ? leads.find((l) => l.id === activeId) : null;
 
   /* ---------- Drag handlers ---------- */
+  function isColumnDrag(id: string) {
+    return id.startsWith('col:');
+  }
+  function stageIdFromDragId(id: string) {
+    return id.startsWith('col:') ? id.slice(4) : id;
+  }
+
   function handleDragStart(e: DragStartEvent) {
     setActiveId(e.active.id as string);
   }
@@ -353,13 +380,17 @@ export function Pipeline() {
     const activeId = active.id as string;
     const overId = over.id as string;
 
+    // Drag de columna → no muta leads, deja que DragEnd reordene.
+    if (isColumnDrag(activeId)) return;
+
     // Encontramos el lead que estamos arrastrando
     const activeLead = leads.find((l) => l.id === activeId);
     if (!activeLead) return;
 
-    // El "over" puede ser otra card (mismo column o distinto) O una columna vacía
+    // El "over" puede ser otra card, una columna vacía (col:<id>) o el id
+    // de stage directo (compat). Resolvemos a un stageId limpio.
     const overLead = leads.find((l) => l.id === overId);
-    const overStage = (overLead?.stage || (overId as LeadStage)) as LeadStage;
+    const overStage = (overLead?.stage || stageIdFromDragId(overId)) as LeadStage;
 
     // Si está sobre la misma stage, no hacemos nada acá (lo maneja DragEnd para reordenar)
     if (activeLead.stage === overStage) return;
@@ -381,6 +412,45 @@ export function Pipeline() {
 
     if (activeId === overId) return;
 
+    // ── Reorder de columnas ─────────────────────────────────────
+    if (isColumnDrag(activeId)) {
+      const fromStageId = stageIdFromDragId(activeId);
+      const toStageId = stageIdFromDragId(overId);
+      const fromIdx = STAGES.findIndex((s) => s.id === fromStageId);
+      const toIdx = STAGES.findIndex((s) => s.id === toStageId);
+      if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+      const reordered = arrayMove(STAGES, fromIdx, toIdx);
+      // Optimistic: actualizamos la query cache para que el render
+      // muestre el orden nuevo de inmediato; persistimos en background.
+      const wid = activeWorkspace?.id ?? '';
+      qcGlobal.setQueryData(['pipeline-stages', wid], (old: import('../../lib/db/types').PipelineStage[] | undefined) => {
+        if (!old) return old;
+        const byId = new Map(old.map((r) => [r.id, r]));
+        return reordered
+          .map((s, i) => {
+            const row = byId.get(s.id);
+            return row ? { ...row, stage_order: i } : null;
+          })
+          .filter((r): r is import('../../lib/db/types').PipelineStage => r !== null);
+      });
+      // Persistir
+      const cached = qcGlobal.getQueryData<import('../../lib/db/types').PipelineStage[]>(['pipeline-stages', wid]);
+      if (cached) {
+        settingsDb
+          .savePipelineStages(wid, cached)
+          .then(() => {
+            qcGlobal.invalidateQueries({ queryKey: ['pipeline-stages', wid] });
+            showToast('Orden de etapas guardado', 'success');
+          })
+          .catch((err) => {
+            showToast(err instanceof Error ? err.message : 'No se pudo guardar', 'error');
+            qcGlobal.invalidateQueries({ queryKey: ['pipeline-stages', wid] });
+          });
+      }
+      return;
+    }
+
+    // ── Reorder/move de leads ───────────────────────────────────
     setLeads((prev) => {
       const activeIdx = prev.findIndex((l) => l.id === activeId);
       const overIdx = prev.findIndex((l) => l.id === overId);
@@ -490,6 +560,11 @@ export function Pipeline() {
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
+        <SortableContext
+          items={STAGES.map((s) => `col:${s.id}`)}
+          strategy={horizontalListSortingStrategy}
+          id="columns"
+        >
         <div
           style={{
             display: 'flex',
@@ -511,6 +586,8 @@ export function Pipeline() {
                 count={stageLeads.length}
                 totalAmount={totalAmount}
                 isTerminal={stage.terminal}
+                width={columnWidth}
+                onResize={persistColumnWidth}
                 onAddLead={() => {
                   setNewLeadStage(stage.id);
                   setNewLeadOpen(true);
@@ -582,6 +659,7 @@ export function Pipeline() {
             );
           })}
         </div>
+        </SortableContext>
 
         {/* Overlay que sigue al cursor durante drag */}
         <DragOverlay>

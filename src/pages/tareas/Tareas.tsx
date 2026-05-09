@@ -7,6 +7,13 @@ import { Tabs } from "../../components/Tabs";
 import { Badge } from "../../components/Badge";
 import { EmptyState } from "../../components/EmptyState";
 import { DataTable, type ColumnDef } from "../../components/data-table";
+import {
+  ContextMenu,
+  ContextMenuItem,
+  ContextMenuDivider,
+  ContextMenuLabel,
+  useContextMenu,
+} from "../../components/ContextMenu";
 import { Modal, ModalField } from "../../components/Modal";
 import { Input, Select } from "../../components/Input";
 import { tasksDb } from "../../lib/db/tasks";
@@ -30,6 +37,8 @@ export function Tareas() {
   const [statusFilter, setStatusFilter] = usePersistedState<FilterStatus>("tareas.statusFilter", "pendientes");
   const [typeFilter, setTypeFilter] = usePersistedState<FilterType>("tareas.typeFilter", "todos");
   const [openForm, setOpenForm] = useState(false);
+  const ctxMenu = useContextMenu();
+  const [ctxTask, setCtxTask] = useState<DbTask | null>(null);
 
   useEffect(() => {
     const handler = () => setOpenForm(true);
@@ -196,6 +205,10 @@ export function Tareas() {
           rows={filtered}
           columns={columns}
           getRowId={(t) => t.id}
+          onRowContextMenu={(t, e) => {
+            setCtxTask(t);
+            ctxMenu.openAt(e);
+          }}
           density="normal"
           empty={
             <EmptyState
@@ -216,6 +229,34 @@ export function Tareas() {
       </div>
 
       <NewTaskModal open={openForm} onClose={() => setOpenForm(false)} />
+
+      {ctxMenu.open && ctxTask && (
+        <ContextMenu position={ctxMenu.position} onClose={ctxMenu.close}>
+          <ContextMenuLabel>{ctxTask.title}</ContextMenuLabel>
+          <ContextMenuItem
+            icon={<Check size={14} />}
+            onClick={() => {
+              toggleMut.mutate({ id: ctxTask.id, done: ctxTask.completed === 0 });
+              ctxMenu.close();
+            }}
+          >
+            {ctxTask.completed === 1 ? "Marcar pendiente" : "Marcar completada"}
+          </ContextMenuItem>
+          <ContextMenuDivider />
+          <ContextMenuItem
+            tone="danger"
+            icon={<Trash2 size={14} />}
+            onClick={() => {
+              if (window.confirm(`¿Eliminar tarea "${ctxTask.title}"?`)) {
+                removeMut.mutate(ctxTask.id);
+              }
+              ctxMenu.close();
+            }}
+          >
+            Eliminar
+          </ContextMenuItem>
+        </ContextMenu>
+      )}
     </div>
   );
 }

@@ -18,6 +18,7 @@ import { CASH_CATEGORY_LABELS, PAYMENT_METHOD_LABELS } from '../../../types/doma
 interface CashMovementsListProps {
   movements: CashMovement[];
   onMovementClick?: (m: CashMovement) => void;
+  onMovementContextMenu?: (m: CashMovement, e: React.MouseEvent) => void;
 }
 
 const categoryIcons: Record<
@@ -52,7 +53,7 @@ const toneFgMap = {
   neutral: color.textMuted,
 };
 
-export function CashMovementsList({ movements, onMovementClick }: CashMovementsListProps) {
+export function CashMovementsList({ movements, onMovementClick, onMovementContextMenu }: CashMovementsListProps) {
   // Sort por fecha desc
   const sorted = [...movements].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -106,6 +107,9 @@ export function CashMovementsList({ movements, onMovementClick }: CashMovementsL
             movement={m}
             isLast={idx === sorted.length - 1}
             onClick={() => onMovementClick?.(m)}
+            onContextMenu={
+              onMovementContextMenu ? (e) => onMovementContextMenu(m, e) : undefined
+            }
           />
         ))}
       </div>
@@ -117,10 +121,12 @@ function MovementRow({
   movement,
   isLast,
   onClick,
+  onContextMenu,
 }: {
   movement: CashMovement;
   isLast: boolean;
   onClick?: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const { icon: Icon, tone } = categoryIcons[movement.category];
   const isIncome = movement.kind === 'income';
@@ -128,6 +134,7 @@ function MovementRow({
   return (
     <div
       onClick={onClick}
+      onContextMenu={onContextMenu}
       style={{
         padding: `${space[3]} ${space[5]}`,
         borderBottom: isLast ? 'none' : `1px solid ${color.border}`,

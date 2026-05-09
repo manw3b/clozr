@@ -7,6 +7,14 @@ import { Avatar } from "../../components/Avatar";
 import { Badge } from "../../components/Badge";
 import { EmptyState } from "../../components/EmptyState";
 import { DataTable, type ColumnDef } from "../../components/data-table";
+import {
+  ContextMenu,
+  ContextMenuItem,
+  ContextMenuDivider,
+  ContextMenuLabel,
+  useContextMenu,
+} from "../../components/ContextMenu";
+import { openMail, openTel } from "../../lib/openExternal";
 import { Modal, ModalField } from "../../components/Modal";
 import { Input, Select } from "../../components/Input";
 import { teamDb } from "../../lib/db/team";
@@ -37,6 +45,8 @@ export function Equipo() {
   const qc = useQueryClient();
   const currentRole = useAuthStore((s) => s.userRole);
   const [openForm, setOpenForm] = useState(false);
+  const ctxMenu = useContextMenu();
+  const [ctxMember, setCtxMember] = useState<WorkspaceMember | null>(null);
 
   const { data: members = [] } = useQuery({
     queryKey: ["team", wid],
@@ -178,6 +188,10 @@ export function Equipo() {
           rows={members}
           columns={columns}
           getRowId={(m) => m.user_id}
+          onRowContextMenu={(m, e) => {
+            setCtxMember(m);
+            ctxMenu.openAt(e);
+          }}
           density="normal"
           empty={
             <EmptyState
@@ -190,6 +204,51 @@ export function Equipo() {
       </div>
 
       <AddMemberModal open={openForm} onClose={() => setOpenForm(false)} workspaceId={wid} />
+
+      {ctxMenu.open && ctxMember && (
+        <ContextMenu position={ctxMenu.position} onClose={ctxMenu.close}>
+          <ContextMenuLabel>{ctxMember.name}</ContextMenuLabel>
+          {ctxMember.email && (
+            <ContextMenuItem
+              icon={<Mail size={14} />}
+              onClick={() => {
+                if (ctxMember.email) openMail(ctxMember.email);
+                ctxMenu.close();
+              }}
+            >
+              Email
+            </ContextMenuItem>
+          )}
+          {ctxMember.phone && (
+            <ContextMenuItem
+              icon={<Phone size={14} />}
+              onClick={() => {
+                if (ctxMember.phone) openTel(ctxMember.phone);
+                ctxMenu.close();
+              }}
+            >
+              Llamar
+            </ContextMenuItem>
+          )}
+          {canManage && ctxMember.role !== "owner" && (
+            <>
+              <ContextMenuDivider />
+              <ContextMenuItem
+                tone="danger"
+                icon={<Trash2 size={14} />}
+                onClick={() => {
+                  if (window.confirm(`¿Quitar a ${ctxMember.name} del equipo?`)) {
+                    removeMut.mutate(ctxMember.user_id);
+                  }
+                  ctxMenu.close();
+                }}
+              >
+                Quitar del equipo
+              </ContextMenuItem>
+            </>
+          )}
+        </ContextMenu>
+      )}
     </div>
   );
 }

@@ -18,6 +18,13 @@ import { getTemplateImageUrl } from "../../lib/templates/productImageMap";
 import { useEffect } from "react";
 import type { CatalogItemWithImeis } from "../../lib/db/types";
 import { ProductDetailDrawer } from "./components/ProductDetailDrawer";
+import {
+  ContextMenu,
+  ContextMenuItem,
+  ContextMenuLabel,
+  useContextMenu,
+} from "../../components/ContextMenu";
+import { Eye, Copy } from "lucide-react";
 import { AddProductSimpleModal } from "./components/AddProductSimpleModal";
 import { VisualProductPicker } from "./components/VisualProductPicker";
 import { NewSaleModal, type NewSalePreset } from "../ventas/components/NewSaleModal";
@@ -32,6 +39,8 @@ export function Inventario() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<StockFilter>("todos");
   const [selected, setSelected] = useState<CatalogItemWithImeis | null>(null);
+  const ctxMenu = useContextMenu();
+  const [ctxItem, setCtxItem] = useState<CatalogItemWithImeis | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [saleOpen, setSaleOpen] = useState(false);
@@ -141,7 +150,15 @@ export function Inventario() {
             }}
           >
             {filtered.map((p) => (
-              <ProductCard key={p.id} item={p} onClick={() => setSelected(p)} />
+              <ProductCard
+                key={p.id}
+                item={p}
+                onClick={() => setSelected(p)}
+                onContextMenu={(e) => {
+                  setCtxItem(p);
+                  ctxMenu.openAt(e);
+                }}
+              />
             ))}
           </div>
         )}
@@ -151,6 +168,43 @@ export function Inventario() {
         item={selected}
         onClose={() => setSelected(null)}
       />
+
+      {ctxMenu.open && ctxItem && (
+        <ContextMenu position={ctxMenu.position} onClose={ctxMenu.close}>
+          <ContextMenuLabel>{ctxItem.name}</ContextMenuLabel>
+          <ContextMenuItem
+            icon={<Eye size={14} />}
+            onClick={() => {
+              setSelected(ctxItem);
+              ctxMenu.close();
+            }}
+          >
+            Ver detalle
+          </ContextMenuItem>
+          <ContextMenuItem
+            icon={<Zap size={14} />}
+            onClick={() => {
+              setSalePreset({ catalogItem: ctxItem });
+              setSaleOpen(true);
+              ctxMenu.close();
+            }}
+          >
+            Vender ahora
+          </ContextMenuItem>
+          <ContextMenuItem
+            icon={<Copy size={14} />}
+            onClick={() => {
+              navigator.clipboard.writeText(ctxItem.name).then(
+                () => showToast("Nombre copiado", "success"),
+                () => showToast("No se pudo copiar", "error"),
+              );
+              ctxMenu.close();
+            }}
+          >
+            Copiar nombre
+          </ContextMenuItem>
+        </ContextMenu>
+      )}
 
       <VisualProductPicker
         open={pickerOpen}
@@ -193,7 +247,15 @@ export function Inventario() {
   );
 }
 
-function ProductCard({ item, onClick }: { item: CatalogItemWithImeis; onClick: () => void }) {
+function ProductCard({
+  item,
+  onClick,
+  onContextMenu,
+}: {
+  item: CatalogItemWithImeis;
+  onClick: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
+}) {
   // track_stock=1 → IMEIs son la fuente de verdad; el campo stock es solo cache.
   // track_stock=0 → no hay IMEIs, usar stock genérico.
   const units = item.track_stock ? (item.available_imeis ?? 0) : (item.stock ?? 0);
@@ -217,7 +279,13 @@ function ProductCard({ item, onClick }: { item: CatalogItemWithImeis; onClick: (
   }, [item.image_path]);
 
   return (
-    <Card padding={0} interactive onClick={onClick} style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <Card
+      padding={0}
+      interactive
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+      style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}
+    >
       <div
         style={{
           aspectRatio: "1",

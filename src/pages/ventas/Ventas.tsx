@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Plus, Download, MoreHorizontal } from 'lucide-react';
+import { Search, Plus, Download, MoreHorizontal, Check, Copy, Eye } from 'lucide-react';
 import { PageHeader } from '../../components/PageHeader';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -8,6 +8,13 @@ import { Badge } from '../../components/Badge';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { DataTable, applySort, ColumnDef } from '../../components/data-table';
+import {
+  ContextMenu,
+  ContextMenuItem,
+  ContextMenuDivider,
+  ContextMenuLabel,
+  useContextMenu,
+} from '../../components/ContextMenu';
 import { RowActions } from '../../components/data-table/RowActions';
 import { SalesMetrics } from './components/SalesMetrics';
 import { SalesSparkChart } from './components/SalesSparkChart';
@@ -51,6 +58,8 @@ export function Ventas() {
     direction: 'desc',
   });
   const [openSaleId, setOpenSaleId] = useState<string | null>(null);
+  const ctxMenu = useContextMenu();
+  const [ctxSale, setCtxSale] = useState<Sale | null>(null);
   const [newSaleOpen, setNewSaleOpen] = useState(false);
 
   useEffect(() => {
@@ -222,6 +231,10 @@ export function Ventas() {
             columns={columns}
             getRowId={(s) => s.id}
             onRowClick={(s) => setOpenSaleId(s.id)}
+            onRowContextMenu={(s, e) => {
+              setCtxSale(s);
+              ctxMenu.openAt(e);
+            }}
             activeRowId={openSaleId || undefined}
             sort={sort || undefined}
             onSortChange={setSort}
@@ -264,6 +277,47 @@ export function Ventas() {
         onClose={() => setNewSaleOpen(false)}
         onSubmit={handleNewSale}
       />
+
+      {/* Context menu (click derecho en una venta) */}
+      {ctxMenu.open && ctxSale && (
+        <ContextMenu position={ctxMenu.position} onClose={ctxMenu.close}>
+          <ContextMenuLabel>
+            {ctxSale.clientName ?? 'Sin cliente'} · {formatMoney(ctxSale.amount, ctxSale.currency)}
+          </ContextMenuLabel>
+          <ContextMenuItem
+            icon={<Eye size={14} />}
+            onClick={() => {
+              setOpenSaleId(ctxSale.id);
+              ctxMenu.close();
+            }}
+          >
+            Ver detalle
+          </ContextMenuItem>
+          {ctxSale.status !== 'paid' && (
+            <ContextMenuItem
+              icon={<Check size={14} />}
+              onClick={() => {
+                markPaidMut.mutate(ctxSale.id);
+                showToast('Venta marcada como pagada', 'success');
+                ctxMenu.close();
+              }}
+            >
+              Marcar como pagada
+            </ContextMenuItem>
+          )}
+          <ContextMenuDivider />
+          <ContextMenuItem
+            icon={<Copy size={14} />}
+            onClick={() => {
+              navigator.clipboard.writeText(ctxSale.id).catch(() => {});
+              showToast('ID copiado', 'success');
+              ctxMenu.close();
+            }}
+          >
+            Copiar ID
+          </ContextMenuItem>
+        </ContextMenu>
+      )}
     </div>
   );
 }

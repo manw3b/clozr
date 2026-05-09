@@ -37,6 +37,9 @@ export type _DnDListenerType = DraggableSyntheticListeners;
 
 interface LeadCardProps {
   lead: Lead;
+  /** Se dispara con click derecho sobre la card. El parent decide qué
+   *  menu mostrar (típicamente un ContextMenu posicionado en el cursor). */
+  onContextMenu?: (lead: Lead, e: React.MouseEvent) => void;
   /** Se pasa al wrapper draggable */
   isDragging?: boolean;
   /** Se aplica al "ghost" overlay durante drag */
@@ -77,7 +80,7 @@ interface LeadCardProps {
  * - El "isOverlay" se usa para el preview que sigue al cursor — se ve más sólido
  */
 export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadCard(
-  { lead, isDragging, isOverlay, onClick, onWhatsApp, businessName, onCall, onConvertToSale, onChangeStage, onSnooze, onAddNote, selected, selectionActive, onToggleSelect, dragHandleProps, style },
+  { lead, isDragging, isOverlay, onClick, onContextMenu, onWhatsApp, businessName, onCall, onConvertToSale, onChangeStage, onSnooze, onAddNote, selected, selectionActive, onToggleSelect, dragHandleProps, style },
   ref
 ) {
   const stuckDays = lead.stageChangedAt
@@ -102,6 +105,7 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
         }
         onClick?.(lead);
       }}
+      onContextMenu={onContextMenu ? (e) => onContextMenu(lead, e) : undefined}
       style={{
         background: selected ? color.primaryBg : color.surface,
         border: `1px solid ${selected ? color.primary : isHot ? color.primary : color.border}`,

@@ -1,8 +1,15 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Phone, Check, Download } from "lucide-react";
+import { Phone, Check, Download, Eye } from "lucide-react";
 import { WhatsAppIcon } from "../../components/icons/WhatsAppIcon";
 import { openWhatsApp, openTel } from "../../lib/openExternal";
+import {
+  ContextMenu,
+  ContextMenuItem,
+  ContextMenuDivider,
+  ContextMenuLabel,
+  useContextMenu,
+} from "../../components/ContextMenu";
 import { PageHeader } from "../../components/PageHeader";
 import { Button } from "../../components/Button";
 import { Avatar } from "../../components/Avatar";
@@ -35,6 +42,8 @@ interface DeudaRow {
 export function Deudas() {
   const { activeWorkspace } = useWorkspaceStore();
   const { showToast } = useUIStore();
+  const ctxMenu = useContextMenu();
+  const [ctxRow, setCtxRow] = useState<DeudaRow | null>(null);
   const wid = activeWorkspace?.id ?? "";
   const qc = useQueryClient();
   const recordContactMut = useRecordContact();
@@ -309,6 +318,10 @@ export function Deudas() {
           rows={rows}
           columns={columns}
           getRowId={(r) => r.customerId}
+          onRowContextMenu={(r, e) => {
+            setCtxRow(r);
+            ctxMenu.openAt(e);
+          }}
           density="normal"
           empty={
             <EmptyState
@@ -318,6 +331,52 @@ export function Deudas() {
           }
         />
       </div>
+
+      {ctxMenu.open && ctxRow && (
+        <ContextMenu position={ctxMenu.position} onClose={ctxMenu.close}>
+          <ContextMenuLabel>{ctxRow.customerName}</ContextMenuLabel>
+          {ctxRow.customerPhone && (
+            <>
+              <ContextMenuItem
+                icon={<WhatsAppIcon size={13} color="var(--success)" />}
+                onClick={() => {
+                  if (ctxRow.customerPhone) {
+                    openWhatsApp(ctxRow.customerPhone);
+                    recordContactMut.mutate({ customerId: ctxRow.customerId, kind: "whatsapp" });
+                  }
+                  ctxMenu.close();
+                }}
+              >
+                WhatsApp
+              </ContextMenuItem>
+              <ContextMenuItem
+                icon={<Phone size={14} />}
+                onClick={() => {
+                  if (ctxRow.customerPhone) {
+                    openTel(ctxRow.customerPhone);
+                    recordContactMut.mutate({ customerId: ctxRow.customerId, kind: "call" });
+                  }
+                  ctxMenu.close();
+                }}
+              >
+                Llamar
+              </ContextMenuItem>
+              <ContextMenuDivider />
+            </>
+          )}
+          <ContextMenuItem
+            icon={<Eye size={14} />}
+            onClick={() => {
+              window.dispatchEvent(
+                new CustomEvent("clozr:open-client", { detail: { id: ctxRow.customerId } }),
+              );
+              ctxMenu.close();
+            }}
+          >
+            Ver cliente
+          </ContextMenuItem>
+        </ContextMenu>
+      )}
     </div>
   );
 }

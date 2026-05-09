@@ -33,6 +33,15 @@ import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useAuthStore } from '../../store/authStore';
 import { useExchangeRateStore } from '../../store/exchangeRateStore';
 import { openWhatsApp, openTel, openMail } from '../../lib/openExternal';
+import {
+  ContextMenu,
+  ContextMenuItem,
+  ContextMenuDivider,
+  ContextMenuLabel,
+  useContextMenu,
+} from '../../components/ContextMenu';
+import { ArrowRight, Trophy, XCircle, Clock3, ShoppingCart, Phone } from 'lucide-react';
+import { WhatsAppIcon } from '../../components/icons/WhatsAppIcon';
 import { space } from '../../tokens';
 import { STAGES } from '../../types/domain';
 import type { Lead, LeadStage } from '../../types/domain';
@@ -145,6 +154,8 @@ export function Pipeline() {
 
   // Selección múltiple para bulk actions
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const ctxMenu = useContextMenu();
+  const [ctxLead, setCtxLead] = useState<Lead | null>(null);
   const selectionActive = selectedIds.size > 0;
   function toggleSelect(leadId: string) {
     setSelectedIds((prev) => {
@@ -457,6 +468,10 @@ export function Pipeline() {
                         key={lead.id}
                         lead={lead}
                         onClick={(l) => setOpenClientId(l.clientId)}
+                        onContextMenu={(l, e) => {
+                          setCtxLead(l);
+                          ctxMenu.openAt(e);
+                        }}
                         onWhatsApp={(l, body) => {
                           const c = allClients.find((x) => x.id === l.clientId);
                           whatsappCustomer(c?.phone ?? null, l.clientId, body);
@@ -573,6 +588,82 @@ export function Pipeline() {
           }}
         />
       )}
+
+      {/* Context menu — click derecho sobre una card */}
+      {ctxMenu.open && ctxLead && (() => {
+        const lead = ctxLead;
+        const phone = allClients.find((c) => c.id === lead.clientId)?.phone ?? null;
+        const close = () => ctxMenu.close();
+        const moveTo = (stage: typeof lead.stage) => {
+          if (stage === 'perdido' && !window.confirm(`¿Marcar el lead de ${lead.clientName} como perdido?`)) {
+            close();
+            return;
+          }
+          moveLeadMut.mutate({ leadId: lead.id, newStage: stage });
+          if (stage === 'cerrado') showToast(`${lead.clientName} marcado como ganado 🎯`, 'success');
+          else if (stage === 'perdido') showToast(`${lead.clientName} marcado como perdido`);
+          close();
+        };
+        return (
+          <ContextMenu position={ctxMenu.position} onClose={close}>
+            <ContextMenuLabel>{lead.clientName}</ContextMenuLabel>
+            {phone && (
+              <ContextMenuItem
+                icon={<WhatsAppIcon size={13} color="var(--success)" />}
+                onClick={() => {
+                  whatsappCustomer(phone, lead.clientId);
+                  close();
+                }}
+              >
+                WhatsApp
+              </ContextMenuItem>
+            )}
+            {phone && (
+              <ContextMenuItem
+                icon={<Phone size={14} />}
+                onClick={() => {
+                  callCustomer(phone, lead.clientId);
+                  close();
+                }}
+              >
+                Llamar
+              </ContextMenuItem>
+            )}
+            <ContextMenuItem
+              icon={<ShoppingCart size={14} />}
+              onClick={() => {
+                startConvertToSale(lead);
+                close();
+              }}
+            >
+              Convertir a venta
+            </ContextMenuItem>
+            <ContextMenuDivider />
+            <ContextMenuLabel>Posponer</ContextMenuLabel>
+            <ContextMenuItem icon={<Clock3 size={14} />} onClick={() => { snoozeLeadMut.mutate({ leadId: lead.id, days: 1 }); showToast('Pospuesto mañana', 'success'); close(); }}>+1 día</ContextMenuItem>
+            <ContextMenuItem icon={<Clock3 size={14} />} onClick={() => { snoozeLeadMut.mutate({ leadId: lead.id, days: 3 }); showToast('Pospuesto en 3 días', 'success'); close(); }}>+3 días</ContextMenuItem>
+            <ContextMenuItem icon={<Clock3 size={14} />} onClick={() => { snoozeLeadMut.mutate({ leadId: lead.id, days: 7 }); showToast('Pospuesto en 1 semana', 'success'); close(); }}>+1 semana</ContextMenuItem>
+            <ContextMenuDivider />
+            <ContextMenuLabel>Mover a</ContextMenuLabel>
+            {STAGES.filter((s) => !s.terminal && s.id !== lead.stage).map((s) => (
+              <ContextMenuItem key={s.id} icon={<ArrowRight size={12} />} onClick={() => moveTo(s.id)}>
+                {s.label}
+              </ContextMenuItem>
+            ))}
+            <ContextMenuDivider />
+            {lead.stage !== 'cerrado' && (
+              <ContextMenuItem icon={<Trophy size={14} />} onClick={() => moveTo('cerrado')}>
+                Marcar como ganado
+              </ContextMenuItem>
+            )}
+            {lead.stage !== 'perdido' && (
+              <ContextMenuItem tone="danger" icon={<XCircle size={14} />} onClick={() => moveTo('perdido')}>
+                Marcar como perdido
+              </ContextMenuItem>
+            )}
+          </ContextMenu>
+        );
+      })()}
     </div>
   );
 }

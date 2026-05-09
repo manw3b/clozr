@@ -27,6 +27,7 @@ import { useClientDetail, useRecordContact, useClientsList } from '../clientes/u
 import { useUIStore } from '../../store/uiStore';
 import { useBusinessStore } from '../../store/businessStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { useAuthStore } from '../../store/authStore';
 import { useExchangeRateStore } from '../../store/exchangeRateStore';
 import { space } from '../../tokens';
 import { STAGES } from '../../types/domain';
@@ -35,11 +36,25 @@ import { NewSaleModal, type NewSalePreset } from '../ventas/components/NewSaleMo
 import { useCreateSale } from '../ventas/useSalesData';
 import { NewLeadModal } from './components/NewLeadModal';
 
-const priorityFilters = [
+/** IDs únicos de los filtros rápidos. Persistimos el activo en
+ *  localStorage para que sobreviva un reload del usuario. */
+type QuickFilter =
+  | 'todos'
+  | 'mis'
+  | 'hot'
+  | 'high'
+  | 'stuck'
+  | 'esta-semana'
+  | 'sin-accion';
+
+const quickFilters: { value: QuickFilter; label: string }[] = [
   { value: 'todos', label: 'Todos' },
+  { value: 'mis', label: 'Mis leads' },
   { value: 'hot', label: '🔥 Calientes' },
-  { value: 'high', label: 'Alta' },
-  { value: 'stuck', label: 'Estancados' },
+  { value: 'high', label: 'Alta prioridad' },
+  { value: 'stuck', label: '⚠ Estancados' },
+  { value: 'esta-semana', label: 'Esta semana' },
+  { value: 'sin-accion', label: 'Sin próxima acción' },
 ];
 
 export function Pipeline() {
@@ -50,6 +65,7 @@ export function Pipeline() {
   const { setActiveScreen, showToast } = useUIStore();
   const { activeBusiness } = useBusinessStore();
   const { activeWorkspace } = useWorkspaceStore();
+  const { userId } = useAuthStore();
   const businessName = activeBusiness?.name ?? activeWorkspace?.name ?? null;
   const recordContactMut = useRecordContact();
   const { data: allClients = [] } = useClientsList();
@@ -111,7 +127,19 @@ export function Pipeline() {
     recordContactMut.mutate({ customerId, kind: 'call' });
   }
   const [search, setSearch] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState('todos');
+  // Filtro persistido por workspace (cada workspace puede tener su default).
+  const filterKey = `clozr.pipeline.filter.${activeWorkspace?.id ?? 'default'}`;
+  const [priorityFilter, setPriorityFilterRaw] = useState<QuickFilter>(() => {
+    if (typeof window === 'undefined') return 'todos';
+    const saved = localStorage.getItem(filterKey);
+    return (saved as QuickFilter) ?? 'todos';
+  });
+  const setPriorityFilter = (f: QuickFilter) => {
+    setPriorityFilterRaw(f);
+    try {
+      localStorage.setItem(filterKey, f);
+    } catch { /* ignore */ }
+  };
   const [activeId, setActiveId] = useState<string | null>(null);
   const [openClientId, setOpenClientId] = useState<string | null>(null);
   const { data: openClientDetail } = useClientDetail(openClientId);
@@ -136,6 +164,7 @@ export function Pipeline() {
 
   /* ---------- Filtrado ---------- */
   const filteredLeads = useMemo(() => {
+    const now = Date.now();
     return leads.filter((l) => {
       if (search.trim()) {
         const q = search.toLowerCase();
@@ -145,16 +174,38 @@ export function Pipeline() {
         )
           return false;
       }
-      if (priorityFilter === 'hot' && l.priority !== 'hot') return false;
-      if (priorityFilter === 'high' && l.priority !== 'high' && l.priority !== 'hot') return false;
-      if (priorityFilter === 'stuck') {
-        if (!l.stageChangedAt) return false;
-        const days = (Date.now() - new Date(l.stageChangedAt).getTime()) / 86_400_000;
-        if (days < 7) return false;
+      switch (priorityFilter) {
+        case 'mis':
+          if (l.ownerId !== userId) return false;
+          break;
+        case 'hot':
+          if (l.priority !== 'hot') return false;
+          break;
+        case 'high':
+          if (l.priority !== 'high' && l.priority !== 'hot') return false;
+          break;
+        case 'stuck': {
+          if (!l.stageChangedAt) return false;
+          const days = (now - new Date(l.stageChangedAt).getTime()) / 86_400_000;
+          if (days < 7) return false;
+          break;
+        }
+        case 'esta-semana': {
+          const ref = l.stageChangedAt || l.createdAt;
+          const days = (now - new Date(ref).getTime()) / 86_400_000;
+          if (days > 7) return false;
+          break;
+        }
+        case 'sin-accion':
+          if (l.nextActionAt) return false;
+          break;
+        case 'todos':
+        default:
+          break;
       }
       return true;
     });
-  }, [leads, search, priorityFilter]);
+  }, [leads, search, priorityFilter, userId]);
 
   const grouped = useMemo(() => groupLeadsByStage(filteredLeads), [filteredLeads]);
   const activeLead = activeId ? leads.find((l) => l.id === activeId) : null;
@@ -292,8 +343,8 @@ export function Pipeline() {
           variant="pills"
           size="sm"
           value={priorityFilter}
-          onChange={setPriorityFilter}
-          items={priorityFilters}
+          onChange={(v) => setPriorityFilter(v as QuickFilter)}
+          items={quickFilters}
         />
       </div>
 

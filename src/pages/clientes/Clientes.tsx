@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Plus, MoreHorizontal, Users, Download } from 'lucide-react';
+import { Search, Plus, MoreHorizontal, Users, Download, Upload } from 'lucide-react';
 import { PageHeader } from '../../components/PageHeader';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -14,6 +14,7 @@ import { ClientDrawer } from './components/ClientDrawer';
 import { BulkActionBar } from './components/BulkActionBar';
 import { useClientsList, useClientDetail, useDeleteClients, useRecordContact } from './useClientsData';
 import { ClientFormModal } from './components/ClientFormModal';
+import { ImportClientsModal } from './components/ImportClientsModal';
 import { useUIStore } from '../../store/uiStore';
 import { openWhatsApp, openTel, openMail } from '../../lib/openExternal';
 import { exportToCsv as exportCsv, timestamp as csvTimestamp } from '../../lib/exportCsv';
@@ -55,6 +56,7 @@ export function Clientes() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openClientId, setOpenClientId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const { setActiveScreen, showToast } = useUIStore();
 
@@ -168,6 +170,9 @@ export function Clientes() {
         }`}
         actions={
           <>
+            <Button variant="ghost" size="md" iconLeft={<Upload size={14} />} onClick={() => setImportOpen(true)}>
+              Importar
+            </Button>
             <Button variant="secondary" size="md" iconLeft={<Download size={14} />} onClick={handleExportAll}>
               Exportar
             </Button>
@@ -296,6 +301,11 @@ export function Clientes() {
         open={formOpen}
         onClose={() => setFormOpen(false)}
         client={editingClient}
+      />
+
+      <ImportClientsModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
       />
     </div>
   );

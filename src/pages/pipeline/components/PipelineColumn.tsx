@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { useDroppable } from '@dnd-kit/core';
 import { Plus } from 'lucide-react';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney } from '../../../lib/format';
@@ -8,13 +9,9 @@ interface PipelineColumnProps {
   stage: StageConfig;
   count: number;
   totalAmount: number;
-  /** Si el draggable está hovering encima — feedback visual */
-  isDropTarget?: boolean;
   /** El drop pasaría a una etapa terminal (cerrado/perdido) */
   isTerminal?: boolean;
   onAddLead?: () => void;
-  /** ref para el SortableContext / droppable */
-  setNodeRef?: (el: HTMLElement | null) => void;
   children: ReactNode;
 }
 
@@ -29,21 +26,26 @@ export function PipelineColumn({
   stage,
   count,
   totalAmount,
-  isDropTarget,
   isTerminal,
   onAddLead,
-  setNodeRef,
   children,
 }: PipelineColumnProps) {
   const accent = stageAccent(stage.color);
 
+  // Droppable de toda la columna — useDroppable con id = stage.id permite
+  // soltar cards en columnas vacías y en el espacio libre debajo de las
+  // cards. El handleDragOver de Pipeline lee `over.id` y, si no es id de
+  // un lead, lo trata como id de stage.
+  const { setNodeRef, isOver } = useDroppable({ id: stage.id });
+
   return (
     <div
+      ref={setNodeRef}
       style={{
         display: 'flex',
         flexDirection: 'column',
-        background: isDropTarget ? `${accent.bg}` : color.surface2,
-        border: `1px solid ${isDropTarget ? accent.bar : color.border}`,
+        background: isOver ? `${accent.bg}` : color.surface2,
+        border: `1px solid ${isOver ? accent.bar : color.border}`,
         borderRadius: radius.lg,
         minWidth: 280,
         maxWidth: 320,
@@ -156,7 +158,6 @@ export function PipelineColumn({
 
       {/* Body */}
       <div
-        ref={setNodeRef}
         style={{
           flex: 1,
           overflowY: 'auto',

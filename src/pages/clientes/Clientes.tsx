@@ -8,6 +8,15 @@ import { Tabs } from '../../components/Tabs';
 import { Badge } from '../../components/Badge';
 import { Avatar } from '../../components/Avatar';
 import { TagChip } from '../../components/TagChip';
+import {
+  ContextMenu,
+  ContextMenuItem,
+  ContextMenuDivider,
+  ContextMenuLabel,
+  useContextMenu,
+} from '../../components/ContextMenu';
+import { WhatsAppIcon } from '../../components/icons/WhatsAppIcon';
+import { Phone, Pencil, Trash2, ShoppingCart, Mail, Copy } from 'lucide-react';
 import { EmptyState } from '../../components/EmptyState';
 import { DataTable, applySort, ColumnDef } from '../../components/data-table';
 import { RowActions } from '../../components/data-table/RowActions';
@@ -61,6 +70,11 @@ export function Clientes() {
   const [importOpen, setImportOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const { setActiveScreen, showToast } = useUIStore();
+
+  // Context menu (right-click) state — sostiene el client objetivo y la
+  // posición. Se cierra al elegir cualquier item o click outside.
+  const ctxMenu = useContextMenu();
+  const [ctxClient, setCtxClient] = useState<Client | null>(null);
 
   const { data: clientsData = [] } = useClientsList();
   const { data: openClientDetail } = useClientDetail(openClientId);
@@ -256,6 +270,10 @@ export function Clientes() {
           columns={columns}
           getRowId={(c) => c.id}
           onRowClick={(c) => setOpenClientId(c.id)}
+          onRowContextMenu={(c, e) => {
+            setCtxClient(c);
+            ctxMenu.openAt(e);
+          }}
           activeRowId={openClientId || undefined}
           selection={{
             selected,
@@ -322,6 +340,110 @@ export function Clientes() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
       />
+
+      {/* Context menu (click derecho en una fila) */}
+      {ctxMenu.open && ctxClient && (
+        <ContextMenu position={ctxMenu.position} onClose={ctxMenu.close}>
+          <ContextMenuLabel>{ctxClient.name}</ContextMenuLabel>
+          <ContextMenuItem
+            icon={<Users size={14} />}
+            onClick={() => {
+              setOpenClientId(ctxClient.id);
+              ctxMenu.close();
+            }}
+          >
+            Ver detalle
+          </ContextMenuItem>
+          <ContextMenuDivider />
+          {ctxClient.phone && (
+            <>
+              <ContextMenuItem
+                icon={<WhatsAppIcon size={13} color="var(--success)" />}
+                onClick={() => {
+                  if (ctxClient.phone) {
+                    openWhatsApp(ctxClient.phone);
+                    recordContactMut.mutate({ customerId: ctxClient.id, kind: 'whatsapp' });
+                  }
+                  ctxMenu.close();
+                }}
+              >
+                WhatsApp
+              </ContextMenuItem>
+              <ContextMenuItem
+                icon={<Phone size={14} />}
+                onClick={() => {
+                  if (ctxClient.phone) {
+                    openTel(ctxClient.phone);
+                    recordContactMut.mutate({ customerId: ctxClient.id, kind: 'call' });
+                  }
+                  ctxMenu.close();
+                }}
+              >
+                Llamar
+              </ContextMenuItem>
+            </>
+          )}
+          {ctxClient.email && (
+            <ContextMenuItem
+              icon={<Mail size={14} />}
+              onClick={() => {
+                if (ctxClient.email) openMail(ctxClient.email);
+                ctxMenu.close();
+              }}
+            >
+              Email
+            </ContextMenuItem>
+          )}
+          <ContextMenuItem
+            icon={<Copy size={14} />}
+            onClick={() => {
+              const text = [ctxClient.name, ctxClient.phone, ctxClient.email]
+                .filter(Boolean)
+                .join(' · ');
+              navigator.clipboard.writeText(text).catch(() => {});
+              showToast('Datos copiados', 'success');
+              ctxMenu.close();
+            }}
+          >
+            Copiar contacto
+          </ContextMenuItem>
+          <ContextMenuDivider />
+          <ContextMenuItem
+            icon={<ShoppingCart size={14} />}
+            onClick={() => {
+              setOpenClientId(ctxClient.id);
+              ctxMenu.close();
+            }}
+          >
+            Nueva venta
+          </ContextMenuItem>
+          <ContextMenuItem
+            icon={<Pencil size={14} />}
+            onClick={() => {
+              setEditingClient(ctxClient);
+              setFormOpen(true);
+              ctxMenu.close();
+            }}
+          >
+            Editar
+          </ContextMenuItem>
+          <ContextMenuDivider />
+          <ContextMenuItem
+            tone="danger"
+            icon={<Trash2 size={14} />}
+            onClick={() => {
+              if (window.confirm(`¿Eliminar a ${ctxClient.name}?`)) {
+                deleteMut.mutate([ctxClient.id], {
+                  onSuccess: () => showToast('Cliente eliminado', 'success'),
+                });
+              }
+              ctxMenu.close();
+            }}
+          >
+            Eliminar
+          </ContextMenuItem>
+        </ContextMenu>
+      )}
     </div>
   );
 }

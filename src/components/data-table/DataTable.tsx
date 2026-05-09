@@ -36,6 +36,9 @@ interface DataTableProps<T> {
   getRowId: (row: T) => string;
   /** Click en una row (abre drawer, navega, etc.) */
   onRowClick?: (row: T) => void;
+  /** Click derecho en una row → abre context menu custom. Recibe el
+   *  evento para extraer coordenadas y la row. */
+  onRowContextMenu?: (row: T, e: React.MouseEvent) => void;
   /** Row marcada visualmente como activa (ej: la que está abierta en el drawer) */
   activeRowId?: string;
   /** Selección múltiple */
@@ -64,6 +67,7 @@ export function DataTable<T>({
   columns,
   getRowId,
   onRowClick,
+  onRowContextMenu,
   activeRowId,
   selection,
   sort,
@@ -215,6 +219,9 @@ export function DataTable<T>({
               isActive={isActive}
               isSelected={isSelected}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
+              onContextMenu={
+                onRowContextMenu ? (e) => onRowContextMenu(row, e) : undefined
+              }
               isLast={idx === rows.length - 1}
             >
               {hasSelection && (
@@ -275,6 +282,7 @@ function Row({
   isActive,
   isSelected,
   onClick,
+  onContextMenu,
   isLast,
 }: {
   children: ReactNode;
@@ -283,6 +291,7 @@ function Row({
   isActive: boolean;
   isSelected: boolean;
   onClick?: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
   isLast: boolean;
 }) {
   const [hover, setHover] = useState(false);
@@ -299,6 +308,7 @@ function Row({
     <div
       role="row"
       onClick={onClick}
+      onContextMenu={onContextMenu}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{

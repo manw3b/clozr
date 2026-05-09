@@ -7,6 +7,14 @@ import { useUIStore } from "./store/uiStore";
 import { errorMessage, log } from "./lib/logger";
 import "./styles/globals.css";
 
+// Deshabilitar el context menu nativo del WebView (Atrás / Actualizar /
+// Imprimir / Inspeccionar / etc) que aparece por default. En una app
+// desktop esos items son ruido. En DEV lo dejamos activo para que se
+// pueda usar Inspeccionar/F12 al debuggear.
+if (!import.meta.env.DEV) {
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
+}
+
 const queryCache = new QueryCache({
   onError: (err, query) => {
     log.warn("Query failed", {

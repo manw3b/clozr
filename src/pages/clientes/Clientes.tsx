@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Search, Plus, MoreHorizontal, Users, Download, Upload } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Search, Plus, MoreHorizontal, Users, Download, Upload, Tag as TagIcon, ChevronDown } from 'lucide-react';
+import { colorCss } from '../../lib/colorPalette';
 import { PageHeader } from '../../components/PageHeader';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -12,7 +13,7 @@ import { DataTable, applySort, ColumnDef } from '../../components/data-table';
 import { RowActions } from '../../components/data-table/RowActions';
 import { ClientDrawer } from './components/ClientDrawer';
 import { BulkActionBar } from './components/BulkActionBar';
-import { useClientsList, useClientDetail, useDeleteClients, useRecordContact } from './useClientsData';
+import { useClientsList, useClientDetail, useDeleteClients, useRecordContact, useCustomerTags } from './useClientsData';
 import { ClientFormModal } from './components/ClientFormModal';
 import { ImportClientsModal } from './components/ImportClientsModal';
 import { useUIStore } from '../../store/uiStore';
@@ -49,6 +50,7 @@ export function Clientes() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = usePersistedState<string>('clientes.typeFilter', 'todos');
   const [statusFilter, setStatusFilter] = usePersistedState<string>('clientes.statusFilter', 'todos');
+  const [tagFilter, setTagFilter] = usePersistedState<string>('clientes.tagFilter', 'todos');
   const [sort, setSort] = usePersistedState<{ columnId: string; direction: 'asc' | 'desc' } | null>(
     'clientes.sort',
     { columnId: 'lastContactAt', direction: 'desc' },
@@ -62,6 +64,7 @@ export function Clientes() {
 
   const { data: clientsData = [] } = useClientsList();
   const { data: openClientDetail } = useClientDetail(openClientId);
+  const { data: allTags = [] } = useCustomerTags();
   const deleteMut = useDeleteClients();
   const recordContactMut = useRecordContact();
 
@@ -71,6 +74,7 @@ export function Clientes() {
       ['Teléfono', (c) => c.phone ?? ''],
       ['Email', (c) => c.email ?? ''],
       ['Tipo', (c) => c.type ?? ''],
+      ['Etiquetas', (c) => (c.tags ?? []).map((t) => t.name).join(' · ')],
       ['Notas', (c) => c.notes ?? ''],
     ]);
   }
@@ -123,6 +127,10 @@ export function Clientes() {
     return clientsData.filter((c) => {
       if (typeFilter !== 'todos' && c.type !== typeFilter) return false;
       if (statusFilter !== 'todos' && c.status !== statusFilter) return false;
+      if (tagFilter !== 'todos') {
+        const ids = (c.tags ?? []).map((t) => t.id);
+        if (!ids.includes(tagFilter)) return false;
+      }
       if (search.trim()) {
         const q = search.toLowerCase();
         return (
@@ -133,7 +141,7 @@ export function Clientes() {
       }
       return true;
     });
-  }, [search, typeFilter, statusFilter]);
+  }, [clientsData, search, typeFilter, statusFilter, tagFilter]);
 
   /* ---------- Sort ---------- */
   const sortedRows = useMemo(() => {
@@ -212,6 +220,13 @@ export function Clientes() {
           onChange={setTypeFilter}
           items={typeFilters.map((f) => ({ value: f.value, label: f.label }))}
         />
+        {allTags.length > 0 && (
+          <TagFilterPicker
+            tags={allTags}
+            value={tagFilter}
+            onChange={setTagFilter}
+          />
+        )}
         <div style={{ flex: 1 }} />
         <Tabs
           variant="pills"
@@ -490,4 +505,129 @@ function typeBadgeTone(type: ClientType): 'neutral' | 'info' | 'primary' | 'warn
     default:
       return 'neutral';
   }
+}
+
+/* ============================================================
+ *  TagFilterPicker — dropdown para filtrar la lista por una etiqueta
+ * ============================================================ */
+
+function TagFilterPicker({
+  tags,
+  value,
+  onChange,
+}: {
+  tags: Array<{ id: string; name: string; color: string }>;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const selected = value !== 'todos' ? tags.find((t) => t.id === value) : null;
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: space[2],
+          padding: `6px ${space[3]}`,
+          borderRadius: 'var(--radius-full)',
+          background: selected ? `${colorCss(selected.color)}22` : color.surface2,
+          border: `1px solid ${selected ? colorCss(selected.color) : color.border}`,
+          color: selected ? colorCss(selected.color) : color.text,
+          fontSize: text.xs,
+          fontWeight: weight.semibold,
+          cursor: 'pointer',
+        }}
+      >
+        <TagIcon size={11} />
+        {selected ? selected.name : 'Etiqueta'}
+        <ChevronDown size={11} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            zIndex: 30,
+            minWidth: 200,
+            maxHeight: 300,
+            overflowY: 'auto',
+            background: color.surface,
+            border: `1px solid var(--border-strong)`,
+            borderRadius: 8,
+            boxShadow: 'var(--shadow-lg)',
+            padding: 4,
+          }}
+        >
+          <FilterRow active={value === 'todos'} onClick={() => { onChange('todos'); setOpen(false); }}>
+            Todas las etiquetas
+          </FilterRow>
+          <div style={{ height: 1, background: color.border, margin: '4px 0' }} />
+          {tags.map((t) => (
+            <FilterRow
+              key={t.id}
+              active={value === t.id}
+              onClick={() => { onChange(t.id); setOpen(false); }}
+            >
+              <span
+                style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: colorCss(t.color), flexShrink: 0,
+                }}
+              />
+              {t.name}
+            </FilterRow>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FilterRow({
+  children, active, onClick,
+}: {
+  children: React.ReactNode; active: boolean; onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: space[2],
+        padding: `7px ${space[3]}`,
+        background: active ? color.surfaceHover : 'transparent',
+        color: color.text,
+        fontSize: text.sm,
+        fontWeight: weight.medium,
+        textAlign: 'left',
+        borderRadius: 4,
+        cursor: 'pointer',
+        width: '100%',
+        transition: 'background 100ms',
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = color.surfaceHover)}
+      onMouseLeave={(e) => (e.currentTarget.style.background = active ? color.surfaceHover : 'transparent')}
+    >
+      {children}
+    </button>
+  );
 }

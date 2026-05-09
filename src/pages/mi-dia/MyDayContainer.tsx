@@ -13,6 +13,7 @@ import { salesDb } from "../../lib/db/sales";
 import { customersDb } from "../../lib/db/customers";
 import { scoreDb } from "../../lib/db/score";
 import { workspaceDb } from "../../lib/db/workspace";
+import { openWhatsApp, openTel } from "../../lib/openExternal";
 import { getTodayISO } from "../../lib/hooks";
 import {
   greetingForHour,
@@ -194,19 +195,14 @@ export function MyDayContainer() {
       onWhatsApp={(clientId, opts) => {
         const customer = customersQ.data?.find((c) => c.id === clientId);
         if (customer?.phone) {
-          const num = customer.phone.replace(/\D/g, "");
-          const final = num.startsWith("54") ? num : `54${num}`;
-          const url = opts?.message
-            ? `https://wa.me/${final}?text=${encodeURIComponent(opts.message)}`
-            : `https://wa.me/${final}`;
-          window.open(url, "_blank");
+          openWhatsApp(customer.phone, opts?.message);
           recordContactMut.mutate({ customerId: clientId, kind: "whatsapp" });
         }
       }}
       onCall={(clientId) => {
         const customer = customersQ.data?.find((c) => c.id === clientId);
         if (customer?.phone) {
-          window.open(`tel:${customer.phone}`);
+          openTel(customer.phone);
           recordContactMut.mutate({ customerId: clientId, kind: "call" });
         }
       }}

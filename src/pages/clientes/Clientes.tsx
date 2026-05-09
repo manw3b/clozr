@@ -14,6 +14,7 @@ import { BulkActionBar } from './components/BulkActionBar';
 import { useClientsList, useClientDetail, useDeleteClients, useRecordContact } from './useClientsData';
 import { ClientFormModal } from './components/ClientFormModal';
 import { useUIStore } from '../../store/uiStore';
+import { openWhatsApp, openTel, openMail } from '../../lib/openExternal';
 import { exportToCsv as exportCsv, timestamp as csvTimestamp } from '../../lib/exportCsv';
 import { usePersistedState } from '../../lib/usePersistedState';
 import { color, space, text, weight } from '../../tokens';
@@ -268,21 +269,19 @@ export function Clientes() {
           onClose={() => setOpenClientId(null)}
           onWhatsApp={() => {
             if (openClient.phone) {
-              const num = openClient.phone.replace(/\D/g, "");
-              const final = num.startsWith("54") ? num : `54${num}`;
-              window.open(`https://wa.me/${final}`, "_blank");
+              openWhatsApp(openClient.phone);
               recordContactMut.mutate({ customerId: openClient.id, kind: "whatsapp" });
             }
           }}
           onCall={() => {
             if (openClient.phone) {
-              window.open(`tel:${openClient.phone}`);
+              openTel(openClient.phone);
               recordContactMut.mutate({ customerId: openClient.id, kind: "call" });
             }
           }}
           onEmail={() => {
             if (openClient.email) {
-              window.open(`mailto:${openClient.email}`);
+              openMail(openClient.email);
               recordContactMut.mutate({ customerId: openClient.id, kind: "email" });
             }
           }}

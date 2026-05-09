@@ -32,6 +32,7 @@ import { useBusinessStore } from '../../store/businessStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useAuthStore } from '../../store/authStore';
 import { useExchangeRateStore } from '../../store/exchangeRateStore';
+import { openWhatsApp, openTel, openMail } from '../../lib/openExternal';
 import { space } from '../../tokens';
 import { STAGES } from '../../types/domain';
 import type { Lead, LeadStage } from '../../types/domain';
@@ -113,12 +114,7 @@ export function Pipeline() {
       showToast('Este cliente no tiene teléfono registrado');
       return;
     }
-    const num = phone.replace(/\D/g, '');
-    const final = num.startsWith('54') ? num : `54${num}`;
-    const url = body
-      ? `https://wa.me/${final}?text=${encodeURIComponent(body)}`
-      : `https://wa.me/${final}`;
-    window.open(url, '_blank');
+    openWhatsApp(phone, body);
     recordContactMut.mutate({ customerId, kind: 'whatsapp' });
   }
 
@@ -127,7 +123,7 @@ export function Pipeline() {
       showToast('Este cliente no tiene teléfono registrado');
       return;
     }
-    window.open(`tel:${phone}`);
+    openTel(phone);
     recordContactMut.mutate({ customerId, kind: 'call' });
   }
   const [search, setSearch] = useState('');
@@ -505,7 +501,7 @@ export function Pipeline() {
           onCall={() => callCustomer(openClient.phone, openClient.id)}
           onEmail={() => {
             if (openClient.email) {
-              window.open(`mailto:${openClient.email}`);
+              openMail(openClient.email);
               recordContactMut.mutate({ customerId: openClient.id, kind: 'email' });
             } else showToast('Este cliente no tiene email registrado');
           }}

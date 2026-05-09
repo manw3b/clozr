@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Phone, Check, Download } from "lucide-react";
 import { WhatsAppIcon } from "../../components/icons/WhatsAppIcon";
+import { openWhatsApp, openTel } from "../../lib/openExternal";
 import { PageHeader } from "../../components/PageHeader";
 import { Button } from "../../components/Button";
 import { Avatar } from "../../components/Avatar";
@@ -102,11 +103,10 @@ export function Deudas() {
     return { totalDue, overdueCount, customerCount: rows.length };
   }, [rows]);
 
-  function whatsappLink(phone: string | null) {
-    if (!phone) return null;
-    const num = phone.replace(/\D/g, "");
-    const final = num.startsWith("54") ? num : `54${num}`;
-    return `https://wa.me/${final}`;
+  // hasPhone se usa solo para mostrar/ocultar el botón. La normalización
+  // del número y la apertura van por openWhatsApp().
+  function hasPhone(phone: string | null): boolean {
+    return !!phone && phone.replace(/\D/g, "").length > 0;
   }
 
   const columns: ColumnDef<DeudaRow>[] = [
@@ -172,18 +172,19 @@ export function Deudas() {
       header: "",
       width: "240px",
       cell: (r) => {
-        const wa = whatsappLink(r.customerPhone);
         return (
           <div style={{ display: "flex", gap: space[2], justifyContent: "flex-end" }}>
-            {wa && (
+            {hasPhone(r.customerPhone) && (
               <Button
                 variant="secondary"
                 size="sm"
                 iconLeft={<WhatsAppIcon size={13} color="var(--success)" />}
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.open(wa, "_blank");
-                  recordContactMut.mutate({ customerId: r.customerId, kind: "whatsapp" });
+                  if (r.customerPhone) {
+                    openWhatsApp(r.customerPhone);
+                    recordContactMut.mutate({ customerId: r.customerId, kind: "whatsapp" });
+                  }
                 }}
               >
                 WhatsApp
@@ -196,8 +197,10 @@ export function Deudas() {
                 iconLeft={<Phone size={13} />}
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.open(`tel:${r.customerPhone}`);
-                  recordContactMut.mutate({ customerId: r.customerId, kind: "call" });
+                  if (r.customerPhone) {
+                    openTel(r.customerPhone);
+                    recordContactMut.mutate({ customerId: r.customerId, kind: "call" });
+                  }
                 }}
               />
             )}

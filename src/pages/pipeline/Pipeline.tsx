@@ -52,8 +52,8 @@ import {
 import { ArrowRight, Trophy, XCircle, Clock3, ShoppingCart, Phone, CalendarPlus } from 'lucide-react';
 import { WhatsAppIcon } from '../../components/icons/WhatsAppIcon';
 import { space } from '../../tokens';
-import { STAGES } from '../../types/domain';
-import type { Lead, LeadStage } from '../../types/domain';
+import type { Lead, LeadStage, StageConfig } from '../../types/domain';
+import { usePipelineStages } from './usePipelineStages';
 import { NewSaleModal, type NewSalePreset } from '../ventas/components/NewSaleModal';
 import { useCreateSale } from '../ventas/useSalesData';
 import { NewLeadModal } from './components/NewLeadModal';
@@ -85,6 +85,12 @@ export function Pipeline() {
   const moveLeadMut = useMoveLead();
   const snoozeLeadMut = useSnoozeLead();
   const scheduleVisitMut = useScheduleVisit();
+  // Etapas dinámicas del workspace (configurables desde Ajustes).
+  const { stages: STAGES } = usePipelineStages();
+  // Helpers para acciones que necesitan saber qué etapa cuenta como
+  // "ganado" o "perdido" — útil porque el usuario pudo renombrar/agregar.
+  const wonStage: StageConfig | undefined = STAGES.find((s) => s.isWon);
+  const lostStage: StageConfig | undefined = STAGES.find((s) => s.isLost);
   const addNoteMut = useAddLeadNote();
   const { setActiveScreen, showToast } = useUIStore();
   const { activeBusiness } = useBusinessStore();
@@ -397,7 +403,7 @@ export function Pipeline() {
     // — fácil hacerlo por accidente con el drag.
     const movedLead = leads.find((l) => l.id === activeId);
     if (movedLead) {
-      if (movedLead.stage === 'perdido') {
+      if (lostStage && movedLead.stage === lostStage.id) {
         const ok = window.confirm(
           `¿Marcar el lead de ${movedLead.clientName} como perdido?`,
         );
@@ -419,7 +425,10 @@ export function Pipeline() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: space[5], height: '100%' }}>
       <PageHeader
         title="Pipeline"
-        subtitle={`${filteredLeads.filter((l) => l.stage !== 'cerrado' && l.stage !== 'perdido').length} leads activos`}
+        subtitle={`${filteredLeads.filter((l) => {
+          const cfg = STAGES.find((s) => s.id === l.stage);
+          return !cfg?.terminal;
+        }).length} leads activos`}
         actions={
           <>
             <Button
@@ -546,9 +555,10 @@ export function Pipeline() {
                         onConvertToSale={startConvertToSale}
                         onChangeStage={(l, newStage) => {
                           moveLeadMut.mutate({ leadId: l.id, newStage });
-                          if (newStage === 'cerrado') {
+                          const cfg = STAGES.find((s) => s.id === newStage);
+                          if (cfg?.isWon) {
                             showToast(`${l.clientName} marcado como ganado 🎯`, 'success');
-                          } else if (newStage === 'perdido') {
+                          } else if (cfg?.isLost) {
                             showToast(`${l.clientName} marcado como perdido`);
                           }
                         }}
@@ -619,10 +629,10 @@ export function Pipeline() {
         preset={salePreset}
         onSubmit={async (data) => {
           await createSaleMut.mutateAsync(data);
-          // Mover el lead a "cerrado" automáticamente
-          if (convertingLead) {
+          // Mover el lead a la etapa de "ganado" del workspace.
+          if (convertingLead && wonStage) {
             try {
-              await moveLeadMut.mutateAsync({ leadId: convertingLead.id, newStage: 'cerrado' });
+              await moveLeadMut.mutateAsync({ leadId: convertingLead.id, newStage: wonStage.id });
             } catch {
               /* si falla el move, la venta igual quedó registrada */
             }
@@ -657,13 +667,14 @@ export function Pipeline() {
         const phone = allClients.find((c) => c.id === lead.clientId)?.phone ?? null;
         const close = () => ctxMenu.close();
         const moveTo = (stage: typeof lead.stage) => {
-          if (stage === 'perdido' && !window.confirm(`¿Marcar el lead de ${lead.clientName} como perdido?`)) {
+          const target = STAGES.find((s) => s.id === stage);
+          if (target?.isLost && !window.confirm(`¿Marcar el lead de ${lead.clientName} como perdido?`)) {
             close();
             return;
           }
           moveLeadMut.mutate({ leadId: lead.id, newStage: stage });
-          if (stage === 'cerrado') showToast(`${lead.clientName} marcado como ganado 🎯`, 'success');
-          else if (stage === 'perdido') showToast(`${lead.clientName} marcado como perdido`);
+          if (target?.isWon) showToast(`${lead.clientName} marcado como ganado 🎯`, 'success');
+          else if (target?.isLost) showToast(`${lead.clientName} marcado como perdido`);
           close();
         };
         return (
@@ -722,13 +733,13 @@ export function Pipeline() {
               </ContextMenuItem>
             ))}
             <ContextMenuDivider />
-            {lead.stage !== 'cerrado' && (
-              <ContextMenuItem icon={<Trophy size={14} />} onClick={() => moveTo('cerrado')}>
+            {wonStage && lead.stage !== wonStage.id && (
+              <ContextMenuItem icon={<Trophy size={14} />} onClick={() => moveTo(wonStage.id)}>
                 Marcar como ganado
               </ContextMenuItem>
             )}
-            {lead.stage !== 'perdido' && (
-              <ContextMenuItem tone="danger" icon={<XCircle size={14} />} onClick={() => moveTo('perdido')}>
+            {lostStage && lead.stage !== lostStage.id && (
+              <ContextMenuItem tone="danger" icon={<XCircle size={14} />} onClick={() => moveTo(lostStage.id)}>
                 Marcar como perdido
               </ContextMenuItem>
             )}

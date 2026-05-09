@@ -2,7 +2,7 @@ import { TrendingUp, DollarSign, Target, Trophy, AlertCircle } from 'lucide-reac
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney } from '../../../lib/format';
 import type { Lead } from '../../../types/domain';
-import { STAGES } from '../../../types/domain';
+import { usePipelineStages } from '../usePipelineStages';
 
 interface PipelineMetricsProps {
   leads: Lead[];
@@ -22,9 +22,15 @@ const STUCK_DAYS = 7;
  * no-terminal, para identificar cuellos de botella.
  */
 export function PipelineMetrics({ leads }: PipelineMetricsProps) {
-  const active = leads.filter((l) => l.stage !== 'cerrado' && l.stage !== 'perdido');
-  const closed = leads.filter((l) => l.stage === 'cerrado');
-  const lost = leads.filter((l) => l.stage === 'perdido');
+  const { stages: STAGES } = usePipelineStages();
+  const stageById = new Map(STAGES.map((s) => [s.id, s]));
+  const isTerminal = (stageId: string) => stageById.get(stageId)?.terminal === true;
+  const isWon = (stageId: string) => stageById.get(stageId)?.isWon === true;
+  const isLost = (stageId: string) => stageById.get(stageId)?.isLost === true;
+
+  const active = leads.filter((l) => !isTerminal(l.stage));
+  const closed = leads.filter((l) => isWon(l.stage));
+  const lost = leads.filter((l) => isLost(l.stage));
 
   const totalPipeline = active.reduce((sum, l) => sum + (l.amount || 0), 0);
 
@@ -105,6 +111,7 @@ export function PipelineMetrics({ leads }: PipelineMetricsProps) {
  * ============================================================ */
 
 function StageBreakdown({ leads }: { leads: Lead[] }) {
+  const { stages: STAGES } = usePipelineStages();
   const now = Date.now();
   const nonTerminal = STAGES.filter((s) => !s.terminal);
 

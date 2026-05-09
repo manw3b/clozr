@@ -5,8 +5,8 @@ import { pipelineDb } from "../../lib/db/pipeline";
 import { followupsDb } from "../../lib/db/followups";
 import { dbItemToLead } from "../../lib/mappers";
 import { qk, invalidate } from "../../lib/queryKeys";
-import { STAGES } from "../../types/domain";
 import { followupForStage } from "../../lib/stageFollowups";
+import { getCachedStages } from "./usePipelineStages";
 import type { Lead, LeadStage } from "../../types/domain";
 
 export function usePipelineLeads() {
@@ -31,8 +31,10 @@ export function useMoveLead() {
 
   return useMutation({
     mutationFn: async ({ leadId, newStage }: { leadId: string; newStage: LeadStage }) => {
-      const stageConfig = STAGES.find((s) => s.id === newStage);
-      const stageOrder = STAGES.findIndex((s) => s.id === newStage);
+      // Usamos la lista dinámica del workspace (cacheada en React Query).
+      const stages = getCachedStages(qc, wid);
+      const stageConfig = stages.find((s) => s.id === newStage);
+      const stageOrder = stages.findIndex((s) => s.id === newStage);
       if (!stageConfig) return;
       await pipelineDb.updateStage(leadId, newStage, stageConfig.label, stageOrder);
 
@@ -121,9 +123,14 @@ export function useScheduleVisit() {
       product?: string | null;
       isMayorista: boolean;
     }) => {
-      const stageCfg = STAGES.find((s) => s.id === "visita-agendada");
-      const stageOrder = STAGES.findIndex((s) => s.id === "visita-agendada");
-      if (!stageCfg) throw new Error("Etapa visita-agendada no configurada");
+      // Buscamos la etapa "visita agendada" del workspace: primero por id
+      // canonical, después por nombre (tolerante a guion/espacio/case).
+      const stages = getCachedStages(qc, wid);
+      const stageCfg =
+        stages.find((s) => s.id === "visita-agendada") ??
+        stages.find((s) => /visita/i.test(s.label));
+      const stageOrder = stageCfg ? stages.findIndex((s) => s.id === stageCfg.id) : -1;
+      if (!stageCfg) throw new Error("No hay etapa de visita configurada en este workspace");
 
       // Si es mayorista, generamos el código antes de persistir.
       let wholesaleCode: string | null = null;

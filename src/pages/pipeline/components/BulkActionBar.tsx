@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, ChevronDown, Trophy, XCircle, ArrowRight } from 'lucide-react';
 import { color, radius, space, text, weight, duration, ease } from '../../../tokens';
-import { STAGES } from '../../../types/domain';
 import type { LeadStage } from '../../../types/domain';
+import { usePipelineStages } from '../usePipelineStages';
 
 interface BulkActionBarProps {
   count: number;
@@ -18,6 +18,8 @@ interface BulkActionBarProps {
 export function BulkActionBar({ count, onClear, onChangeStage }: BulkActionBarProps) {
   const [moveOpen, setMoveOpen] = useState(false);
   const moveWrapRef = useRef<HTMLDivElement>(null);
+  const { stages: STAGES } = usePipelineStages();
+  const lostStage = STAGES.find((s) => s.isLost);
 
   useEffect(() => {
     if (!moveOpen) return;
@@ -38,7 +40,7 @@ export function BulkActionBar({ count, onClear, onChangeStage }: BulkActionBarPr
   }, [moveOpen]);
 
   function move(stage: LeadStage) {
-    if (stage === 'perdido') {
+    if (lostStage && stage === lostStage.id) {
       if (
         !window.confirm(
           `¿Marcar ${count} ${count === 1 ? 'lead' : 'leads'} como perdido?`,
@@ -138,15 +140,22 @@ export function BulkActionBar({ count, onClear, onChangeStage }: BulkActionBarPr
         )}
       </div>
 
-      <ToolbarBtn tone="success" onClick={() => move('cerrado')}>
-        <Trophy size={13} />
-        Marcar ganados
-      </ToolbarBtn>
+      {(() => {
+        const wonStage = STAGES.find((s) => s.isWon);
+        return wonStage ? (
+          <ToolbarBtn tone="success" onClick={() => move(wonStage.id)}>
+            <Trophy size={13} />
+            Marcar ganados
+          </ToolbarBtn>
+        ) : null;
+      })()}
 
-      <ToolbarBtn tone="danger" onClick={() => move('perdido')}>
-        <XCircle size={13} />
-        Marcar perdidos
-      </ToolbarBtn>
+      {lostStage && (
+        <ToolbarBtn tone="danger" onClick={() => move(lostStage.id)}>
+          <XCircle size={13} />
+          Marcar perdidos
+        </ToolbarBtn>
+      )}
 
       <span
         aria-hidden

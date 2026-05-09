@@ -28,11 +28,9 @@ function sale(partial: Partial<Sale>): Sale {
 }
 
 describe("groupLeadsByStage", () => {
-  it("returns object with all 7 stages even when empty", () => {
+  it("returns empty object when no leads (buckets son on-demand)", () => {
     const grouped = groupLeadsByStage([]);
-    expect(Object.keys(grouped).sort()).toEqual(
-      ["cerrado", "contactado", "negociando", "perdido", "presupuestado", "prospecto", "visita-agendada"].sort(),
-    );
+    expect(Object.keys(grouped)).toEqual([]);
   });
 
   it("buckets leads by their stage", () => {

@@ -4,20 +4,20 @@
  */
 import type { Lead, Sale } from "../types/domain";
 
-/** Agrupa leads por stage, ordenados por `position` asc dentro de cada columna. */
+/**
+ * Agrupa leads por stage, ordenados por `position` asc dentro de cada columna.
+ *
+ * Crea buckets on-the-fly para cualquier stage id que aparezca en `leads`
+ * (soporta etapas custom del workspace). El caller renderiza las columnas
+ * en base a su propia lista de stages — si un lead apunta a un id que ya
+ * no existe en la config, igual queda accesible vía `grouped[id]` para
+ * que la app pueda detectarlo.
+ */
 export function groupLeadsByStage(leads: Lead[]): Record<string, Lead[]> {
-  const grouped: Record<string, Lead[]> = {
-    prospecto: [],
-    contactado: [],
-    "visita-agendada": [],
-    presupuestado: [],
-    negociando: [],
-    cerrado: [],
-    perdido: [],
-  };
+  const grouped: Record<string, Lead[]> = {};
   for (const lead of leads) {
-    const arr = grouped[lead.stage];
-    if (arr) arr.push(lead);
+    const arr = grouped[lead.stage] ?? (grouped[lead.stage] = []);
+    arr.push(lead);
   }
   for (const k of Object.keys(grouped)) {
     grouped[k]?.sort((a, b) => (a.position || 0) - (b.position || 0));

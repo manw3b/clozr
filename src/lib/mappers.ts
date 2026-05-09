@@ -207,6 +207,12 @@ export function dbCustomerToInactive(c: DbCustomer, daysSinceContact: number): I
 
 /* ── Pipeline (Lead) ────────────────────────────────────────── */
 
+/**
+ * Mapeo legacy: en versiones viejas de la app, pipeline_items.stage_name
+ * guardaba el LABEL en castellano ("Visita Agendada") en vez del id. Acá
+ * canonicalizamos. Para stages custom (id desconocido), devolvemos el
+ * input tal cual para que el renderer dinámico los matche por id.
+ */
 const STAGE_LABEL_TO_ID: Record<string, LeadStage> = {
   prospecto: "prospecto",
   prospect: "prospecto",
@@ -214,6 +220,7 @@ const STAGE_LABEL_TO_ID: Record<string, LeadStage> = {
   contacted: "contactado",
   "visita agendada": "visita-agendada",
   "visita-agendada": "visita-agendada",
+  visita_agendada: "visita-agendada",
   presupuestado: "presupuestado",
   negociando: "negociando",
   cerrado: "cerrado",
@@ -221,7 +228,11 @@ const STAGE_LABEL_TO_ID: Record<string, LeadStage> = {
 };
 
 export function leadStageFromDb(stageNameOrId: string): LeadStage {
-  return STAGE_LABEL_TO_ID[stageNameOrId.toLowerCase().trim()] ?? "prospecto";
+  if (!stageNameOrId) return "prospecto";
+  const key = stageNameOrId.toLowerCase().trim();
+  // Si lo conocemos en el mapeo legacy, devolvemos el id canonical;
+  // si no, asumimos que ya es un id válido (custom stage).
+  return STAGE_LABEL_TO_ID[key] ?? stageNameOrId;
 }
 
 export function leadPriorityFromInactiveDays(days: number): LeadPriority {
@@ -245,7 +256,9 @@ export function dbItemToLead(p: DbPipelineItem): Lead {
     clientId: p.customer_id,
     clientName: p.customer_name ?? "Sin cliente",
     clientInitials: nameInitials(p.customer_name),
-    stage: leadStageFromDb(p.stage_name ?? p.stage_id),
+    // Preferimos stage_id (fuente de verdad de pipeline_stages.id); sólo
+    // caemos a stage_name si llegó vacío (DBs muy viejas pre-stage_id).
+    stage: p.stage_id ? leadStageFromDb(p.stage_id) : leadStageFromDb(p.stage_name ?? ""),
     amount: p.estimated_value ?? undefined,
     currency: (p.currency as "ARS" | "USD") ?? "ARS",
     priority,

@@ -37,7 +37,16 @@ export interface Client {
  *  Lead
  * ============================================================ */
 
-export type LeadStage =
+/**
+ * El id de una etapa del pipeline.
+ *
+ * Antes era un union literal cerrado, pero ahora las etapas son configurables
+ * por workspace (tabla pipeline_stages) y pueden tener id custom (UUID o
+ * slug). Mantenemos los semantic ids viejos como referencia/seed pero el
+ * tipo es `string` para soportar etapas custom.
+ */
+export type LeadStage = string;
+export type CanonicalLeadStage =
   | 'prospecto'
   | 'contactado'
   | 'visita-agendada'
@@ -321,13 +330,16 @@ export interface MyDayData {
 export interface StageConfig {
   id: LeadStage;
   label: string;
-  /** ID de la paleta unificada (lib/colorPalette.ts). Aceptamos string
-   *  para que stages custom del usuario (que pueden traer aliases legacy
-   *  como 'info' o 'primary' de versiones anteriores) sigan funcionando.
-   *  El renderer hace el lookup tolerante. */
+  /** ID de la paleta unificada (lib/colorPalette.ts). */
   color: string;
   probability?: number;
   terminal?: boolean;
+  /** Migración a stages dinámicos: marca la columna que cuenta como
+   *  "ganado" / "perdido" para acciones tipo "Marcar como ganado". */
+  isWon?: boolean;
+  isLost?: boolean;
+  /** Para preservar el orden cuando viene de DB. */
+  order?: number;
 }
 
 export const STAGES: StageConfig[] = [

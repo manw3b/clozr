@@ -15,8 +15,8 @@ import { useAuthStore } from "../../../store/authStore";
 import { useClientsList } from "../../clientes/useClientsData";
 import { invalidate } from "../../../lib/queryKeys";
 import { color, radius, space, text, weight } from "../../../tokens";
-import { STAGES } from "../../../types/domain";
 import type { Client, LeadStage, LeadPriority } from "../../../types/domain";
+import { usePipelineStages } from "../usePipelineStages";
 
 interface Props {
   open: boolean;
@@ -31,6 +31,7 @@ export function NewLeadModal({ open, onClose, initialStage = "prospecto" }: Prop
   const { activeWorkspace } = useWorkspaceStore();
   const { userId } = useAuthStore();
   const wid = activeWorkspace?.id ?? "";
+  const { stages: STAGES } = usePipelineStages();
 
   const [clientSearch, setClientSearch] = useState("");
   const [client, setClient] = useState<Client | null>(null);

@@ -20,7 +20,7 @@ import { Avatar } from '../../../components/Avatar';
 import { color, radius, space, text, weight, duration, ease } from '../../../tokens';
 import { formatMoney, formatRelative } from '../../../lib/format';
 import type { Lead, LeadStage } from '../../../types/domain';
-import { STAGES } from '../../../types/domain';
+import { usePipelineStages } from '../usePipelineStages';
 
 /** Combinación de attributes + listeners de @dnd-kit/sortable que se
  *  spreadea sobre el elemento que dispara el drag. No los podemos
@@ -394,6 +394,7 @@ function QuickActionsMenu({
   const [open, setOpen] = useState(false);
   const [noteInput, setNoteInput] = useState<string | null>(null); // null = no abierto
   const wrapRef = useRef<HTMLDivElement>(null);
+  const { stages: STAGES } = usePipelineStages();
 
   useEffect(() => {
     if (!open) return;

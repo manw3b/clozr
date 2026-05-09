@@ -198,8 +198,13 @@ describe("leadStageFromDb", () => {
     expect(leadStageFromDb("PROSPECT")).toBe("prospecto");
   });
 
-  it("falls back to prospecto for unknown", () => {
-    expect(leadStageFromDb("xyz-stage")).toBe("prospecto");
+  it("returns input as-is for unknown ids (custom stages)", () => {
+    expect(leadStageFromDb("xyz-stage")).toBe("xyz-stage");
+    expect(leadStageFromDb("aprobado")).toBe("aprobado");
+  });
+
+  it("falls back to prospecto for empty input", () => {
+    expect(leadStageFromDb("")).toBe("prospecto");
   });
 });
 

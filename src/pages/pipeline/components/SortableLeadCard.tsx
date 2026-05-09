@@ -13,6 +13,9 @@ interface SortableLeadCardProps {
   onChangeStage?: (lead: Lead, newStage: LeadStage) => void;
   onSnooze?: (lead: Lead, days: number) => void;
   onAddNote?: (lead: Lead, text: string) => void;
+  selected?: boolean;
+  selectionActive?: boolean;
+  onToggleSelect?: (lead: Lead) => void;
 }
 
 /**
@@ -27,7 +30,7 @@ interface SortableLeadCardProps {
  * El componente DragOverlay (en Pipeline.tsx) renderiza el preview que
  * sigue al cursor — eso es lo que el usuario ve nítido durante el drag.
  */
-export function SortableLeadCard({ lead, onClick, onWhatsApp, businessName, onCall, onConvertToSale, onChangeStage, onSnooze, onAddNote }: SortableLeadCardProps) {
+export function SortableLeadCard({ lead, onClick, onWhatsApp, businessName, onCall, onConvertToSale, onChangeStage, onSnooze, onAddNote, selected, selectionActive, onToggleSelect }: SortableLeadCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: lead.id,
     data: { type: 'lead', lead },
@@ -51,6 +54,9 @@ export function SortableLeadCard({ lead, onClick, onWhatsApp, businessName, onCa
       onChangeStage={onChangeStage}
       onSnooze={onSnooze}
       onAddNote={onAddNote}
+      selected={selected}
+      selectionActive={selectionActive}
+      onToggleSelect={onToggleSelect}
       dragHandleProps={{ ...attributes, ...listeners }}
       style={style}
     />

@@ -54,6 +54,14 @@ interface LeadCardProps {
   onSnooze?: (lead: Lead, days: number) => void;
   /** Agrega una nota libre al activity log del lead. */
   onAddNote?: (lead: Lead, text: string) => void;
+  /** Selection (multi-select). Si pasás onToggleSelect, se renderiza un
+   *  checkbox en la card y la card mueve el click body para que NO abra
+   *  el drawer cuando hay selección activa. */
+  selected?: boolean;
+  /** Si true, hay otras cards seleccionadas — se fuerza a mostrar el
+   *  checkbox aunque no haya hover sobre esta. */
+  selectionActive?: boolean;
+  onToggleSelect?: (lead: Lead) => void;
   /** Listeners y attributes del DnD-kit (sortable) */
   dragHandleProps?: DragHandleProps;
   /** Style externo (transformación durante drag) */
@@ -69,7 +77,7 @@ interface LeadCardProps {
  * - El "isOverlay" se usa para el preview que sigue al cursor — se ve más sólido
  */
 export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadCard(
-  { lead, isDragging, isOverlay, onClick, onWhatsApp, businessName, onCall, onConvertToSale, onChangeStage, onSnooze, onAddNote, dragHandleProps, style },
+  { lead, isDragging, isOverlay, onClick, onWhatsApp, businessName, onCall, onConvertToSale, onChangeStage, onSnooze, onAddNote, selected, selectionActive, onToggleSelect, dragHandleProps, style },
   ref
 ) {
   const stuckDays = lead.stageChangedAt
@@ -83,39 +91,91 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
   return (
     <div
       ref={ref}
-      onClick={() => !isOverlay && onClick?.(lead)}
+      onClick={(e) => {
+        if (isOverlay) return;
+        // Si hay selección activa o cmd/ctrl-click, click toggea selección
+        // en lugar de abrir el drawer.
+        if (onToggleSelect && (selectionActive || e.metaKey || e.ctrlKey)) {
+          e.stopPropagation();
+          onToggleSelect(lead);
+          return;
+        }
+        onClick?.(lead);
+      }}
       style={{
-        background: color.surface,
-        border: `1px solid ${isHot ? color.primary : color.border}`,
+        background: selected ? color.primaryBg : color.surface,
+        border: `1px solid ${selected ? color.primary : isHot ? color.primary : color.border}`,
         // Indicador stuck: borde izquierdo grueso warning para que llame
         // la atención sin romper la grid de la card
-        borderLeft: isStuck && !isHot ? `3px solid ${color.warning}` : `1px solid ${color.border}`,
+        borderLeft:
+          isStuck && !isHot && !selected
+            ? `3px solid ${color.warning}`
+            : `1px solid ${selected ? color.primary : color.border}`,
         borderRadius: radius.md,
         padding: space[3],
-        paddingLeft: isStuck && !isHot ? `calc(${space[3]} - 2px)` : space[3],
+        paddingLeft: isStuck && !isHot && !selected ? `calc(${space[3]} - 2px)` : space[3],
         display: 'flex',
         flexDirection: 'column',
         gap: space[2],
         cursor: isOverlay ? 'grabbing' : 'grab',
         position: 'relative',
-        transition: isDragging ? 'none' : 'border-color 100ms, box-shadow 100ms',
+        transition: isDragging ? 'none' : 'border-color 100ms, box-shadow 100ms, background 100ms',
         boxShadow: isOverlay ? '0 12px 32px rgba(0, 0, 0, 0.5)' : 'none',
         opacity: isDragging ? 0.4 : 1,
         userSelect: 'none',
         ...style,
       }}
       onMouseEnter={(e) => {
-        if (!isHot && !isDragging && !isOverlay) {
+        if (!isHot && !isDragging && !isOverlay && !selected) {
           e.currentTarget.style.borderColor = color.borderStrong;
         }
       }}
       onMouseLeave={(e) => {
-        if (!isHot && !isDragging && !isOverlay) {
+        if (!isHot && !isDragging && !isOverlay && !selected) {
           e.currentTarget.style.borderColor = color.border;
         }
       }}
       {...dragHandleProps}
     >
+      {/* Checkbox de selección — visible cuando hay selección activa o
+          en hover. Click NO propaga al body de la card. */}
+      {onToggleSelect && (
+        <button
+          type="button"
+          aria-label={selected ? 'Deseleccionar' : 'Seleccionar'}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelect(lead);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            top: 6,
+            right: 6,
+            width: 18,
+            height: 18,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: radius.sm,
+            border: `1.5px solid ${selected ? color.primary : color.borderStrong}`,
+            background: selected ? color.primary : color.surface,
+            color: '#fff',
+            cursor: 'pointer',
+            opacity: selected || selectionActive ? 1 : 0,
+            transition: 'opacity 120ms, background 120ms, border-color 120ms',
+            zIndex: 2,
+          }}
+          // Mostrar checkbox al hacer hover sobre la card
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+          onMouseLeave={(e) => {
+            if (!selected && !selectionActive) e.currentTarget.style.opacity = '0';
+          }}
+        >
+          {selected && <Check size={11} strokeWidth={3} />}
+        </button>
+      )}
+
       {/* Indicador izquierdo de prioridad */}
       {isHot && (
         <div

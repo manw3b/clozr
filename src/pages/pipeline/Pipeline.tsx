@@ -35,6 +35,7 @@ import type { Lead, LeadStage } from '../../types/domain';
 import { NewSaleModal, type NewSalePreset } from '../ventas/components/NewSaleModal';
 import { useCreateSale } from '../ventas/useSalesData';
 import { NewLeadModal } from './components/NewLeadModal';
+import { BulkActionBar } from './components/BulkActionBar';
 
 /** IDs únicos de los filtros rápidos. Persistimos el activo en
  *  localStorage para que sobreviva un reload del usuario. */
@@ -142,6 +143,30 @@ export function Pipeline() {
   };
   const [activeId, setActiveId] = useState<string | null>(null);
   const [openClientId, setOpenClientId] = useState<string | null>(null);
+
+  // Selección múltiple para bulk actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const selectionActive = selectedIds.size > 0;
+  function toggleSelect(leadId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(leadId)) next.delete(leadId);
+      else next.add(leadId);
+      return next;
+    });
+  }
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+  // Esc limpia la selección
+  useEffect(() => {
+    if (selectedIds.size === 0) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') clearSelection();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [selectedIds.size]);
   const { data: openClientDetail } = useClientDetail(openClientId);
 
   // Local optimistic state for drag&drop reorder. Mutation handles persistence.
@@ -422,6 +447,9 @@ export function Pipeline() {
                           addNoteMut.mutate({ leadId: l.id, text });
                           showToast('Nota agregada', 'success');
                         }}
+                        selected={selectedIds.has(lead.id)}
+                        selectionActive={selectionActive}
+                        onToggleSelect={(l) => toggleSelect(l.id)}
                       />
                     ))
                   )}
@@ -490,6 +518,24 @@ export function Pipeline() {
           setSalePreset(null);
         }}
       />
+
+      {/* Bulk action bar — flota cuando hay leads seleccionados */}
+      {selectionActive && (
+        <BulkActionBar
+          count={selectedIds.size}
+          onClear={clearSelection}
+          onChangeStage={(stage) => {
+            const ids = Array.from(selectedIds);
+            ids.forEach((id) => moveLeadMut.mutate({ leadId: id, newStage: stage }));
+            const stageLabel = STAGES.find((s) => s.id === stage)?.label ?? stage;
+            showToast(
+              `${ids.length} ${ids.length === 1 ? 'lead movido' : 'leads movidos'} a ${stageLabel}`,
+              'success',
+            );
+            clearSelection();
+          }}
+        />
+      )}
     </div>
   );
 }

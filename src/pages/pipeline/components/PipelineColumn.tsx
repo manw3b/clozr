@@ -3,6 +3,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { Plus } from 'lucide-react';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney } from '../../../lib/format';
+import { colorCss, colorBg } from '../../../lib/colorPalette';
 import type { StageConfig } from '../../../types/domain';
 
 interface PipelineColumnProps {
@@ -30,7 +31,8 @@ export function PipelineColumn({
   onAddLead,
   children,
 }: PipelineColumnProps) {
-  const accent = stageAccent(stage.color);
+  const accentBar = colorCss(stage.color);
+  const accentBg = colorBg(stage.color, 0.08);
 
   // Droppable de toda la columna — useDroppable con id = stage.id permite
   // soltar cards en columnas vacías y en el espacio libre debajo de las
@@ -44,8 +46,9 @@ export function PipelineColumn({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        background: isOver ? `${accent.bg}` : color.surface2,
-        border: `1px solid ${isOver ? accent.bar : color.border}`,
+        background: isOver ? accentBg : color.surface2,
+        border: `1px solid ${isOver ? accentBar : color.border}`,
+        borderTop: `3px solid ${accentBar}`,
         borderRadius: radius.lg,
         minWidth: 240,
         maxWidth: 280,
@@ -67,13 +70,13 @@ export function PipelineColumn({
           gap: space[2],
         }}
       >
-        {/* Color dot */}
+        {/* Color dot — refuerza el stripe del top */}
         <span
           style={{
             width: 8,
             height: 8,
             borderRadius: '50%',
-            background: accent.bar,
+            background: accentBar,
             flexShrink: 0,
           }}
         />
@@ -172,49 +175,75 @@ export function PipelineColumn({
 }
 
 /* ============================================================
- *  Mapeo de colores por stage
- * ============================================================ */
-
-function stageAccent(c: StageConfig['color']) {
-  switch (c) {
-    case 'info':
-      return { bar: color.info, bg: 'rgba(59, 130, 246, 0.05)' };
-    case 'warning':
-      return { bar: color.warning, bg: 'rgba(245, 158, 11, 0.05)' };
-    case 'primary':
-      return { bar: color.primary, bg: 'rgba(225, 29, 72, 0.05)' };
-    case 'success':
-      return { bar: color.success, bg: 'rgba(16, 185, 129, 0.05)' };
-    case 'danger':
-      return { bar: color.danger, bg: 'rgba(239, 68, 68, 0.05)' };
-    default:
-      return { bar: color.textDim, bg: 'rgba(100, 116, 139, 0.05)' };
-  }
-}
-
-/* ============================================================
  *  Empty state interno de la columna
  * ============================================================ */
 
-export function ColumnEmpty({ message }: { message?: string }) {
-  // Empty state mínimo: solo se ve cuando arrastrás algo o pasás el cursor.
-  // En reposo, deja la columna casi en blanco para no distraer.
+export function ColumnEmpty({
+  message,
+  onAddLead,
+  isTerminal,
+}: {
+  message?: string;
+  onAddLead?: () => void;
+  isTerminal?: boolean;
+}) {
+  // Si es etapa terminal (Cerrado/Perdido) sin onAddLead → empty mínimo.
+  // Si es no-terminal con onAddLead → CTA "Agregar primer lead" más útil.
+  if (isTerminal || !onAddLead) {
+    return (
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: space[3],
+          textAlign: 'center',
+          color: color.textDim,
+          fontSize: text.xs,
+          opacity: 0.5,
+          minHeight: 60,
+        }}
+      >
+        {message || '—'}
+      </div>
+    );
+  }
   return (
-    <div
+    <button
+      type="button"
+      onClick={onAddLead}
       style={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: space[3],
-        textAlign: 'center',
+        marginTop: 4,
+        padding: `${space[3]} ${space[2]}`,
+        border: `1px dashed ${color.border}`,
+        borderRadius: radius.md,
+        background: 'transparent',
         color: color.textDim,
         fontSize: text.xs,
-        opacity: 0.5,
-        minHeight: 60,
+        fontWeight: weight.medium,
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: space[1],
+        minHeight: 80,
+        transition: 'all 120ms',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = color.borderStrong;
+        e.currentTarget.style.color = color.textMuted;
+        e.currentTarget.style.background = color.surfaceHover;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = color.border;
+        e.currentTarget.style.color = color.textDim;
+        e.currentTarget.style.background = 'transparent';
       }}
     >
-      {message || '—'}
-    </div>
+      <Plus size={14} strokeWidth={2.2} />
+      Agregar lead
+    </button>
   );
 }

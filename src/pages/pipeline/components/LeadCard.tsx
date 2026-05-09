@@ -208,7 +208,7 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
           >
             {lead.clientName}
           </div>
-          {lead.product && (
+          {lead.product ? (
             <div
               style={{
                 fontSize: text.xs,
@@ -220,6 +220,20 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
               }}
             >
               {lead.product}
+            </div>
+          ) : (
+            <div
+              style={{
+                fontSize: text.xs,
+                color: color.textDim,
+                fontStyle: 'italic',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                marginTop: 1,
+              }}
+            >
+              Sin producto definido
             </div>
           )}
         </div>

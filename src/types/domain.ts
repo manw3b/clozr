@@ -307,19 +307,27 @@ export interface MyDayData {
 export interface StageConfig {
   id: LeadStage;
   label: string;
-  color: 'neutral' | 'info' | 'warning' | 'primary' | 'success' | 'danger';
+  /** ID de la paleta unificada (lib/colorPalette.ts). Aceptamos string
+   *  para que stages custom del usuario (que pueden traer aliases legacy
+   *  como 'info' o 'primary' de versiones anteriores) sigan funcionando.
+   *  El renderer hace el lookup tolerante. */
+  color: string;
   probability?: number;
   terminal?: boolean;
 }
 
 export const STAGES: StageConfig[] = [
-  { id: 'prospecto', label: 'Prospecto', color: 'neutral', probability: 0.1 },
-  { id: 'contactado', label: 'Contactado', color: 'info', probability: 0.2 },
-  { id: 'visita-agendada', label: 'Visita agendada', color: 'info', probability: 0.4 },
-  { id: 'presupuestado', label: 'Presupuestado', color: 'warning', probability: 0.6 },
-  { id: 'negociando', label: 'Negociando', color: 'primary', probability: 0.8 },
-  { id: 'cerrado', label: 'Cerrado', color: 'success', probability: 1, terminal: true },
-  { id: 'perdido', label: 'Perdido', color: 'danger', probability: 0, terminal: true },
+  // Colores ahora vienen de la paleta unificada (lib/colorPalette.ts).
+  // Cada etapa con un color distinto para que el kanban dé información de
+  // un vistazo. Los semantic ids viejos (info/warning/primary/etc.) siguen
+  // funcionando gracias al LEGACY_ALIAS — no rompemos workspaces existentes.
+  { id: 'prospecto', label: 'Prospecto', color: 'slate', probability: 0.1 },
+  { id: 'contactado', label: 'Contactado', color: 'blue', probability: 0.2 },
+  { id: 'visita-agendada', label: 'Visita agendada', color: 'cyan', probability: 0.4 },
+  { id: 'presupuestado', label: 'Presupuestado', color: 'yellow', probability: 0.6 },
+  { id: 'negociando', label: 'Negociando', color: 'orange', probability: 0.8 },
+  { id: 'cerrado', label: 'Cerrado', color: 'green', probability: 1, terminal: true },
+  { id: 'perdido', label: 'Perdido', color: 'red', probability: 0, terminal: true },
 ];
 
 /* ============================================================

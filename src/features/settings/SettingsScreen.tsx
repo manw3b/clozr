@@ -12,6 +12,9 @@ import { PaymentMethodsSection } from "./PaymentMethodsSection";
 import { CatalogPricingSection } from "./CatalogPricingSection";
 import { FeaturedModelsSection } from "./FeaturedModelsSection";
 import type { PipelineStage, CustomerTypeRow } from "../../lib/db/types";
+// Paleta unificada — la misma que usa el kanban del pipeline para el
+// color de cada etapa. Cualquier cambio acá se refleja allá.
+import { PALETTE_LIST as COLORS, colorCss } from "../../lib/colorPalette";
 
 // ── Shared ────────────────────────────────────────────────────────
 
@@ -27,19 +30,6 @@ const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "catalog-featured", label: "Productos destacados" },
   { id: "data", label: "Datos y backup" },
 ];
-
-const COLORS = [
-  { id: "gray", css: "#636366" },
-  { id: "blue", css: "#0A84FF" },
-  { id: "green", css: "#30D158" },
-  { id: "amber", css: "#FFD60A" },
-  { id: "red", css: "#E8001D" },
-  { id: "purple", css: "#BF5AF2" },
-];
-
-function colorCss(color: string) {
-  return COLORS.find((c) => c.id === color)?.css ?? "#636366";
-}
 
 function SectionHeader({ title, description }: { title: string; description?: string }) {
   return (

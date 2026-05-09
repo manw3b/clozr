@@ -440,7 +440,17 @@ export function Pipeline() {
                   id={stage.id}
                 >
                   {stageLeads.length === 0 ? (
-                    <ColumnEmpty />
+                    <ColumnEmpty
+                      isTerminal={stage.terminal}
+                      onAddLead={
+                        stage.terminal
+                          ? undefined
+                          : () => {
+                              setNewLeadStage(stage.id);
+                              setNewLeadOpen(true);
+                            }
+                      }
+                    />
                   ) : (
                     stageLeads.map((lead) => (
                       <SortableLeadCard

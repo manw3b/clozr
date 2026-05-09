@@ -10,7 +10,23 @@ interface AvatarProps {
   src?: string;
 }
 
-const palette = ['#E11D48', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#14B8A6'];
+// Paleta ampliada (12 colores) y bien diferenciados — antes eran 7 y se
+// repetían los azules con frecuencia. Ahora dos clientes distintos casi
+// siempre obtienen colores claramente distintos.
+const palette = [
+  '#E11D48', // rose
+  '#F43F5E', // pink
+  '#F97316', // orange
+  '#EAB308', // yellow
+  '#10B981', // emerald
+  '#14B8A6', // teal
+  '#06B6D4', // cyan
+  '#3B82F6', // blue
+  '#6366F1', // indigo
+  '#8B5CF6', // violet
+  '#A855F7', // purple
+  '#D946EF', // fuchsia
+];
 
 function hashColor(name: string) {
   let hash = 0;

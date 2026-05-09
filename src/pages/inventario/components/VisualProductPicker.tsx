@@ -14,6 +14,7 @@ import {
   resolveVariant,
   resolveAnyVariantForColor,
   getCategoryFamilyTree,
+  findModelById,
   type ProductCategory,
   type ProductFamily,
   type ProductModel,
@@ -35,6 +36,10 @@ interface Props {
   onCreated?: (item: CatalogItemWithImeis) => void;
   /** Permite iniciar en modo manual (texto libre) */
   onSwitchToManual?: () => void;
+  /** Si llega, abre el picker directamente en el step "color" con este modelo
+   *  preseleccionado (saltea categoría → familia → modelo). Útil para
+   *  "Sumar al catálogo" desde una card de la grilla de Inventario. */
+  initialModelId?: string | null;
 }
 
 type Step = "category" | "family" | "model" | "color" | "storage" | "confirm";
@@ -50,7 +55,7 @@ interface Picked {
   variantImage?: string | null;
 }
 
-export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToManual }: Props) {
+export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToManual, initialModelId }: Props) {
   const qc = useQueryClient();
   const { showToast } = useUIStore();
 
@@ -71,8 +76,28 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
       setImeis([""]);
       setPrices({});
       setPricesOpen(false);
+      return;
     }
-  }, [open]);
+    // Si abrieron el picker desde una card-template de Inventario, salteamos
+    // los primeros tres steps yendo directo a "color".
+    if (initialModelId) {
+      let cancelled = false;
+      findModelById(initialModelId)
+        .then((ctx) => {
+          if (cancelled || !ctx) return;
+          setPicked({
+            category: ctx.category,
+            family: ctx.family,
+            model: ctx.model,
+          });
+          setStep("color");
+        })
+        .catch(() => {});
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [open, initialModelId]);
 
   // Cargar tipos de cliente cuando llegamos al confirm
   const customerTypesQ = useQuery({

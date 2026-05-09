@@ -9,6 +9,7 @@ import { Tabs } from "../../components/Tabs";
 import { Badge } from "../../components/Badge";
 import { EmptyState } from "../../components/EmptyState";
 import { catalogDb } from "../../lib/db/catalog";
+import { getAllModelsByCategory, type ProductModelWithFamily } from "../../lib/db/quickStock";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useUIStore } from "../../store/uiStore";
 import { color, space, text, weight } from "../../tokens";
@@ -45,6 +46,7 @@ export function Inventario() {
   const ctxMenu = useContextMenu();
   const [ctxItem, setCtxItem] = useState<CatalogItemWithImeis | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerInitialModelId, setPickerInitialModelId] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [saleOpen, setSaleOpen] = useState(false);
   const [salePreset, setSalePreset] = useState<NewSalePreset | null>(null);
@@ -62,6 +64,17 @@ export function Inventario() {
     enabled: !!wid,
   });
 
+  // Catálogo template de iPhones (todos los modelos del seed Apple).
+  // Lo usamos en el tab "Agotados" para mostrar también lo que el negocio
+  // todavía no agregó al catálogo — así "Agotados" responde a la pregunta
+  // "¿qué iPhone podría tener para vender pero no tengo?".
+  const iphoneTemplatesQ = useQuery({
+    queryKey: ["inventario", "iphone-templates"],
+    queryFn: () => getAllModelsByCategory("cat-iphone"),
+    enabled: filter === "agotados",
+    staleTime: 1000 * 60 * 60, // los templates no cambian, cache 1h
+  });
+
   const products = productsQ.data ?? [];
   const summary = summaryQ.data ?? { total_items: 0, in_stock: 0, out_of_stock: 0, total_value: 0 };
 
@@ -77,6 +90,42 @@ export function Inventario() {
       return true;
     });
   }, [products, search, filter]);
+
+  /**
+   * Templates de iPhone que NO están en el catálogo del workspace. Sólo
+   * se calcula en el tab "Agotados". El match se hace por image_path
+   * (que es la fuente común — el picker copia el image_path del template
+   * al catalog item al crearlo) y como fallback por nombre normalizado.
+   */
+  const missingTemplates: ProductModelWithFamily[] = useMemo(() => {
+    if (filter !== "agotados") return [];
+    const templates = iphoneTemplatesQ.data ?? [];
+    const ownedImagePaths = new Set(
+      products.map((p) => p.image_path ?? "").filter(Boolean),
+    );
+    const ownedNormalizedNames = new Set(
+      products.map((p) => p.name.trim().toLowerCase()),
+    );
+    const q = search.trim().toLowerCase();
+    return templates.filter((t) => {
+      if (t.image_path && ownedImagePaths.has(t.image_path)) return false;
+      // Match por nombre como red de seguridad: el picker compone el
+      // nombre como "{model} {storage} {color}" o variantes; si el
+      // template tiene nombre exacto que ya existe (sin variantes), lo
+      // omitimos. Es heurístico — no es problema si a veces aparece un
+      // duplicado (el usuario lo ignora).
+      if (ownedNormalizedNames.has(t.name.trim().toLowerCase())) return false;
+      if (q && !t.name.toLowerCase().includes(q) && !t.family_name.toLowerCase().includes(q)) {
+        return false;
+      }
+      return true;
+    });
+  }, [filter, iphoneTemplatesQ.data, products, search]);
+
+  function openPickerForTemplate(modelId: string) {
+    setPickerInitialModelId(modelId);
+    setPickerOpen(true);
+  }
 
   // (vista legacy retirada — todo se maneja con drawer + modales)
 
@@ -134,7 +183,7 @@ export function Inventario() {
       </div>
 
       <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
-        {filtered.length === 0 ? (
+        {filtered.length === 0 && missingTemplates.length === 0 ? (
           <EmptyState
             title={search.trim() ? "Sin resultados" : "Catálogo vacío"}
             description={search.trim() ? "Probá otro término" : "Cargá productos para empezar."}
@@ -145,24 +194,73 @@ export function Inventario() {
             }
           />
         ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-              gap: space[3],
-            }}
-          >
-            {filtered.map((p) => (
-              <ProductCard
-                key={p.id}
-                item={p}
-                onClick={() => setSelected(p)}
-                onContextMenu={(e) => {
-                  setCtxItem(p);
-                  ctxMenu.openAt(e);
+          <div style={{ display: "flex", flexDirection: "column", gap: space[5] }}>
+            {filtered.length > 0 && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                  gap: space[3],
                 }}
-              />
-            ))}
+              >
+                {filtered.map((p) => (
+                  <ProductCard
+                    key={p.id}
+                    item={p}
+                    onClick={() => setSelected(p)}
+                    onContextMenu={(e) => {
+                      setCtxItem(p);
+                      ctxMenu.openAt(e);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Catálogo template — solo en "Agotados", muestra los iPhones
+                que existen como template pero el usuario aún no agregó. */}
+            {filter === "agotados" && missingTemplates.length > 0 && (
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "baseline",
+                    gap: space[2],
+                    marginBottom: space[3],
+                  }}
+                >
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: text.md,
+                      fontWeight: weight.semibold,
+                      color: color.text,
+                    }}
+                  >
+                    Sumar al catálogo
+                  </h3>
+                  <span style={{ fontSize: text.xs, color: color.textMuted }}>
+                    {missingTemplates.length} modelos disponibles
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                    gap: space[3],
+                  }}
+                >
+                  {missingTemplates.map((t) => (
+                    <TemplateCard
+                      key={t.id}
+                      template={t}
+                      onClick={() => openPickerForTemplate(t.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
           </div>
         )}
       </div>
@@ -211,14 +309,20 @@ export function Inventario() {
 
       <VisualProductPicker
         open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
+        onClose={() => {
+          setPickerOpen(false);
+          setPickerInitialModelId(null);
+        }}
         wid={wid}
+        initialModelId={pickerInitialModelId}
         onCreated={(item) => {
           setPickerOpen(false);
+          setPickerInitialModelId(null);
           setSelected(item);
         }}
         onSwitchToManual={() => {
           setPickerOpen(false);
+          setPickerInitialModelId(null);
           setManualOpen(true);
         }}
       />
@@ -340,6 +444,84 @@ function ProductCard({
             {sold} vendida{sold === 1 ? "" : "s"}
           </div>
         )}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Card "ghost" para los templates de iPhone que el negocio aún no agregó
+ * al catálogo. Visualmente más apagada que ProductCard (sin precio, sin
+ * units, opacidad reducida) y un CTA "Sumar al catálogo" debajo del nombre.
+ */
+function TemplateCard({
+  template,
+  onClick,
+}: {
+  template: ProductModelWithFamily;
+  onClick: () => void;
+}) {
+  const imgUrl = template.image_path ? getTemplateImageUrl(template.image_path) : null;
+  return (
+    <Card
+      padding={0}
+      interactive
+      onClick={onClick}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        opacity: 0.78,
+        borderStyle: "dashed",
+      }}
+    >
+      <div
+        style={{
+          aspectRatio: "1",
+          background: color.surface2,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+        }}
+      >
+        {imgUrl ? (
+          <img
+            src={imgUrl}
+            alt={template.name}
+            style={{ width: "70%", height: "70%", objectFit: "contain", opacity: 0.85 }}
+          />
+        ) : (
+          <Package size={36} color={color.textDim} />
+        )}
+      </div>
+      <div style={{ padding: space[3], display: "flex", flexDirection: "column", gap: space[1] }}>
+        <div
+          style={{
+            fontSize: text.sm,
+            fontWeight: weight.semibold,
+            color: color.text,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {template.name}
+        </div>
+        <div style={{ fontSize: text.xs, color: color.textMuted }}>{template.family_name}</div>
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            marginTop: space[2],
+            fontSize: text.xs,
+            color: color.primary,
+            fontWeight: weight.semibold,
+          }}
+        >
+          <Plus size={12} /> Sumar al catálogo
+        </div>
       </div>
     </Card>
   );

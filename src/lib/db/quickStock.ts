@@ -1245,6 +1245,29 @@ export async function getModels(familyId: string): Promise<ProductModel[]> {
   );
 }
 
+/**
+ * Devuelve todos los modelos de una categoría aplanados (cruzando familias),
+ * ordenados primero por familia (sort_order) y luego por modelo. Útil para
+ * pintar "todo el catálogo de iPhones" sin tener que navegar la jerarquía.
+ */
+export interface ProductModelWithFamily extends ProductModel {
+  family_name: string;
+  family_sort: number;
+}
+
+export async function getAllModelsByCategory(
+  categoryId: string,
+): Promise<ProductModelWithFamily[]> {
+  return dbSelect<ProductModelWithFamily>(
+    `SELECT m.*, f.name AS family_name, f.sort_order AS family_sort
+     FROM product_models m
+     JOIN product_families f ON f.id = m.family_id
+     WHERE f.category_id = ?
+     ORDER BY f.sort_order ASC, m.sort_order ASC`,
+    [categoryId],
+  );
+}
+
 export async function getVariants(modelId: string): Promise<ProductVariant[]> {
   return dbSelect<ProductVariant>(
     "SELECT * FROM product_variants WHERE model_id = ? AND is_available = 1",
@@ -1553,6 +1576,33 @@ export async function findModelForItem(nameHint: string): Promise<ModelWithConte
      ORDER BY LENGTH(pm.name) ASC
      LIMIT 1`,
     [`%${nameHint}%`],
+  );
+  if (!rows[0]) return null;
+  const r = rows[0];
+  return {
+    model: { id: r.id, family_id: r.family_id, name: r.name, image_path: r.image_path, sort_order: r.sort_order },
+    family: { id: r.fam_id, category_id: r.cat_id, name: r.fam_name, sort_order: r.fam_sort },
+    category: { id: r.cat_id, name: r.cat_name, emoji: r.cat_emoji, sort_order: r.cat_sort },
+  };
+}
+
+/**
+ * Como findModelForItem pero buscando por id exacto. Usado por el picker
+ * cuando lo abrís desde una card del catálogo (ej: "agregar al inventario
+ * desde un template").
+ */
+export async function findModelById(modelId: string): Promise<ModelWithContext | null> {
+  const rows = await dbSelect<
+    ProductModel & { fam_id: string; fam_name: string; fam_sort: number; cat_id: string; cat_name: string; cat_emoji: string | null; cat_sort: number }
+  >(
+    `SELECT pm.*, pf.id as fam_id, pf.name as fam_name, pf.sort_order as fam_sort,
+       pc.id as cat_id, pc.name as cat_name, pc.emoji as cat_emoji, pc.sort_order as cat_sort
+     FROM product_models pm
+     JOIN product_families pf ON pf.id = pm.family_id
+     JOIN product_categories pc ON pc.id = pf.category_id
+     WHERE pm.id = ?
+     LIMIT 1`,
+    [modelId],
   );
   if (!rows[0]) return null;
   const r = rows[0];

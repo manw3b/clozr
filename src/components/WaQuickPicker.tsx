@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MessageSquare, Sparkles } from 'lucide-react';
 import { WhatsAppIcon } from './icons/WhatsAppIcon';
@@ -254,105 +254,96 @@ export function WaQuickPicker({
 
 /* ── Sub-componentes ─────────────────────────────────────── */
 
-const SmallTrigger = ({
-  children,
-  ariaLabel,
-  active,
-  onClick,
-  disabled,
-  ref,
-}: {
+interface SmallTriggerProps {
   children: React.ReactNode;
   ariaLabel: string;
   active?: boolean;
   onClick: (e: React.MouseEvent) => void;
   disabled?: boolean;
-  ref?: React.Ref<HTMLButtonElement>;
-}) => {
-  return (
-    <button
-      ref={ref}
-      type="button"
-      aria-label={ariaLabel}
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        width: 26,
-        height: 26,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: radius.sm,
-        color: color.success,
-        background: active ? color.successBg : 'transparent',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        transition: `background ${duration.fast} ${ease}`,
-        opacity: disabled ? 0.4 : 1,
-      }}
-      onMouseEnter={(e) => {
-        if (!disabled && !active) e.currentTarget.style.background = color.successBg;
-      }}
-      onMouseLeave={(e) => {
-        if (!active) e.currentTarget.style.background = 'transparent';
-      }}
-    >
-      {children}
-    </button>
-  );
-};
+}
+const SmallTrigger = forwardRef<HTMLButtonElement, SmallTriggerProps>(
+  function SmallTrigger({ children, ariaLabel, active, onClick, disabled }, ref) {
+    return (
+      <button
+        ref={ref}
+        type="button"
+        aria-label={ariaLabel}
+        onClick={onClick}
+        disabled={disabled}
+        style={{
+          width: 26,
+          height: 26,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: radius.sm,
+          color: color.success,
+          background: active ? color.successBg : 'transparent',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          transition: `background ${duration.fast} ${ease}`,
+          opacity: disabled ? 0.4 : 1,
+        }}
+        onMouseEnter={(e) => {
+          if (!disabled && !active) e.currentTarget.style.background = color.successBg;
+        }}
+        onMouseLeave={(e) => {
+          if (!active) e.currentTarget.style.background = 'transparent';
+        }}
+      >
+        {children}
+      </button>
+    );
+  },
+);
 
-const FullTrigger = ({
-  children,
-  active,
-  onClick,
-  disabled,
-  ref,
-}: {
+interface FullTriggerProps {
   children: React.ReactNode;
   active?: boolean;
   onClick: (e: React.MouseEvent) => void;
   disabled?: boolean;
-  ref?: React.Ref<HTMLButtonElement>;
-}) => {
-  return (
-    <button
-      ref={ref}
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        height: 36,
-        padding: `0 ${space[3]}`,
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: space[2],
-        borderRadius: radius.md,
-        background: active ? color.surfaceHover : color.surface2,
-        border: `1px solid ${active ? color.borderStrong : color.border}`,
-        color: color.text,
-        fontSize: text.sm,
-        fontWeight: weight.semibold,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        transition: `background ${duration.fast} ${ease}, border-color ${duration.fast} ${ease}`,
-        opacity: disabled ? 0.4 : 1,
-      }}
-      onMouseEnter={(e) => {
-        if (!disabled) {
-          e.currentTarget.style.background = color.surfaceHover;
-          e.currentTarget.style.borderColor = color.borderStrong;
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!active) {
-          e.currentTarget.style.background = color.surface2;
-          e.currentTarget.style.borderColor = color.border;
-        }
-      }}
-    >
-      {children}
-    </button>
-  );
-};
+}
+const FullTrigger = forwardRef<HTMLButtonElement, FullTriggerProps>(
+  function FullTrigger({ children, active, onClick, disabled }, ref) {
+    return (
+      <button
+        ref={ref}
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        style={{
+          height: 36,
+          padding: `0 ${space[3]}`,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: space[2],
+          borderRadius: radius.md,
+          background: active ? color.surfaceHover : color.surface2,
+          border: `1px solid ${active ? color.borderStrong : color.border}`,
+          color: color.text,
+          fontSize: text.sm,
+          fontWeight: weight.semibold,
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          transition: `background ${duration.fast} ${ease}, border-color ${duration.fast} ${ease}`,
+          opacity: disabled ? 0.4 : 1,
+        }}
+        onMouseEnter={(e) => {
+          if (!disabled) {
+            e.currentTarget.style.background = color.surfaceHover;
+            e.currentTarget.style.borderColor = color.borderStrong;
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!active) {
+            e.currentTarget.style.background = color.surface2;
+            e.currentTarget.style.borderColor = color.border;
+          }
+        }}
+      >
+        {children}
+      </button>
+    );
+  },
+);
 
 function TemplateRow({
   icon,

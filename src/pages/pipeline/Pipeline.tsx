@@ -56,6 +56,7 @@ import { WhatsAppIcon } from '../../components/icons/WhatsAppIcon';
 import { space } from '../../tokens';
 import type { Lead, LeadStage, StageConfig } from '../../types/domain';
 import { usePipelineStages } from './usePipelineStages';
+import { resolveLeadStage, isOrphanStage } from './resolveLeadStage';
 import { NewSaleModal, type NewSalePreset } from '../ventas/components/NewSaleModal';
 import { useCreateSale } from '../ventas/useSalesData';
 import { NewLeadModal } from './components/NewLeadModal';
@@ -269,7 +270,40 @@ export function Pipeline() {
 
   // Local optimistic state for drag&drop reorder. Mutation handles persistence.
   const [localLeads, setLocalLeads] = useState<Lead[] | null>(null);
-  const leads = localLeads ?? dbLeads;
+  const rawLeads = localLeads ?? dbLeads;
+
+  // Resolución de etapas huérfanas: si un lead tiene un stage_id que no
+  // matchea ninguna columna del workspace (ej: leads creados con la versión
+  // anterior que tenían `cerrado` cuando hoy la columna se llama `cobrado`),
+  // los rerouteamos a una columna válida — visualmente quedan accesibles
+  // y al moverlos se actualiza el id real en DB.
+  const leads = useMemo(() => {
+    if (STAGES.length === 0) return rawLeads;
+    return rawLeads.map((l) => {
+      if (!isOrphanStage(l.stage, STAGES)) return l;
+      const resolved = resolveLeadStage(l.stage, STAGES);
+      return resolved === l.stage ? l : { ...l, stage: resolved };
+    });
+  }, [rawLeads, STAGES]);
+
+  // Migración silenciosa en DB: para cada lead huérfano, persistimos el
+  // stage resuelto. Idempotente (sólo dispara mutate si stage cambia
+  // efectivamente), y evita refetch en loop con un ref que recuerda lo
+  // que ya migramos en esta sesión.
+  const migratedRef = useState<Set<string>>(() => new Set())[0];
+  useEffect(() => {
+    if (STAGES.length === 0) return;
+    for (const l of rawLeads) {
+      if (!isOrphanStage(l.stage, STAGES)) continue;
+      if (migratedRef.has(l.id)) continue;
+      const target = resolveLeadStage(l.stage, STAGES);
+      if (target === l.stage) continue;
+      migratedRef.add(l.id);
+      moveLeadMut.mutate({ leadId: l.id, newStage: target });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawLeads, STAGES]);
+
   const setLeads = (updater: (prev: Lead[]) => Lead[]) => setLocalLeads(updater(leads));
 
   // Reset local state when server data changes (and no drag in flight).

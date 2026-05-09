@@ -421,6 +421,83 @@ export async function regularizeSale(
   }
 }
 
+/**
+ * Crea una "deuda manual" — un caso especial de venta sin items reales,
+ * usado para registrar dinero que el cliente debe sin que haya una venta
+ * concreta detrás. Ej: saldo de un cellu anterior, préstamo personal,
+ * pago de garantía atrasado.
+ *
+ * Internamente es una row en `sales` con:
+ *   - 1 sale_item descriptivo (concept = description, qty 1)
+ *   - total_paid = 0 → todo va al balance, queda como deuda
+ *   - notes opcionales (ej: fecha de vencimiento)
+ *   - out_of_stock_sale = 1 para que no toque inventario nunca
+ *
+ * Aparece en la lista de Deudas del cliente y en Caja igual que cualquier
+ * otra venta no pagada. Cuando el cliente paga, se usa el flujo normal de
+ * cobro (markAsPaid o agregando un sale_payment).
+ */
+export async function createManualDebt(
+  workspaceId: string,
+  data: {
+    customer_id: string;
+    customer_name: string;
+    business_id?: string | null;
+    concept: string;
+    amount: number;
+    currency?: "ARS" | "USD";
+    due_date?: string | null;
+    seller_id?: string | null;
+    seller_name?: string | null;
+  },
+): Promise<{ id: string }> {
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const concept = data.concept.trim();
+  if (concept.length < 2) throw new Error("El concepto es obligatorio");
+  if (!data.amount || data.amount <= 0) throw new Error("Monto inválido");
+
+  // Notes capturan la fecha de vencimiento si vino
+  const noteParts: string[] = [`Deuda manual: ${concept}`];
+  if (data.due_date) noteParts.push(`Vence: ${data.due_date}`);
+  const notes = noteParts.join(" · ");
+
+  await dbExecute(
+    `INSERT INTO sales (
+      id, workspace_id, business_id, customer_id, customer_name, seller_id, seller_name,
+      subtotal, total, total_paid, balance, is_paid, notes, sale_date, created_at, payment_method,
+      out_of_stock_sale
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL, 1)`,
+    [
+      id,
+      workspaceId,
+      data.business_id ?? null,
+      data.customer_id,
+      data.customer_name,
+      data.seller_id ?? null,
+      data.seller_name ?? null,
+      data.amount,
+      data.amount,
+      0,
+      data.amount,
+      notes,
+      now,
+      now,
+    ],
+  );
+
+  // Una sola sale_item descriptiva (sin catalog_item_id, sin IMEI)
+  const itemId = crypto.randomUUID();
+  await dbExecute(
+    `INSERT INTO sale_items (
+      id, sale_id, catalog_item_id, description, quantity, unit_price, base_price, subtotal, imei, from_stock
+    ) VALUES (?, ?, NULL, ?, 1, ?, ?, ?, NULL, 0)`,
+    [itemId, id, concept, data.amount, data.amount, data.amount],
+  );
+
+  return { id };
+}
+
 export const salesDb = {
   getAll,
   getByCustomer,
@@ -429,6 +506,7 @@ export const salesDb = {
   getItems,
   getPayments,
   createSale,
+  createManualDebt,
   updateSale,
   markAsPaid,
   getRows,

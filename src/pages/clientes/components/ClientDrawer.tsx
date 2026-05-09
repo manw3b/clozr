@@ -22,6 +22,7 @@ import { Tabs } from '../../../components/Tabs';
 import { TagChip } from '../../../components/TagChip';
 import { EmptyState } from '../../../components/EmptyState';
 import { useCustomerTags, useSetCustomerTags } from '../useClientsData';
+import { ManualDebtModal } from './ManualDebtModal';
 import type { ClientTag } from '../../../types/domain';
 import { color, radius, space, text, weight } from '../../../tokens';
 import {
@@ -73,6 +74,7 @@ export function ClientDrawer({
   onMarkPaid,
 }: ClientDrawerProps) {
   const [tab, setTab] = useState<'info' | 'ventas' | 'deudas' | 'historial'>('info');
+  const [debtModalOpen, setDebtModalOpen] = useState(false);
 
   const totalDebt = client.outstandingDebts.reduce((sum, d) => sum + d.amount, 0);
 
@@ -165,10 +167,18 @@ export function ClientDrawer({
           <DebtsTab
             debts={client.outstandingDebts}
             onMarkPaid={onMarkPaid}
+            onAddDebt={() => setDebtModalOpen(true)}
           />
         )}
         {tab === 'historial' && <HistoryTab activity={client.activity} />}
       </div>
+
+      <ManualDebtModal
+        open={debtModalOpen}
+        onClose={() => setDebtModalOpen(false)}
+        clientId={client.id}
+        clientName={client.name}
+      />
     </Drawer>
   );
 }
@@ -612,9 +622,11 @@ function SaleCard({ sale }: { sale: Sale }) {
 function DebtsTab({
   debts,
   onMarkPaid,
+  onAddDebt,
 }: {
   debts: ClientDetail['outstandingDebts'];
   onMarkPaid?: (id: string) => void;
+  onAddDebt?: () => void;
 }) {
   if (debts.length === 0) {
     return (
@@ -623,6 +635,11 @@ function DebtsTab({
         icon={<CheckCircle2 size={20} />}
         title="Sin deudas pendientes"
         description="Este cliente está al día con todos sus pagos."
+        action={
+          onAddDebt
+            ? { label: 'Cargar deuda manual', onClick: onAddDebt, iconLeft: <Plus size={14} /> }
+            : undefined
+        }
       />
     );
   }
@@ -631,6 +648,13 @@ function DebtsTab({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: space[3] }}>
+      {onAddDebt && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Button variant="secondary" size="sm" iconLeft={<Plus size={14} />} onClick={onAddDebt}>
+            Cargar deuda
+          </Button>
+        </div>
+      )}
       <div
         style={{
           padding: space[4],

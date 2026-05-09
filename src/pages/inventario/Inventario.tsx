@@ -37,7 +37,10 @@ export function Inventario() {
   const { showToast } = useUIStore();
   const wid = activeWorkspace?.id ?? "";
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<StockFilter>("todos");
+  // Por defecto ocultamos los agotados — el inventario "operativo" es lo
+  // que tenés para vender ahora. El usuario puede pasar a "Todos" o
+  // "Agotados" cuando quiera revisar el catálogo completo.
+  const [filter, setFilter] = useState<StockFilter>("disponibles");
   const [selected, setSelected] = useState<CatalogItemWithImeis | null>(null);
   const ctxMenu = useContextMenu();
   const [ctxItem, setCtxItem] = useState<CatalogItemWithImeis | null>(null);

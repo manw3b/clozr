@@ -603,6 +603,29 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
   // 029 — daily_goal_count (cantidad de ventas objetivo del día)
   // ════════════════════════════════════════════════════════════
   await safe(() => dbExecute(`ALTER TABLE workspaces ADD COLUMN daily_goal_count INTEGER DEFAULT 0`));
+
+  // ════════════════════════════════════════════════════════════
+  // 030 — customer tags (etiquetas configurables por workspace)
+  // ════════════════════════════════════════════════════════════
+  await safe(() => dbExecute(`
+    CREATE TABLE IF NOT EXISTS customer_tags (
+      id           TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      name         TEXT NOT NULL,
+      color        TEXT NOT NULL DEFAULT 'gray',
+      sort_order   INTEGER DEFAULT 0,
+      created_at   TEXT NOT NULL
+    )`));
+  await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_customer_tags_workspace ON customer_tags (workspace_id, sort_order)`));
+  await safe(() => dbExecute(`
+    CREATE TABLE IF NOT EXISTS customer_tag_assignments (
+      customer_id TEXT NOT NULL,
+      tag_id      TEXT NOT NULL,
+      assigned_at TEXT NOT NULL,
+      PRIMARY KEY (customer_id, tag_id)
+    )`));
+  await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_cust_tag_assign_customer ON customer_tag_assignments (customer_id)`));
+  await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_cust_tag_assign_tag ON customer_tag_assignments (tag_id)`));
 }
 
 async function safe(fn: () => Promise<unknown>) {

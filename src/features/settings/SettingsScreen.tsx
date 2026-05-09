@@ -11,6 +11,7 @@ import { ExchangeRateChip } from "../../components/ExchangeRateChip";
 import { PaymentMethodsSection } from "./PaymentMethodsSection";
 import { CatalogPricingSection } from "./CatalogPricingSection";
 import { FeaturedModelsSection } from "./FeaturedModelsSection";
+import { CustomerTagsSection } from "./CustomerTagsSection";
 import type { PipelineStage, CustomerTypeRow } from "../../lib/db/types";
 // Paleta unificada — la misma que usa el kanban del pipeline para el
 // color de cada etapa. Cualquier cambio acá se refleja allá.
@@ -18,13 +19,14 @@ import { PALETTE_LIST as COLORS, colorCss } from "../../lib/colorPalette";
 
 // ── Shared ────────────────────────────────────────────────────────
 
-type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "data";
+type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "data";
 
 const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "general", label: "General" },
   { id: "profile", label: "Tu perfil" },
   { id: "pipeline", label: "Pipeline" },
   { id: "customer-types", label: "Tipos de cliente" },
+  { id: "customer-tags", label: "Etiquetas de clientes" },
   { id: "payment-methods", label: "Métodos de pago" },
   { id: "catalog-pricing", label: "Precios del catálogo" },
   { id: "catalog-featured", label: "Productos destacados" },
@@ -1006,6 +1008,7 @@ export default function SettingsScreen() {
       case "profile": return <ProfileSection />;
       case "pipeline": return <PipelineSection wid={wid} />;
       case "customer-types": return <CustomerTypesSection wid={wid} />;
+      case "customer-tags": return <CustomerTagsSection wid={wid} />;
       case "payment-methods": return <PaymentMethodsSection wid={wid} />;
       case "catalog-pricing": return <CatalogPricingSection wid={wid} />;
       case "catalog-featured": return <FeaturedModelsSection wid={wid} />;

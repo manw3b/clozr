@@ -1,17 +1,22 @@
-import { CSSProperties, forwardRef } from 'react';
+import { CSSProperties, forwardRef, useEffect, useRef, useState } from 'react';
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core';
 import {
-  MessageCircle,
   Phone,
   Clock,
   AlertCircle,
   Flame,
   ShoppingCart,
+  MoreVertical,
+  ArrowRight,
+  Trophy,
+  XCircle,
 } from 'lucide-react';
+import { WhatsAppIcon } from '../../../components/icons/WhatsAppIcon';
 import { Avatar } from '../../../components/Avatar';
-import { color, radius, space, text, weight } from '../../../tokens';
+import { color, radius, space, text, weight, duration, ease } from '../../../tokens';
 import { formatMoney, formatRelative } from '../../../lib/format';
-import type { Lead } from '../../../types/domain';
+import type { Lead, LeadStage } from '../../../types/domain';
+import { STAGES } from '../../../types/domain';
 
 /** Combinación de attributes + listeners de @dnd-kit/sortable que se
  *  spreadea sobre el elemento que dispara el drag. No los podemos
@@ -36,6 +41,8 @@ interface LeadCardProps {
   onWhatsApp?: (lead: Lead) => void;
   onCall?: (lead: Lead) => void;
   onConvertToSale?: (lead: Lead) => void;
+  /** Mover el lead a otra etapa sin drag (alternativa táctil/teclado). */
+  onChangeStage?: (lead: Lead, newStage: LeadStage) => void;
   /** Listeners y attributes del DnD-kit (sortable) */
   dragHandleProps?: DragHandleProps;
   /** Style externo (transformación durante drag) */
@@ -51,7 +58,7 @@ interface LeadCardProps {
  * - El "isOverlay" se usa para el preview que sigue al cursor — se ve más sólido
  */
 export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadCard(
-  { lead, isDragging, isOverlay, onClick, onWhatsApp, onCall, onConvertToSale, dragHandleProps, style },
+  { lead, isDragging, isOverlay, onClick, onWhatsApp, onCall, onConvertToSale, onChangeStage, dragHandleProps, style },
   ref
 ) {
   const stuckDays = lead.stageChangedAt
@@ -247,7 +254,7 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
               onWhatsApp?.(lead);
             }}
           >
-            <MessageCircle size={13} strokeWidth={2.2} />
+            <WhatsAppIcon size={13} />
           </CardActionBtn>
           <CardActionBtn
             ariaLabel="Llamar"
@@ -258,11 +265,179 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
           >
             <Phone size={13} strokeWidth={2.2} />
           </CardActionBtn>
+          {onChangeStage && (
+            <QuickActionsMenu lead={lead} onChangeStage={onChangeStage} />
+          )}
         </div>
       </div>
     </div>
   );
 });
+
+/* ============================================================
+ *  QuickActionsMenu — dropdown con shortcuts: cambiar etapa,
+ *  marcar como ganado/perdido sin tener que dragear
+ * ============================================================ */
+
+function QuickActionsMenu({
+  lead,
+  onChangeStage,
+}: {
+  lead: Lead;
+  onChangeStage: (lead: Lead, stage: LeadStage) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  function moveTo(stage: LeadStage) {
+    if (stage !== lead.stage) onChangeStage(lead, stage);
+    setOpen(false);
+  }
+
+  // Stages disponibles para mover (excluye la actual)
+  const moveOptions = STAGES.filter((s) => !s.terminal && s.id !== lead.stage);
+  const wonStage = STAGES.find((s) => s.id === 'cerrado');
+  const lostStage = STAGES.find((s) => s.id === 'perdido');
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative' }}>
+      <CardActionBtn
+        ariaLabel="Más acciones"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+      >
+        <MoreVertical size={13} strokeWidth={2.2} />
+      </CardActionBtn>
+      {open && (
+        <div
+          role="menu"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            right: 0,
+            zIndex: 30,
+            minWidth: 200,
+            background: color.surface,
+            border: `1px solid ${color.borderStrong}`,
+            borderRadius: radius.md,
+            boxShadow: 'var(--shadow-lg)',
+            padding: 4,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {moveOptions.length > 0 && (
+            <>
+              <MenuLabel>Mover a</MenuLabel>
+              {moveOptions.map((s) => (
+                <MenuItem key={s.id} onClick={() => moveTo(s.id)}>
+                  <ArrowRight size={12} color={color.textDim} />
+                  {s.label}
+                </MenuItem>
+              ))}
+            </>
+          )}
+          {(wonStage || lostStage) && (
+            <>
+              <Divider />
+              {lead.stage !== 'cerrado' && wonStage && (
+                <MenuItem tone="success" onClick={() => moveTo('cerrado')}>
+                  <Trophy size={12} />
+                  Marcar como ganado
+                </MenuItem>
+              )}
+              {lead.stage !== 'perdido' && lostStage && (
+                <MenuItem tone="danger" onClick={() => moveTo('perdido')}>
+                  <XCircle size={12} />
+                  Marcar como perdido
+                </MenuItem>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MenuLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        fontSize: 10,
+        fontWeight: weight.semibold,
+        color: color.textDim,
+        textTransform: 'uppercase',
+        letterSpacing: '0.6px',
+        padding: `${space[2]} ${space[3]} 4px`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function MenuItem({
+  children,
+  onClick,
+  tone,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  tone?: 'success' | 'danger';
+}) {
+  const c =
+    tone === 'success' ? color.success : tone === 'danger' ? color.danger : color.text;
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: space[2],
+        padding: `7px ${space[3]}`,
+        background: 'transparent',
+        color: c,
+        fontSize: text.sm,
+        fontWeight: weight.medium,
+        textAlign: 'left',
+        borderRadius: radius.sm,
+        cursor: 'pointer',
+        transition: `background ${duration.fast} ${ease}`,
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = color.surfaceHover)}
+      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Divider() {
+  return <div style={{ height: 1, background: color.border, margin: '4px 0' }} />;
+}
 
 function CardActionBtn({
   children,

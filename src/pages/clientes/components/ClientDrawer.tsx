@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  MessageCircle,
   Phone,
   Mail,
   Plus,
@@ -12,6 +11,7 @@ import {
   CheckCircle2,
   Clock,
 } from 'lucide-react';
+import { WhatsAppIcon } from '../../../components/icons/WhatsAppIcon';
 import { DrawerPanel } from '../../../components/Drawer';
 import { Button } from '../../../components/Button';
 import { Badge } from '../../../components/Badge';
@@ -89,7 +89,7 @@ export function ClientDrawer({
           <Button
             variant="secondary"
             size="md"
-            iconLeft={<MessageCircle size={15} />}
+            iconLeft={<WhatsAppIcon size={15} color="var(--success)" />}
             onClick={onWhatsApp}
             fullWidth
           >

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Phone, MessageCircle, Check, Download } from "lucide-react";
+import { Phone, Check, Download } from "lucide-react";
+import { WhatsAppIcon } from "../../components/icons/WhatsAppIcon";
 import { PageHeader } from "../../components/PageHeader";
 import { Button } from "../../components/Button";
 import { Avatar } from "../../components/Avatar";
@@ -178,7 +179,7 @@ export function Deudas() {
               <Button
                 variant="secondary"
                 size="sm"
-                iconLeft={<MessageCircle size={13} />}
+                iconLeft={<WhatsAppIcon size={13} color="var(--success)" />}
                 onClick={(e) => {
                   e.stopPropagation();
                   window.open(wa, "_blank");

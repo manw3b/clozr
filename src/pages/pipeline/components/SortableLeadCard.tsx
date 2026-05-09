@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { LeadCard } from './LeadCard';
-import type { Lead } from '../../../types/domain';
+import type { Lead, LeadStage } from '../../../types/domain';
 
 interface SortableLeadCardProps {
   lead: Lead;
@@ -9,6 +9,7 @@ interface SortableLeadCardProps {
   onWhatsApp?: (lead: Lead) => void;
   onCall?: (lead: Lead) => void;
   onConvertToSale?: (lead: Lead) => void;
+  onChangeStage?: (lead: Lead, newStage: LeadStage) => void;
 }
 
 /**
@@ -23,7 +24,7 @@ interface SortableLeadCardProps {
  * El componente DragOverlay (en Pipeline.tsx) renderiza el preview que
  * sigue al cursor — eso es lo que el usuario ve nítido durante el drag.
  */
-export function SortableLeadCard({ lead, onClick, onWhatsApp, onCall, onConvertToSale }: SortableLeadCardProps) {
+export function SortableLeadCard({ lead, onClick, onWhatsApp, onCall, onConvertToSale, onChangeStage }: SortableLeadCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: lead.id,
     data: { type: 'lead', lead },
@@ -43,6 +44,7 @@ export function SortableLeadCard({ lead, onClick, onWhatsApp, onCall, onConvertT
       onWhatsApp={onWhatsApp}
       onCall={onCall}
       onConvertToSale={onConvertToSale}
+      onChangeStage={onChangeStage}
       dragHandleProps={{ ...attributes, ...listeners }}
       style={style}
     />

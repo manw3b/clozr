@@ -1,4 +1,5 @@
-import { MessageCircle, Phone, Zap, ArrowRight } from 'lucide-react';
+import { Phone, Zap, ArrowRight } from 'lucide-react';
+import { WhatsAppIcon } from '../../../components/icons/WhatsAppIcon';
 import { SectionCard, SectionRow } from './SectionCard';
 import { EmptyState } from '../../../components/EmptyState';
 import { Avatar } from '../../../components/Avatar';
@@ -138,7 +139,7 @@ function FollowUpRow({
           ariaLabel={`WhatsApp a ${followUp.clientName}`}
           tone="success"
         >
-          <MessageCircle size={15} strokeWidth={2.2} />
+          <WhatsAppIcon size={15} />
         </QuickActionButton>
         <QuickActionButton
           onClick={onCall}

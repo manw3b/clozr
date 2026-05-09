@@ -1,4 +1,5 @@
-import { X, Tag, Trash2, Download, MessageCircle } from 'lucide-react';
+import { X, Tag, Trash2, Download } from 'lucide-react';
+import { WhatsAppIcon } from '../../../components/icons/WhatsAppIcon';
 import { Button } from '../../../components/Button';
 import { color, radius, space, text, weight } from '../../../tokens';
 
@@ -76,7 +77,7 @@ export function BulkActionBar({
         <Button
           variant="ghost"
           size="sm"
-          iconLeft={<MessageCircle size={13} />}
+          iconLeft={<WhatsAppIcon size={13} color="var(--success)" />}
           onClick={onSendWhatsApp}
         >
           Enviar mensaje

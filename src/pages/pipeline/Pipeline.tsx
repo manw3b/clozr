@@ -319,15 +319,17 @@ export function Pipeline() {
                         lead={lead}
                         onClick={(l) => setOpenClientId(l.clientId)}
                         onWhatsApp={(l) => {
-                          const phone = leads.find((x) => x.id === l.id)?.clientId;
-                          // The card-level WA shortcut needs the phone — for now, navigate to the client
-                          if (phone) setOpenClientId(phone);
+                          const c = allClients.find((x) => x.id === l.clientId);
+                          whatsappCustomer(c?.phone ?? null, l.clientId);
                         }}
                         onCall={(l) => {
-                          const cid = leads.find((x) => x.id === l.id)?.clientId;
-                          if (cid) setOpenClientId(cid);
+                          const c = allClients.find((x) => x.id === l.clientId);
+                          callCustomer(c?.phone ?? null, l.clientId);
                         }}
                         onConvertToSale={startConvertToSale}
+                        onChangeStage={(l, newStage) => {
+                          moveLeadMut.mutate({ leadId: l.id, newStage });
+                        }}
                       />
                     ))
                   )}

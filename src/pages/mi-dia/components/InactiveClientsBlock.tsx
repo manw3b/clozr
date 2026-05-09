@@ -1,4 +1,5 @@
-import { UserMinus, MessageCircle, Phone } from 'lucide-react';
+import { UserMinus, Phone } from 'lucide-react';
+import { WhatsAppIcon } from '../../../components/icons/WhatsAppIcon';
 import { SectionCard, SectionRow } from './SectionCard';
 import { EmptyState } from '../../../components/EmptyState';
 import { Avatar } from '../../../components/Avatar';
@@ -138,7 +139,7 @@ function InactiveRow({
 
       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
         <QuickButton onClick={onWhatsApp} ariaLabel="WhatsApp" tone="success">
-          <MessageCircle size={15} strokeWidth={2.2} />
+          <WhatsAppIcon size={15} />
         </QuickButton>
         <QuickButton onClick={onCall} ariaLabel="Llamar">
           <Phone size={15} strokeWidth={2.2} />

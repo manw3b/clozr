@@ -14,7 +14,7 @@ import {
   Check,
 } from 'lucide-react';
 import { WhatsAppIcon } from '../../../components/icons/WhatsAppIcon';
-import { DrawerPanel } from '../../../components/Drawer';
+import { Drawer } from '../../../components/Drawer';
 import { Button } from '../../../components/Button';
 import { Badge } from '../../../components/Badge';
 import { Avatar } from '../../../components/Avatar';
@@ -77,7 +77,8 @@ export function ClientDrawer({
   const totalDebt = client.outstandingDebts.reduce((sum, d) => sum + d.amount, 0);
 
   return (
-    <DrawerPanel
+    <Drawer
+      open={true}
       onClose={onClose}
       header={
         <ClientHeader
@@ -168,7 +169,7 @@ export function ClientDrawer({
         )}
         {tab === 'historial' && <HistoryTab activity={client.activity} />}
       </div>
-    </DrawerPanel>
+    </Drawer>
   );
 }
 

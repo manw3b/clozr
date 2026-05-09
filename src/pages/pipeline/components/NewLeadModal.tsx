@@ -472,7 +472,7 @@ function InlineCreateClient({
         status: "potencial",
       }),
     onSuccess: (row) => {
-      qc.invalidateQueries({ queryKey: ["clients-list"] });
+      invalidate.afterClientChange(qc);
       showToast(`Cliente "${row.name}" creado`, "success");
       onCreated({
         id: row.id,

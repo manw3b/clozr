@@ -9,6 +9,7 @@ import { parseCsv } from '../../../lib/exportCsv';
 import { parseVCard } from '../../../lib/parseVCard';
 import { useUIStore } from '../../../store/uiStore';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
+import { invalidate } from '../../../lib/queryKeys';
 import { color, radius, space, text, weight } from '../../../tokens';
 import type { ClientType } from '../../../types/domain';
 
@@ -165,8 +166,7 @@ export function ImportClientsModal({ open, onClose }: Props) {
       return { created, skipped };
     },
     onSuccess: ({ created, skipped }) => {
-      qc.invalidateQueries({ queryKey: ['clients-list'] });
-      qc.invalidateQueries({ queryKey: ['clients'] });
+      invalidate.afterClientChange(qc);
       showToast(
         `${created} clientes importados${skipped > 0 ? ` · ${skipped} salteados` : ''}`,
         'success',

@@ -9,6 +9,7 @@ import { Badge } from "../../../components/Badge";
 import { Stepper } from "../../../components/Stepper";
 import { color, radius, space, text, weight } from "../../../tokens";
 import { formatMoney } from "../../../lib/format";
+import { invalidate } from "../../../lib/queryKeys";
 import { useClientsList } from "../../clientes/useClientsData";
 import { paymentMethodsDb } from "../../../lib/db/paymentMethods";
 import { customersDb } from "../../../lib/db/customers";
@@ -1075,8 +1076,7 @@ function InlineCreateClient({
       });
     },
     onSuccess: (row) => {
-      qc.invalidateQueries({ queryKey: ["clients-list"] });
-      qc.invalidateQueries({ queryKey: ["clients", wid] });
+      invalidate.afterClientChange(qc);
       showToast(`Cliente "${row.name}" creado`, "success");
       onCreated({
         id: row.id,

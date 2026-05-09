@@ -56,8 +56,7 @@ export function useSetCustomerTags() {
     mutationFn: ({ customerId, tagIds }: { customerId: string; tagIds: string[] }) =>
       customerTagsDb.setForCustomer(customerId, tagIds),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["clients"] });
-      qc.invalidateQueries({ queryKey: ["clients-list"] });
+      invalidate.afterClientChange(qc);
       qc.invalidateQueries({ queryKey: ["customer-tags-with-count"] });
     },
   });

@@ -877,14 +877,15 @@ function ItemRowEditor({
           </div>
           <div>
             <label style={{ fontSize: text.xs, color: color.textMuted, fontWeight: weight.semibold }}>
-              Precio unitario (USD)
+              Precio unitario
             </label>
             <Input
               type="number"
               step="0.01"
               value={item.unitPriceUsdInput}
               onChange={(e) => handleManualPriceChange(e.target.value)}
-              placeholder={suggestedUsd ? String(suggestedUsd) : "0"}
+              placeholder={suggestedUsd ? `Sugerido: ${suggestedUsd}` : "Ingresá el precio en USD"}
+              iconLeft={<span style={{ fontSize: 12, fontWeight: weight.semibold }}>US$</span>}
             />
             {markupOutOfRange && (
               <div

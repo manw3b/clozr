@@ -1,7 +1,7 @@
 import { ButtonHTMLAttributes, forwardRef, ReactNode, useState, CSSProperties } from 'react';
 import { color, radius, text, weight, duration, ease, shadow } from '../tokens';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -41,6 +41,12 @@ function getVariantStyle(
     case 'danger':
       return {
         background: state === 'hover' ? '#DC2626' : 'var(--danger)',
+        color: '#FFFFFF',
+      };
+    case 'success':
+      // Para acciones positivas tipo "+ Ingreso" en Caja.
+      return {
+        background: state === 'hover' ? '#22C55E' : 'var(--success)',
         color: '#FFFFFF',
       };
     case 'secondary':

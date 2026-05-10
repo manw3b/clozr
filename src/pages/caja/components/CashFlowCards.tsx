@@ -138,33 +138,39 @@ function FlowCard({
           {label}
         </span>
         {onQuickAdd && (
+          // Botón visible desde el arranque (tono coloreado, no sólo hover).
+          // Da affordance clara: cada card tiene su propio "+ cargar".
           <button
             onClick={onQuickAdd}
             aria-label={`Agregar ${isIncome ? 'ingreso' : 'egreso'}`}
             title={`Agregar ${isIncome ? 'ingreso' : 'egreso'}`}
             style={{
-              width: 24,
-              height: 24,
+              height: 26,
+              padding: '0 8px',
               borderRadius: radius.sm,
-              background: 'transparent',
-              color: color.textMuted,
+              background: toneBg,
+              color: tone,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
+              gap: 4,
               flexShrink: 0,
-              transition: 'all 100ms',
+              transition: 'all 120ms',
               cursor: 'pointer',
+              fontSize: text.xs,
+              fontWeight: weight.semibold,
             }}
             onMouseEnter={(e) => {
+              e.currentTarget.style.background = tone;
+              e.currentTarget.style.color = '#fff';
+            }}
+            onMouseLeave={(e) => {
               e.currentTarget.style.background = toneBg;
               e.currentTarget.style.color = tone;
             }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.color = color.textMuted;
-            }}
           >
-            <Plus size={14} strokeWidth={2.4} />
+            <Plus size={13} strokeWidth={2.6} />
+            Cargar
           </button>
         )}
       </div>

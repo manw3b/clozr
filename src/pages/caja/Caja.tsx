@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Copy, Trash2, Wallet, Search, Calendar, ExternalLink } from 'lucide-react';
+import { Plus, Copy, Trash2, Wallet, Search, Calendar, ExternalLink, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { PageHeader } from '../../components/PageHeader';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -173,18 +173,28 @@ export function Caja() {
                 Cerrar caja
               </Button>
             )}
+            {/* Botones prominentes de alta — verde para ingreso, rojo para
+                egreso. Sustituyen al "Nuevo movimiento" único: 1 click menos
+                porque el tipo ya viene preseleccionado. */}
             <Button
-              variant="primary"
+              variant="success"
               size="md"
-              iconLeft={<Plus size={16} />}
-              onClick={() => {
-                setNewMovKind('income');
-                setNewMovOpen(true);
-              }}
+              iconLeft={<ArrowUpRight size={16} strokeWidth={2.4} />}
+              onClick={() => openQuickAdd('income')}
               disabled={isClosed}
-              title={isClosed ? 'La caja está cerrada' : undefined}
+              title={isClosed ? 'La caja está cerrada' : 'Registrar ingreso'}
             >
-              Nuevo movimiento
+              Ingreso
+            </Button>
+            <Button
+              variant="danger"
+              size="md"
+              iconLeft={<ArrowDownRight size={16} strokeWidth={2.4} />}
+              onClick={() => openQuickAdd('expense')}
+              disabled={isClosed}
+              title={isClosed ? 'La caja está cerrada' : 'Registrar egreso'}
+            >
+              Egreso
             </Button>
           </>
         }

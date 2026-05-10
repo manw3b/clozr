@@ -120,3 +120,45 @@ export function useDeleteMovement() {
     onSuccess: () => invalidate.afterCashChange(qc),
   });
 }
+
+/** Sesión de caja del día (la que se abrió hoy). Sirve para mostrar el
+ *  estado (abierta/cerrada) en el header y los timestamps. */
+export function useCashSession() {
+  const { activeWorkspace } = useWorkspaceStore();
+  const { activeBusiness } = useBusinessStore();
+  const wid = activeWorkspace?.id ?? "";
+  const bid = activeBusiness?.id ?? "";
+  const today = getTodayISO();
+  return useQuery({
+    queryKey: ["caja", "session", wid, bid, today],
+    queryFn: () => cashSessionsDb.ensureForDay(wid, bid, today),
+    enabled: !!wid && !!bid,
+  });
+}
+
+/** Cierra la sesión de caja de HOY con los balances físicos contados.
+ *  Devuelve un toast/error al caller; persiste closed_at + balances. */
+export function useCloseCashSession() {
+  const qc = useQueryClient();
+  const { activeWorkspace } = useWorkspaceStore();
+  const { activeBusiness } = useBusinessStore();
+  const wid = activeWorkspace?.id ?? "";
+  const bid = activeBusiness?.id ?? "";
+  const today = getTodayISO();
+
+  return useMutation({
+    mutationFn: async (input: { ars: number; usd: number }) => {
+      const session = await cashSessionsDb.ensureForDay(wid, bid, today);
+      if (session.id === "ghost-session") {
+        throw new Error("No hay sesión de caja para cerrar");
+      }
+      await cashSessionsDb.close(session.id, {
+        closed_balance_ars: input.ars,
+        closed_balance_usd: input.usd,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["caja"] });
+    },
+  });
+}

@@ -9,6 +9,7 @@ import {
   Home,
   Tag,
   Receipt,
+  ExternalLink,
 } from 'lucide-react';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney, formatTime } from '../../../lib/format';
@@ -190,9 +191,26 @@ function MovementRow({
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             marginBottom: 1,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            maxWidth: '100%',
           }}
         >
-          {movement.description}
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {movement.description}
+          </span>
+          {/* Indicador de movimiento que viene de una venta — click abre la
+              venta original. El icono es subtle pero deja claro que es
+              accionable / linkeable. */}
+          {movement.saleId && (
+            <ExternalLink
+              size={11}
+              color={color.textDim}
+              style={{ flexShrink: 0 }}
+              aria-label="Ver venta original"
+            />
+          )}
         </div>
         <div
           style={{
@@ -211,6 +229,12 @@ function MovementRow({
             <>
               <span>·</span>
               <span>{PAYMENT_METHOD_LABELS[movement.paymentMethod]}</span>
+            </>
+          )}
+          {movement.clientName && (
+            <>
+              <span>·</span>
+              <span>{movement.clientName}</span>
             </>
           )}
         </div>

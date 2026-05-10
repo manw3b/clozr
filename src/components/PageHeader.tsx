@@ -2,7 +2,9 @@ import { ReactNode } from 'react';
 import { color, space, text, weight } from '../tokens';
 
 interface PageHeaderProps {
-  title: string;
+  /** El title acepta ReactNode para que callers puedan inyectar
+   *  decoraciones inline como un chip de estado al lado del título. */
+  title: ReactNode;
   /** Texto secundario debajo del título (ej: "0 resultados", "iPhone Club · sábado 2 de mayo") */
   subtitle?: ReactNode;
   /** Iconito opcional al lado del título */

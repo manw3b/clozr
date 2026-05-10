@@ -81,6 +81,18 @@ export function Ventas() {
     return () => window.removeEventListener('clozr:open-new-sale', handler);
   }, []);
 
+  // Permite abrir un drawer de venta desde otras pantallas (ej: Caja
+  // → click en un movimiento que vino de una venta) disparando el evento
+  // `clozr:open-sale` con detail.id.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<{ id?: string }>).detail?.id;
+      if (id) setOpenSaleId(id);
+    };
+    window.addEventListener('clozr:open-sale', handler);
+    return () => window.removeEventListener('clozr:open-sale', handler);
+  }, []);
+
   /* ---------- Filtrado por período ---------- */
   const periodFiltered = useMemo(() => {
     const now = Date.now();

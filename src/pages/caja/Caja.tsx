@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Copy, Trash2, Wallet, Search } from 'lucide-react';
+import { Plus, Copy, Trash2, Wallet, Search, Calendar, ExternalLink } from 'lucide-react';
 import { PageHeader } from '../../components/PageHeader';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -18,6 +18,8 @@ import { CashFlowCards } from './components/CashFlowCards';
 import { CashMovementsList } from './components/CashMovementsList';
 import { NewMovementModal } from './components/NewMovementModal';
 import { TopExpenseCategories } from './components/TopExpenseCategories';
+import { CashSessionChip } from './components/CashSessionChip';
+import { CloseCashModal } from './components/CloseCashModal';
 import { CASH_CATEGORY_LABELS } from '../../types/domain';
 import { space } from '../../tokens';
 import { formatMoney } from '../../lib/format';
@@ -25,6 +27,8 @@ import {
   useCashSummary,
   useCreateMovement,
   useDeleteMovement,
+  useCashSession,
+  useCloseCashSession,
   type CashPeriod,
 } from './useCashData';
 import type { CashSummary, CashMovement, CashMovementKind, CashCategory, PaymentMethod } from '../../types/domain';
@@ -63,8 +67,12 @@ const PERIOD_LABELS: Record<CashPeriod, { suffix: string; verbose: string }> = {
 export function Caja() {
   const [period, setPeriod] = useState<CashPeriod>('today');
   const { data: summary = EMPTY_SUMMARY } = useCashSummary(period);
+  const { data: session } = useCashSession();
   const createMovementMut = useCreateMovement();
   const deleteMovementMut = useDeleteMovement();
+  const closeCashMut = useCloseCashSession();
+  const [closeOpen, setCloseOpen] = useState(false);
+  const isClosed = !!session?.closed_at;
   const [kindFilter, setKindFilter] = useState<string>('todos');
   const [search, setSearch] = useState('');
   const [newMovOpen, setNewMovOpen] = useState(false);
@@ -73,7 +81,7 @@ export function Caja() {
   const [newMovKind, setNewMovKind] = useState<CashMovementKind>('income');
   const ctxMenu = useContextMenu();
   const [ctxMov, setCtxMov] = useState<CashMovement | null>(null);
-  const { showToast } = useUIStore();
+  const { showToast, setActiveScreen } = useUIStore();
   const periodLabel = PERIOD_LABELS[period];
 
   function openQuickAdd(kind: CashMovementKind) {
@@ -86,6 +94,23 @@ export function Caja() {
     window.addEventListener('clozr:open-new-movement', handler);
     return () => window.removeEventListener('clozr:open-new-movement', handler);
   }, []);
+
+  /**
+   * Click en un movimiento que vino de una venta → navegamos a Ventas y
+   * disparamos un evento que abre el drawer de esa venta. Si el movimiento
+   * NO tiene saleId asociada, no hacemos nada (la card es informativa).
+   */
+  function handleOpenMovement(m: CashMovement) {
+    if (!m.saleId) return;
+    setActiveScreen('sales');
+    // Diferimos un tick para que Ventas ya esté montado y haya registrado
+    // su listener del evento.
+    setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent('clozr:open-sale', { detail: { id: m.saleId } }),
+      );
+    }, 0);
+  }
 
   const filteredMovements = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -129,20 +154,39 @@ export function Caja() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: space[5], height: '100%' }}>
       <PageHeader
-        title="Caja"
+        title={
+          <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+            Caja
+            <CashSessionChip session={session} />
+          </span>
+        }
         subtitle={`Balance dual ARS/USD · movimientos ${periodLabel.suffix}`}
         actions={
-          <Button
-            variant="primary"
-            size="md"
-            iconLeft={<Plus size={16} />}
-            onClick={() => {
-              setNewMovKind('income');
-              setNewMovOpen(true);
-            }}
-          >
-            Nuevo movimiento
-          </Button>
+          <>
+            {!isClosed && (
+              <Button
+                variant="secondary"
+                size="md"
+                iconLeft={<Calendar size={14} />}
+                onClick={() => setCloseOpen(true)}
+              >
+                Cerrar caja
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              size="md"
+              iconLeft={<Plus size={16} />}
+              onClick={() => {
+                setNewMovKind('income');
+                setNewMovOpen(true);
+              }}
+              disabled={isClosed}
+              title={isClosed ? 'La caja está cerrada' : undefined}
+            >
+              Nuevo movimiento
+            </Button>
+          </>
         }
       />
 
@@ -207,7 +251,7 @@ export function Caja() {
           movements={filteredMovements}
           title="Movimientos"
           subtitle={periodLabel.suffix}
-          onMovementClick={() => { /* Detalle de movimiento: próxima iteración */ }}
+          onMovementClick={handleOpenMovement}
           onMovementContextMenu={(m, e) => {
             setCtxMov(m);
             ctxMenu.openAt(e);
@@ -257,9 +301,44 @@ export function Caja() {
         onSubmit={handleNewMovement}
       />
 
+      {/* Modal de cierre / arqueo */}
+      <CloseCashModal
+        open={closeOpen}
+        onClose={() => setCloseOpen(false)}
+        summary={summary}
+        onConfirm={async ({ ars, usd }) => {
+          await closeCashMut.mutateAsync(
+            { ars, usd },
+            {
+              onSuccess: () => {
+                showToast('Caja cerrada · arqueo guardado', 'success');
+              },
+              onError: (e) => {
+                showToast(
+                  e instanceof Error ? e.message : 'No se pudo cerrar la caja',
+                  'error',
+                );
+              },
+            },
+          );
+        }}
+      />
+
       {ctxMenu.open && ctxMov && (
         <ContextMenu position={ctxMenu.position} onClose={ctxMenu.close}>
           <ContextMenuLabel>{ctxMov.description || 'Movimiento'}</ContextMenuLabel>
+          {ctxMov.saleId && (
+            <ContextMenuItem
+              icon={<ExternalLink size={14} />}
+              onClick={() => {
+                const m = ctxMov;
+                ctxMenu.close();
+                handleOpenMovement(m);
+              }}
+            >
+              Ver venta original
+            </ContextMenuItem>
+          )}
           <ContextMenuItem
             icon={<Copy size={14} />}
             onClick={() => {

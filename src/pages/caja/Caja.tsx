@@ -436,8 +436,13 @@ export function Caja() {
               const m = ctxMov;
               ctxMenu.close();
               const sign = m.kind === 'income' ? '+' : '−';
+              // Si vino de una venta, avisar que la venta NO se borra —
+              // sólo el movement de caja.
+              const saleWarning = m.saleId
+                ? `\n\n⚠ Este movimiento vino de una venta. La venta original NO se borra — sólo este registro de caja.`
+                : '';
               const ok = window.confirm(
-                `¿Eliminar este movimiento?\n\n${sign}${formatMoney(m.amount, m.currency)} · ${m.description || 'sin descripción'}\n\nEsta acción no se puede deshacer.`,
+                `¿Eliminar este movimiento?\n\n${sign}${formatMoney(m.amount, m.currency)} · ${m.description || 'sin descripción'}${saleWarning}\n\nEsta acción no se puede deshacer.`,
               );
               if (!ok) return;
               deleteMovementMut.mutate(m.id, {

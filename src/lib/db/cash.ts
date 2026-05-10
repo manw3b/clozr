@@ -128,8 +128,19 @@ export async function createMovementFromSale(
   );
 }
 
+/**
+ * Borra un cash movement por id. Antes había un guardrail
+ * \`AND reference_type IS NULL\` que bloqueaba borrar movements
+ * vinculados a ventas — pero en la práctica eso impedía corregir
+ * errores históricos (ej: venta cargada con moneda incorrecta).
+ *
+ * Ahora se permite. La venta original NO se borra — sólo el movement,
+ * que es la "manifestación en caja" del cobro. Si después se cobra de
+ * nuevo o el usuario carga el movement manualmente correcto, todo
+ * queda bien.
+ */
 export async function remove(id: string): Promise<void> {
-  await dbExecute("DELETE FROM cash_movements WHERE id = ? AND reference_type IS NULL", [id]);
+  await dbExecute("DELETE FROM cash_movements WHERE id = ?", [id]);
 }
 
 export const cashDb = { getMovements, getSummary, getSummaryByCurrency, createMovement, createMovementFromSale, remove };

@@ -6,11 +6,12 @@
  *   - src-tauri/Cargo.toml
  *
  * Uso:
- *   node scripts/bump-version.mjs patch   → 1.3.2 → 1.3.3
- *   node scripts/bump-version.mjs minor   → 1.3.2 → 1.4.0
- *   node scripts/bump-version.mjs major   → 1.3.2 → 2.0.0
- *   node scripts/bump-version.mjs 1.4.0   → set explícito
- *   node scripts/bump-version.mjs --check → sólo reporta versiones actuales
+ *   node scripts/bump-version.mjs patch              → 1.3.2 → 1.3.3
+ *   node scripts/bump-version.mjs minor              → 1.3.2 → 1.4.0
+ *   node scripts/bump-version.mjs major              → 1.3.2 → 2.0.0
+ *   node scripts/bump-version.mjs 1.4.0              → set explícito
+ *   node scripts/bump-version.mjs --check            → sólo reporta versiones actuales
+ *   node scripts/bump-version.mjs patch --dry-run    → calcula sin escribir
  *
  * La versión "fuente de verdad" es la de `src-tauri/tauri.conf.json` porque
  * es la que consume el auto-updater de Tauri y lo que el usuario final ve.
@@ -70,9 +71,11 @@ function bump(current, kind) {
   return kind;
 }
 
-const arg = process.argv[2];
+const argv = process.argv.slice(2);
+const dryRun = argv.includes('--dry-run');
+const arg = argv.find((a) => !a.startsWith('--'));
 if (!arg) {
-  console.error('Uso: node scripts/bump-version.mjs <patch|minor|major|X.Y.Z|--check>');
+  console.error('Uso: node scripts/bump-version.mjs <patch|minor|major|X.Y.Z|--check> [--dry-run]');
   process.exit(1);
 }
 
@@ -98,6 +101,13 @@ if (arg === '--check') {
 
 const source = tauri.version; // fuente de verdad
 const next = bump(source, arg);
+
+if (dryRun) {
+  console.log(`\n(dry-run) → bumpearía a ${next}\n`);
+  console.log('No se escribió ningún archivo.');
+  process.exit(0);
+}
+
 console.log(`\n→ Bumpeando a ${next}\n`);
 
 pkg.version = next;

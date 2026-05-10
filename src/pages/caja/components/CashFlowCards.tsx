@@ -13,9 +13,16 @@ interface CashFlowCardsProps {
 }
 
 export function CashFlowCards({ summary, periodSuffix = 'del día', onQuickAdd }: CashFlowCardsProps) {
-  const incomeArs = summary.totalIncome.ars + summary.totalIncome.usd * summary.usdRate;
-  const expenseArs = summary.totalExpense.ars + summary.totalExpense.usd * summary.usdRate;
+  // Separamos por moneda — NO convertimos. La plata en pesos y la plata en
+  // dólares son cajas físicas distintas; mezclarlas con cotización oculta
+  // que un dólar puede valer 1450 hoy y 1480 mañana. Cada amount queda en
+  // su moneda original.
+  const incomeArs = summary.totalIncome.ars;
+  const incomeUsd = summary.totalIncome.usd;
+  const expenseArs = summary.totalExpense.ars;
+  const expenseUsd = summary.totalExpense.usd;
   const netArs = incomeArs - expenseArs;
+  const netUsd = incomeUsd - expenseUsd;
 
   const incomeCount = summary.movements.filter((m) => m.kind === 'income').length;
   const expenseCount = summary.movements.filter((m) => m.kind === 'expense').length;
@@ -29,8 +36,8 @@ export function CashFlowCards({ summary, periodSuffix = 'del día', onQuickAdd }
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: space[3] }}>
       <FlowCard
         label={`Ingresos ${periodSuffix}`}
-        amount={incomeArs}
-        currencyDetails={{ ars: summary.totalIncome.ars, usd: summary.totalIncome.usd }}
+        ars={incomeArs}
+        usd={incomeUsd}
         count={incomeCount}
         kind="income"
         onQuickAdd={onQuickAdd ? () => onQuickAdd('income') : undefined}
@@ -39,8 +46,8 @@ export function CashFlowCards({ summary, periodSuffix = 'del día', onQuickAdd }
       />
       <FlowCard
         label={`Egresos ${periodSuffix}`}
-        amount={expenseArs}
-        currencyDetails={{ ars: summary.totalExpense.ars, usd: summary.totalExpense.usd }}
+        ars={expenseArs}
+        usd={expenseUsd}
         count={expenseCount}
         kind="expense"
         onQuickAdd={onQuickAdd ? () => onQuickAdd('expense') : undefined}
@@ -49,7 +56,8 @@ export function CashFlowCards({ summary, periodSuffix = 'del día', onQuickAdd }
       />
       <FlowCard
         label={`Neto ${periodSuffix}`}
-        amount={netArs}
+        ars={netArs}
+        usd={netUsd}
         kind="net"
         animationDelay={120}
       />
@@ -59,8 +67,8 @@ export function CashFlowCards({ summary, periodSuffix = 'del día', onQuickAdd }
 
 function FlowCard({
   label,
-  amount,
-  currencyDetails,
+  ars,
+  usd,
   count,
   kind,
   onQuickAdd,
@@ -68,8 +76,10 @@ function FlowCard({
   animationDelay = 0,
 }: {
   label: string;
-  amount: number;
-  currencyDetails?: { ars: number; usd: number };
+  /** Total en pesos. NO se convierte — son las cajas separadas. */
+  ars: number;
+  /** Total en dólares. */
+  usd: number;
   count?: number;
   kind: 'income' | 'expense' | 'net';
   onQuickAdd?: () => void;
@@ -82,29 +92,31 @@ function FlowCard({
   const isIncome = kind === 'income';
   const isExpense = kind === 'expense';
   const isNet = kind === 'net';
-  // Para "neto" usamos el tono del signo: positivo verde, negativo rojo,
-  // cero/loading neutro. Así de un vistazo se ve si "ganaste plata" hoy.
+
+  // Para "neto" decidimos el tono según el signo combinado: si AMBAS
+  // monedas están en negativo, rojo. Si AMBAS positivas o cero, verde.
+  // Si una es positiva y otra negativa, neutral (porque la realidad es
+  // mixta y no queremos mentir con un solo color).
+  const netSignSummary = isNet ? netSign(ars, usd) : null;
   const tone = isIncome
     ? color.success
     : isExpense
     ? color.danger
-    : amount > 0
+    : netSignSummary === 'positive'
     ? color.success
-    : amount < 0
+    : netSignSummary === 'negative'
     ? color.danger
     : color.text;
   const toneBg = isIncome
     ? color.successBg
     : isExpense
     ? color.dangerBg
-    : amount > 0
+    : netSignSummary === 'positive'
     ? color.successBg
-    : amount < 0
+    : netSignSummary === 'negative'
     ? color.dangerBg
     : color.surface2;
   const Icon = isIncome ? ArrowUpRight : isExpense ? ArrowDownRight : TrendingUp;
-  const sign = isIncome ? '+' : isExpense ? '−' : amount > 0 ? '+' : amount < 0 ? '−' : '';
-  const displayAmount = Math.abs(amount);
 
   return (
     <div
@@ -203,17 +215,13 @@ function FlowCard({
         )}
       </div>
 
-      <div
-        style={{
-          fontSize: text['2xl'],
-          fontWeight: weight.bold,
-          color: tone,
-          letterSpacing: '-0.5px',
-          lineHeight: 1.1,
-          fontVariantNumeric: 'tabular-nums',
-        }}
-      >
-        {sign}{formatMoney(displayAmount)}
+      {/* Dos amounts apilados: ARS arriba (mayor) y USD abajo (un poco
+          menor pero igual prominente). Si una moneda está en 0, queda
+          atenuada — el ojo va al que tiene movimiento sin que la otra
+          desaparezca por completo. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <AmountLine ars usd={undefined} value={ars} kind={kind} netSign={netSignSummary} primary />
+        <AmountLine ars={false} usd value={usd} kind={kind} netSign={netSignSummary} />
       </div>
 
       <div
@@ -230,20 +238,107 @@ function FlowCard({
         {!isNet && typeof count === 'number' && (
           <span>{count} {count === 1 ? 'movimiento' : 'movimientos'}</span>
         )}
-        {!isNet && currencyDetails && currencyDetails.usd > 0 && (
-          <>
-            <span>·</span>
-            <span>
-              {formatMoney(currencyDetails.ars)} ARS + {formatMoney(currencyDetails.usd, 'USD')}
-            </span>
-          </>
-        )}
         {isNet && (
           <span>
-            {amount > 0 ? 'Cierras en positivo' : amount < 0 ? 'Cierras en negativo' : 'Sin movimientos'}
+            {netSignSummary === 'positive'
+              ? 'Cerrás en positivo'
+              : netSignSummary === 'negative'
+              ? 'Cerrás en negativo'
+              : netSignSummary === 'mixed'
+              ? 'Mixto: revisá por moneda'
+              : 'Sin movimientos'}
           </span>
         )}
       </div>
     </div>
   );
+}
+
+/** Una línea de monto en una moneda específica. Tono y signo dependen del
+ *  contexto del flow card padre (ingreso siempre +, egreso siempre −,
+ *  neto según signo). Si el value es 0, se atenúa para no competir con
+ *  la moneda que sí tiene movimiento. */
+function AmountLine({
+  ars,
+  usd,
+  value,
+  kind,
+  netSign: netSignProp,
+  primary,
+}: {
+  ars: boolean;
+  usd: boolean | undefined;
+  value: number;
+  kind: 'income' | 'expense' | 'net';
+  netSign: NetSign | null;
+  primary?: boolean;
+}) {
+  const isIncome = kind === 'income';
+  const isExpense = kind === 'expense';
+  const isNet = kind === 'net';
+  const isZero = value === 0;
+  const sign = isIncome ? '+' : isExpense ? '−' : value > 0 ? '+' : value < 0 ? '−' : '';
+  const display = Math.abs(value);
+  const currency: 'ARS' | 'USD' = ars ? 'ARS' : 'USD';
+  // Para isNet: cada línea usa su propio signo (independiente de las otras).
+  // Para isIncome/isExpense: tono del kind. Si el value es 0, atenuamos.
+  const tone = isZero
+    ? color.textDim
+    : isIncome
+    ? color.success
+    : isExpense
+    ? color.danger
+    : isNet
+    ? value > 0
+      ? color.success
+      : value < 0
+      ? color.danger
+      : color.textMuted
+    : color.text;
+  void netSignProp; // el cálculo de tono ya no depende del summary global
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'baseline',
+        gap: 6,
+        opacity: isZero ? 0.55 : 1,
+      }}
+    >
+      <span
+        style={{
+          fontSize: primary ? text['2xl'] : text.lg,
+          fontWeight: weight.bold,
+          color: tone,
+          letterSpacing: '-0.4px',
+          lineHeight: 1.1,
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {sign}
+        {formatMoney(display, currency)}
+      </span>
+      <span
+        style={{
+          fontSize: text.xs,
+          fontWeight: weight.semibold,
+          color: color.textDim,
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+        }}
+      >
+        {ars ? 'ARS' : usd ? 'USD' : ''}
+      </span>
+    </div>
+  );
+}
+
+type NetSign = 'positive' | 'negative' | 'zero' | 'mixed';
+function netSign(ars: number, usd: number): NetSign {
+  const a = Math.sign(ars);
+  const u = Math.sign(usd);
+  if (a === 0 && u === 0) return 'zero';
+  if (a >= 0 && u >= 0) return 'positive';
+  if (a <= 0 && u <= 0) return 'negative';
+  return 'mixed';
 }

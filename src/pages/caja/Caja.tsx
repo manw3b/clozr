@@ -74,6 +74,7 @@ export function Caja() {
   const [closeOpen, setCloseOpen] = useState(false);
   const isClosed = !!session?.closed_at;
   const [kindFilter, setKindFilter] = useState<string>('todos');
+  const [currencyFilter, setCurrencyFilter] = useState<'todas' | 'ARS' | 'USD'>('todas');
   const [search, setSearch] = useState('');
   const [newMovOpen, setNewMovOpen] = useState(false);
   // Tipo pre-seleccionado para el próximo "Nuevo movimiento" (lo setea
@@ -116,6 +117,7 @@ export function Caja() {
     const q = search.trim().toLowerCase();
     return summary.movements.filter((m) => {
       if (kindFilter !== 'todos' && m.kind !== kindFilter) return false;
+      if (currencyFilter !== 'todas' && m.currency !== currencyFilter) return false;
       if (q) {
         // Buscamos en descripción, categoría humana y monto (string).
         const haystack = [
@@ -129,7 +131,7 @@ export function Caja() {
       }
       return true;
     });
-  }, [summary.movements, kindFilter, search]);
+  }, [summary.movements, kindFilter, currencyFilter, search]);
 
   function handleNewMovement(data: {
     kind: CashMovementKind;
@@ -278,14 +280,25 @@ export function Caja() {
           onChange={(v) => setPeriod(v as CashPeriod)}
           items={periodFilters}
         />
-        <div style={{ flex: 1, minWidth: 200, maxWidth: 360 }}>
+        <div style={{ flex: 1, minWidth: 200, maxWidth: 320 }}>
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por descripción, categoría o monto…"
+            placeholder="Buscar descripción, categoría o monto…"
             iconLeft={<Search size={14} />}
           />
         </div>
+        <Tabs
+          variant="pills"
+          size="sm"
+          value={currencyFilter}
+          onChange={(v) => setCurrencyFilter(v as 'todas' | 'ARS' | 'USD')}
+          items={[
+            { value: 'todas', label: 'Todas' },
+            { value: 'ARS', label: 'Pesos' },
+            { value: 'USD', label: 'Dólares' },
+          ]}
+        />
         <Tabs
           variant="pills"
           size="sm"

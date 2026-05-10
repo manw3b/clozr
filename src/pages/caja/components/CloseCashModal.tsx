@@ -48,7 +48,6 @@ export function CloseCashModal({ open, onClose, summary, onConfirm }: Props) {
   const usd = Number(usdInput) || 0;
   const diffArs = ars - expectedArs;
   const diffUsd = usd - expectedUsd;
-  const totalDiffArs = diffArs + diffUsd * (summary.usdRate || 1);
 
   const isDirty = () => {
     return ars !== Math.round(expectedArs) || usd !== Math.round(expectedUsd);
@@ -147,21 +146,10 @@ export function CloseCashModal({ open, onClose, summary, onConfirm }: Props) {
           diff={diffUsd}
           currency="USD"
         />
-        <div
-          style={{
-            borderTop: `1px solid ${color.border}`,
-            paddingTop: space[2],
-            marginTop: space[1],
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <span style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text }}>
-            Diferencia total (en ARS)
-          </span>
-          <DiffBadge value={totalDiffArs} currency="ARS" big />
-        </div>
+        {/* Sin "diferencia total convertida" — pesos y dólares son cajas
+            distintas y mezclar con cotización oculta el origen real. Si
+            ambas monedas cuadran, el cierre quedó perfecto; si no, el
+            usuario ve qué moneda ajustar. */}
       </div>
     </Modal>
   );

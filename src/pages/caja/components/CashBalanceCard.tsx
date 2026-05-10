@@ -10,17 +10,18 @@ interface CashBalanceCardProps {
 /**
  * Hero card del balance del día.
  *
- * Estructura:
- * - Balance grande total (en ARS, convertido)
- * - Subtotales ARS y USD por separado
- * - Comparativa: apertura → ahora con delta
- * - Cotización USD vigente
+ * Cambio importante respecto al diseño anterior: ya no mostramos un "total
+ * grande" como suma convertida ARS+USD×cotización. Eso era engañoso porque
+ * la caja física en pesos y la caja física en dólares son cosas distintas
+ * y el dólar fluctúa. Ahora cada moneda tiene su propio balance prominente.
  */
 export function CashBalanceCard({ summary }: CashBalanceCardProps) {
-  const totalArs = summary.currentBalance.ars + summary.currentBalance.usd * summary.usdRate;
-  const openingTotalArs = summary.openingBalance.ars + summary.openingBalance.usd * summary.usdRate;
-  const delta = totalArs - openingTotalArs;
-  const deltaPct = openingTotalArs > 0 ? (delta / openingTotalArs) * 100 : 0;
+  const deltaArs = summary.currentBalance.ars - summary.openingBalance.ars;
+  const deltaUsd = summary.currentBalance.usd - summary.openingBalance.usd;
+  const deltaArsPct =
+    summary.openingBalance.ars > 0 ? (deltaArs / summary.openingBalance.ars) * 100 : 0;
+  const deltaUsdPct =
+    summary.openingBalance.usd > 0 ? (deltaUsd / summary.openingBalance.usd) * 100 : 0;
 
   return (
     <div
@@ -57,115 +58,102 @@ export function CashBalanceCard({ summary }: CashBalanceCardProps) {
             color: color.textMuted,
             textTransform: 'uppercase',
             letterSpacing: '0.6px',
-            marginBottom: 4,
+            marginBottom: space[2],
             display: 'flex',
             alignItems: 'center',
             gap: space[2],
           }}
         >
           <Wallet size={14} strokeWidth={2.2} />
-          Balance actual
+          Balance actual · cajas separadas por moneda
         </div>
 
-        {/* Total grande */}
-        <div
-          style={{
-            fontSize: text['3xl'],
-            fontWeight: weight.bold,
-            color: color.text,
-            letterSpacing: '-0.8px',
-            lineHeight: 1.1,
-            fontVariantNumeric: 'tabular-nums',
-          }}
-        >
-          {formatMoney(totalArs)}
-        </div>
-
-        {/* Delta vs apertura */}
-        <div
-          style={{
-            marginTop: 4,
-            fontSize: text.sm,
-            display: 'flex',
-            alignItems: 'center',
-            gap: space[1],
-          }}
-        >
-          {delta >= 0 ? (
-            <ArrowUpRight size={14} color={color.success} strokeWidth={2.4} />
-          ) : (
-            <ArrowDownRight size={14} color={color.danger} strokeWidth={2.4} />
-          )}
-          <span
-            style={{
-              color: delta >= 0 ? color.success : color.danger,
-              fontWeight: weight.semibold,
-            }}
-          >
-            {formatMoney(Math.abs(delta))} ({deltaPct >= 0 ? '+' : ''}{deltaPct.toFixed(1)}%)
-          </span>
-          <span style={{ color: color.textMuted }}>vs apertura</span>
-        </div>
-
-        {/* Subtotales ARS / USD */}
+        {/* Dos balances grandes lado a lado: ARS y USD. Sin conversión. */}
         <div
           style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
-            gap: space[3],
-            marginTop: space[4],
-            paddingTop: space[4],
-            borderTop: `1px solid ${color.border}`,
+            gap: space[4],
           }}
         >
-          <SubBalance
-            label="ARS"
+          <BalanceColumn
+            currency="ARS"
             current={summary.currentBalance.ars}
             opening={summary.openingBalance.ars}
-            currency="ARS"
+            delta={deltaArs}
+            deltaPct={deltaArsPct}
           />
-          <SubBalance
-            label={`USD (cotización ${formatMoney(summary.usdRate)})`}
+          <BalanceColumn
+            currency="USD"
             current={summary.currentBalance.usd}
             opening={summary.openingBalance.usd}
-            currency="USD"
+            delta={deltaUsd}
+            deltaPct={deltaUsdPct}
           />
+        </div>
+
+        {/* Cotización informativa al pie — sin convertir nada, sólo
+            recordatorio para el usuario. */}
+        <div
+          style={{
+            marginTop: space[4],
+            paddingTop: space[3],
+            borderTop: `1px solid ${color.border}`,
+            fontSize: text.xs,
+            color: color.textDim,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <span>
+            Cotización USD ↔ ARS:{' '}
+            <strong style={{ color: color.textMuted, fontVariantNumeric: 'tabular-nums' }}>
+              {formatMoney(summary.usdRate)}
+            </strong>
+          </span>
+          <span style={{ fontStyle: 'italic' }}>Cada moneda se contabiliza por separado</span>
         </div>
       </div>
     </div>
   );
 }
 
-function SubBalance({
-  label,
+function BalanceColumn({
+  currency,
   current,
   opening,
-  currency,
+  delta,
+  deltaPct,
 }: {
-  label: string;
+  currency: 'ARS' | 'USD';
   current: number;
   opening: number;
-  currency: 'ARS' | 'USD';
+  delta: number;
+  deltaPct: number;
 }) {
-  const delta = current - opening;
+  const isPositive = delta >= 0;
   return (
     <div>
       <div
         style={{
-          fontSize: text.xs,
-          color: color.textMuted,
-          fontWeight: weight.medium,
-          marginBottom: 2,
+          fontSize: 10,
+          fontWeight: weight.bold,
+          color: color.textDim,
+          textTransform: 'uppercase',
+          letterSpacing: '0.7px',
+          marginBottom: 4,
         }}
       >
-        {label}
+        Caja en {currency === 'ARS' ? 'pesos' : 'dólares'} · {currency}
       </div>
       <div
         style={{
-          fontSize: text.lg,
+          fontSize: text['2xl'],
           fontWeight: weight.bold,
           color: color.text,
-          letterSpacing: '-0.2px',
+          letterSpacing: '-0.6px',
+          lineHeight: 1.1,
           fontVariantNumeric: 'tabular-nums',
         }}
       >
@@ -173,14 +161,36 @@ function SubBalance({
       </div>
       <div
         style={{
+          marginTop: 4,
           fontSize: text.xs,
-          color: delta >= 0 ? color.success : color.danger,
-          fontWeight: weight.semibold,
-          marginTop: 2,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          flexWrap: 'wrap',
         }}
       >
-        {delta >= 0 ? '+' : ''}{formatMoney(delta, currency)}
+        {isPositive ? (
+          <ArrowUpRight size={12} color={color.success} strokeWidth={2.4} />
+        ) : (
+          <ArrowDownRight size={12} color={color.danger} strokeWidth={2.4} />
+        )}
+        <span
+          style={{
+            color: isPositive ? color.success : color.danger,
+            fontWeight: weight.semibold,
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {isPositive ? '+' : '−'}
+          {formatMoney(Math.abs(delta), currency)}
+          {opening > 0 && ` (${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)}%)`}
+        </span>
+        <span style={{ color: color.textMuted }}>vs apertura</span>
+      </div>
+      <div style={{ fontSize: text.xs, color: color.textDim, marginTop: 2 }}>
+        Apertura: {formatMoney(opening, currency)}
       </div>
     </div>
   );
 }
+

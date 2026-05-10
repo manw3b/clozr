@@ -12,51 +12,21 @@ interface Props {
 }
 
 /**
- * Tira horizontal con las top N categorías de egreso del período.
+ * Top categorías de egreso del período, separadas por moneda.
  *
- * Responde a la pregunta "¿en qué se me va la plata?". Muestra el % de
- * cada categoría sobre el total de egresos + el monto absoluto, con una
- * mini-barra para que el peso relativo se vea sin sumar mentalmente.
- *
- * Si no hay egresos, no se rendea nada — la sección desaparece.
+ * Mezclar pesos y dólares en un mismo ranking miente: $50.000 ARS no es
+ * comparable con US$50 sin conversión, y la conversión cambia día a día.
+ * Por eso rendereamos hasta 2 sub-secciones (ARS y USD) cada una con su
+ * propio top N. Si una moneda no tiene egresos, esa sub-sección no aparece.
  */
 export function TopExpenseCategories({ movements, topN = 3, periodSuffix = 'del día' }: Props) {
   const expenses = movements.filter((m) => m.kind === 'expense');
   if (expenses.length === 0) return null;
 
-  // Agrupar por categoría sumando montos en ARS (los USD ya están normalizados
-  // a ARS en el summary, pero los movements individuales mantienen su moneda
-  // original — para la comparativa relativa podemos usar amount sin convertir
-  // siempre que estén en la misma moneda; si hay mix, multiplicamos por el
-  // ratio aproximado USD≈1450 hardcoded… NO. Mejor: usamos el monto raw y
-  // confiamos en que el % relativo sea representativo. Es una heurística
-  // visual, no un balance contable).
-  const byCategory = new Map<CashCategory, { total: number; count: number }>();
-  let grandTotal = 0;
-  for (const m of expenses) {
-    const entry = byCategory.get(m.category) ?? { total: 0, count: 0 };
-    entry.total += m.amount;
-    entry.count += 1;
-    byCategory.set(m.category, entry);
-    grandTotal += m.amount;
-  }
+  const arsRanking = computeRanking(expenses.filter((m) => m.currency === 'ARS'), topN);
+  const usdRanking = computeRanking(expenses.filter((m) => m.currency === 'USD'), topN);
 
-  if (grandTotal === 0) return null;
-
-  const sorted = Array.from(byCategory.entries())
-    .map(([cat, data]) => ({
-      category: cat,
-      label: CASH_CATEGORY_LABELS[cat],
-      total: data.total,
-      count: data.count,
-      pct: data.total / grandTotal,
-    }))
-    .sort((a, b) => b.total - a.total);
-
-  const visible = sorted.slice(0, topN);
-  const rest = sorted.slice(topN);
-  const restTotal = rest.reduce((s, r) => s + r.total, 0);
-  const restPct = restTotal / grandTotal;
+  if (!arsRanking && !usdRanking) return null;
 
   return (
     <div
@@ -69,6 +39,89 @@ export function TopExpenseCategories({ movements, topN = 3, periodSuffix = 'del 
         animationDelay: '160ms',
       }}
     >
+      <h3
+        style={{
+          margin: 0,
+          marginBottom: space[3],
+          fontSize: text.xs,
+          fontWeight: weight.semibold,
+          color: color.textMuted,
+          textTransform: 'uppercase',
+          letterSpacing: '0.6px',
+        }}
+      >
+        ¿Dónde se va la plata? · Top egresos {periodSuffix}
+      </h3>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: arsRanking && usdRanking ? '1fr 1fr' : '1fr',
+          gap: space[4],
+        }}
+      >
+        {arsRanking && (
+          <RankingBlock currency="ARS" ranking={arsRanking} />
+        )}
+        {usdRanking && (
+          <RankingBlock currency="USD" ranking={usdRanking} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface Ranking {
+  visible: Array<{ category: CashCategory; label: string; total: number; count: number; pct: number }>;
+  rest: { count: number; total: number; pct: number; categories: number };
+  grandTotal: number;
+}
+
+function computeRanking(items: CashMovement[], topN: number): Ranking | null {
+  if (items.length === 0) return null;
+  const byCategory = new Map<CashCategory, { total: number; count: number }>();
+  let grandTotal = 0;
+  for (const m of items) {
+    const entry = byCategory.get(m.category) ?? { total: 0, count: 0 };
+    entry.total += m.amount;
+    entry.count += 1;
+    byCategory.set(m.category, entry);
+    grandTotal += m.amount;
+  }
+  if (grandTotal === 0) return null;
+  const sorted = Array.from(byCategory.entries())
+    .map(([cat, data]) => ({
+      category: cat,
+      label: CASH_CATEGORY_LABELS[cat],
+      total: data.total,
+      count: data.count,
+      pct: data.total / grandTotal,
+    }))
+    .sort((a, b) => b.total - a.total);
+  const visible = sorted.slice(0, topN);
+  const restItems = sorted.slice(topN);
+  const restTotal = restItems.reduce((s, r) => s + r.total, 0);
+  return {
+    visible,
+    rest: {
+      count: restItems.reduce((s, r) => s + r.count, 0),
+      total: restTotal,
+      pct: restTotal / grandTotal,
+      categories: restItems.length,
+    },
+    grandTotal,
+  };
+}
+
+function RankingBlock({
+  currency,
+  ranking,
+}: {
+  currency: 'ARS' | 'USD';
+  ranking: Ranking;
+}) {
+  return (
+    <div>
       <div
         style={{
           display: 'flex',
@@ -78,18 +131,20 @@ export function TopExpenseCategories({ movements, topN = 3, periodSuffix = 'del 
           gap: space[2],
         }}
       >
-        <h3
+        <span
           style={{
-            margin: 0,
-            fontSize: text.xs,
-            fontWeight: weight.semibold,
-            color: color.textMuted,
+            fontSize: 10,
+            fontWeight: weight.bold,
+            color: color.textDim,
             textTransform: 'uppercase',
-            letterSpacing: '0.6px',
+            letterSpacing: '0.7px',
+            padding: '2px 6px',
+            background: color.surface2,
+            borderRadius: radius.sm,
           }}
         >
-          ¿Dónde se va la plata? · Top egresos {periodSuffix}
-        </h3>
+          {currency === 'ARS' ? 'Pesos' : 'Dólares'}
+        </span>
         <span
           style={{
             fontSize: text.xs,
@@ -97,26 +152,27 @@ export function TopExpenseCategories({ movements, topN = 3, periodSuffix = 'del 
             fontVariantNumeric: 'tabular-nums',
           }}
         >
-          Total: {formatMoney(grandTotal)}
+          Total: {formatMoney(ranking.grandTotal, currency)}
         </span>
       </div>
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: space[2] }}>
-        {visible.map((row) => (
+        {ranking.visible.map((row) => (
           <CategoryRow
             key={row.category}
             label={row.label}
             total={row.total}
             count={row.count}
             pct={row.pct}
+            currency={currency}
           />
         ))}
-        {rest.length > 0 && (
+        {ranking.rest.categories > 0 && (
           <CategoryRow
-            label={`Otras (${rest.length})`}
-            total={restTotal}
-            count={rest.reduce((s, r) => s + r.count, 0)}
-            pct={restPct}
+            label={`Otras (${ranking.rest.categories})`}
+            total={ranking.rest.total}
+            count={ranking.rest.count}
+            pct={ranking.rest.pct}
+            currency={currency}
             muted
           />
         )}
@@ -130,12 +186,14 @@ function CategoryRow({
   total,
   count,
   pct,
+  currency,
   muted,
 }: {
   label: string;
   total: number;
   count: number;
   pct: number;
+  currency: 'ARS' | 'USD';
   muted?: boolean;
 }) {
   const pctStr = `${Math.round(pct * 100)}%`;
@@ -200,7 +258,7 @@ function CategoryRow({
         }}
         title={`${count} ${count === 1 ? 'movimiento' : 'movimientos'}`}
       >
-        {formatMoney(total)}
+        {formatMoney(total, currency)}
       </span>
     </div>
   );

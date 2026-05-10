@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { Modal, ModalField } from '../../../components/Modal';
 import { Button } from '../../../components/Button';
@@ -13,6 +13,9 @@ import type { CashCategory, CashMovementKind, PaymentMethod } from '../../../typ
 interface NewMovementModalProps {
   open: boolean;
   onClose: () => void;
+  /** Tipo pre-seleccionado al abrir (ej: cuando viene del quick-add
+   *  de una FlowCard específica). Default: 'income'. */
+  initialKind?: CashMovementKind;
   onSubmit: (data: {
     kind: CashMovementKind;
     amount: number;
@@ -28,20 +31,32 @@ const expenseCategories: CashCategory[] = [
   'supplier', 'salary', 'rent', 'utilities', 'transport', 'fees', 'cash-out', 'other',
 ];
 
-export function NewMovementModal({ open, onClose, onSubmit }: NewMovementModalProps) {
-  const [kind, setKind] = useState<CashMovementKind>('income');
+export function NewMovementModal({ open, onClose, onSubmit, initialKind = 'income' }: NewMovementModalProps) {
+  const [kind, setKind] = useState<CashMovementKind>(initialKind);
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState<'ARS' | 'USD'>('ARS');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState<CashCategory>('cash-in');
+  const [category, setCategory] = useState<CashCategory>(
+    initialKind === 'income' ? 'cash-in' : 'supplier',
+  );
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('efectivo');
 
+  // Sincronizar tipo cuando cambia initialKind (ej: usuario cierra y vuelve
+  // a abrir desde otra card). Sólo cuando el modal está abierto para no
+  // pisar mientras el usuario tipea.
+  useEffect(() => {
+    if (open) {
+      setKind(initialKind);
+      setCategory(initialKind === 'income' ? 'cash-in' : 'supplier');
+    }
+  }, [open, initialKind]);
+
   function reset() {
-    setKind('income');
+    setKind(initialKind);
     setAmount('');
     setCurrency('ARS');
     setDescription('');
-    setCategory('cash-in');
+    setCategory(initialKind === 'income' ? 'cash-in' : 'supplier');
     setPaymentMethod('efectivo');
   }
 

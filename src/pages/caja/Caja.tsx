@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Plus, Copy, Trash2, Wallet } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, Copy, Trash2, Wallet, Search } from 'lucide-react';
 import { PageHeader } from '../../components/PageHeader';
 import { Button } from '../../components/Button';
+import { Input } from '../../components/Input';
 import { Tabs } from '../../components/Tabs';
 import { EmptyState } from '../../components/EmptyState';
 import {
@@ -16,6 +17,8 @@ import { CashBalanceCard } from './components/CashBalanceCard';
 import { CashFlowCards } from './components/CashFlowCards';
 import { CashMovementsList } from './components/CashMovementsList';
 import { NewMovementModal } from './components/NewMovementModal';
+import { TopExpenseCategories } from './components/TopExpenseCategories';
+import { CASH_CATEGORY_LABELS } from '../../types/domain';
 import { space } from '../../tokens';
 import { formatMoney } from '../../lib/format';
 import {
@@ -63,11 +66,20 @@ export function Caja() {
   const createMovementMut = useCreateMovement();
   const deleteMovementMut = useDeleteMovement();
   const [kindFilter, setKindFilter] = useState<string>('todos');
+  const [search, setSearch] = useState('');
   const [newMovOpen, setNewMovOpen] = useState(false);
+  // Tipo pre-seleccionado para el próximo "Nuevo movimiento" (lo setea
+  // el quick-add de las flow cards).
+  const [newMovKind, setNewMovKind] = useState<CashMovementKind>('income');
   const ctxMenu = useContextMenu();
   const [ctxMov, setCtxMov] = useState<CashMovement | null>(null);
   const { showToast } = useUIStore();
   const periodLabel = PERIOD_LABELS[period];
+
+  function openQuickAdd(kind: CashMovementKind) {
+    setNewMovKind(kind);
+    setNewMovOpen(true);
+  }
 
   useEffect(() => {
     const handler = () => setNewMovOpen(true);
@@ -75,10 +87,24 @@ export function Caja() {
     return () => window.removeEventListener('clozr:open-new-movement', handler);
   }, []);
 
-  const filteredMovements = summary.movements.filter((m) => {
-    if (kindFilter !== 'todos' && m.kind !== kindFilter) return false;
-    return true;
-  });
+  const filteredMovements = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return summary.movements.filter((m) => {
+      if (kindFilter !== 'todos' && m.kind !== kindFilter) return false;
+      if (q) {
+        // Buscamos en descripción, categoría humana y monto (string).
+        const haystack = [
+          m.description ?? '',
+          CASH_CATEGORY_LABELS[m.category] ?? '',
+          String(m.amount),
+        ]
+          .join(' ')
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [summary.movements, kindFilter, search]);
 
   function handleNewMovement(data: {
     kind: CashMovementKind;
@@ -110,26 +136,39 @@ export function Caja() {
             variant="primary"
             size="md"
             iconLeft={<Plus size={16} />}
-            onClick={() => setNewMovOpen(true)}
+            onClick={() => {
+              setNewMovKind('income');
+              setNewMovOpen(true);
+            }}
           >
             Nuevo movimiento
           </Button>
         }
       />
 
-      {/* Balance hero + Flow cards */}
+      {/* Balance hero + Flow cards (Ingresos / Egresos / Neto) */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)',
+          gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.5fr)',
           gap: space[3],
         }}
       >
         <CashBalanceCard summary={summary} />
-        <CashFlowCards summary={summary} periodSuffix={periodLabel.suffix} />
+        <CashFlowCards
+          summary={summary}
+          periodSuffix={periodLabel.suffix}
+          onQuickAdd={openQuickAdd}
+        />
       </div>
 
-      {/* Filtros */}
+      {/* Top categorías de egreso — sólo aparece si hay egresos */}
+      <TopExpenseCategories
+        movements={summary.movements}
+        periodSuffix={periodLabel.suffix}
+      />
+
+      {/* Filtros + búsqueda */}
       <div
         style={{
           display: 'flex',
@@ -145,7 +184,14 @@ export function Caja() {
           onChange={(v) => setPeriod(v as CashPeriod)}
           items={periodFilters}
         />
-        <div style={{ flex: 1 }} />
+        <div style={{ flex: 1, minWidth: 200, maxWidth: 360 }}>
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por descripción, categoría o monto…"
+            iconLeft={<Search size={14} />}
+          />
+        </div>
         <Tabs
           variant="pills"
           size="sm"
@@ -167,22 +213,38 @@ export function Caja() {
             ctxMenu.openAt(e);
           }}
           emptyState={
-            <EmptyState
-              icon={<Wallet size={28} />}
-              title={
-                kindFilter === 'todos'
-                  ? `Sin movimientos ${periodLabel.verbose}`
-                  : kindFilter === 'income'
-                  ? `Sin ingresos ${periodLabel.verbose}`
-                  : `Sin egresos ${periodLabel.verbose}`
-              }
-              description="Cargá un ingreso o un egreso para que se refleje en el balance."
-              action={{
-                label: 'Cargar movimiento',
-                iconLeft: <Plus size={14} />,
-                onClick: () => setNewMovOpen(true),
-              }}
-            />
+            search.trim() ? (
+              <EmptyState
+                icon={<Search size={26} />}
+                title="Sin resultados"
+                description={`No encontramos movimientos que coincidan con "${search}".`}
+                action={{
+                  label: 'Limpiar búsqueda',
+                  variant: 'secondary',
+                  onClick: () => setSearch(''),
+                }}
+              />
+            ) : (
+              <EmptyState
+                icon={<Wallet size={28} />}
+                title={
+                  kindFilter === 'todos'
+                    ? `Sin movimientos ${periodLabel.verbose}`
+                    : kindFilter === 'income'
+                    ? `Sin ingresos ${periodLabel.verbose}`
+                    : `Sin egresos ${periodLabel.verbose}`
+                }
+                description="Cargá un ingreso o un egreso para que se refleje en el balance."
+                action={{
+                  label: 'Cargar movimiento',
+                  iconLeft: <Plus size={14} />,
+                  onClick: () => {
+                    setNewMovKind(kindFilter === 'expense' ? 'expense' : 'income');
+                    setNewMovOpen(true);
+                  },
+                }}
+              />
+            )
           }
         />
       </div>
@@ -191,6 +253,7 @@ export function Caja() {
       <NewMovementModal
         open={newMovOpen}
         onClose={() => setNewMovOpen(false)}
+        initialKind={newMovKind}
         onSubmit={handleNewMovement}
       />
 

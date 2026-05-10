@@ -4,7 +4,9 @@ import { color, radius } from '../../tokens';
 interface RowAction {
   icon: ReactNode;
   label: string;
-  onClick: () => void;
+  /** El event se pasa para callers que quieren posicionar un popover/ContextMenu
+   *  en el botón mismo (ej: el ⋯ que abre acciones contextuales). */
+  onClick: (e?: React.MouseEvent) => void;
   /** Verde si es WhatsApp, rojo si es destructivo */
   tone?: 'success' | 'danger' | 'neutral';
 }
@@ -66,7 +68,7 @@ function ActionButton({ action }: { action: RowAction }) {
       title={action.label}
       onClick={(e) => {
         e.stopPropagation();
-        action.onClick();
+        action.onClick(e);
       }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}

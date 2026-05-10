@@ -121,6 +121,37 @@ export function Ventas() {
   const timeline = useMemo(() => buildSalesTimeline(periodFiltered, 30), [periodFiltered]);
   const totalPeriod = periodFiltered.reduce((s, x) => s + x.amount, 0);
 
+  // Columna de acciones: el botón ⋯ abre el ContextMenu posicionado en el
+  // botón mismo, reusando el mismo state (`ctxSale` + `ctxMenu`) que ya
+  // dispara el click derecho. Así una sola fuente de acciones para ambos
+  // gestos. Antes el ⋯ tenía un onClick vacío y no hacía nada.
+  const tableColumns = useMemo<ColumnDef<Sale>[]>(() => {
+    return [
+      ...columns,
+      {
+        id: 'actions',
+        header: '',
+        width: '60px',
+        align: 'right',
+        cell: (s) => (
+          <RowActions
+            actions={[
+              {
+                icon: <MoreHorizontal size={14} strokeWidth={2.2} />,
+                label: 'Más acciones',
+                onClick: (e) => {
+                  if (!e) return;
+                  setCtxSale(s);
+                  ctxMenu.openAt(e);
+                },
+              },
+            ]}
+          />
+        ),
+      },
+    ];
+  }, []);
+
   /* ---------- Handlers ---------- */
   function handleMarkPaid(saleId: string) {
     markPaidMut.mutate(saleId);
@@ -228,7 +259,7 @@ export function Ventas() {
         <div style={{ flex: 1, minHeight: 0 }}>
           <DataTable
             rows={sortedRows}
-            columns={columns}
+            columns={tableColumns}
             getRowId={(s) => s.id}
             onRowClick={(s) => setOpenSaleId(s.id)}
             onRowContextMenu={(s, e) => {
@@ -427,21 +458,6 @@ const columns: ColumnDef<Sale>[] = [
       </span>
     ),
   },
-  {
-    id: 'actions',
-    header: '',
-    width: '120px',
-    align: 'right',
-    cell: () => (
-      <RowActions
-        actions={[
-          {
-            icon: <MoreHorizontal size={14} strokeWidth={2.2} />,
-            label: 'Abrir',
-            onClick: () => {}, // Click en la fila ya abre el drawer
-          },
-        ]}
-      />
-    ),
-  },
+  // La columna de acciones se construye dentro del componente para tener
+  // acceso al ContextMenu (necesita posición + callbacks). Ver buildActionsColumn.
 ];

@@ -6,6 +6,7 @@ import { useBusinessStore } from "./store/businessStore";
 import { useUIStore, type ScreenId } from "./store/uiStore";
 import { useAuthStore } from "./store/authStore";
 import { useExchangeRateStore } from "./store/exchangeRateStore";
+import { useSyncActiveDolarToExchangeRate } from "./store/useDolaresAr";
 import { seedAppleCatalog, seedWatchAndMac, refreshIphoneCatalog, refreshIpadCatalog } from "./lib/db/quickStock";
 import { paymentMethodsDb } from "./lib/db/paymentMethods";
 import { followupsDb } from "./lib/db/followups";
@@ -135,6 +136,11 @@ export default function App() {
   const { userId, userName, clearUser } = useAuthStore();
   const { loadRate } = useExchangeRateStore();
   const queryClient = useQueryClient();
+
+  // Sincroniza el dólar activo (blue/oficial/etc) con el store legacy
+  // de cotización — toda la app que lee `usdToArs` recibe el valor
+  // del API automáticamente sin tener que tocar cada caller.
+  useSyncActiveDolarToExchangeRate();
 
   useGlobalShortcuts();
 

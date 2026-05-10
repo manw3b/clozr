@@ -13,6 +13,7 @@ import { CatalogPricingSection } from "./CatalogPricingSection";
 import { FeaturedModelsSection } from "./FeaturedModelsSection";
 import { CustomerTagsSection } from "./CustomerTagsSection";
 import { WhatsAppTemplatesSection } from "./WhatsAppTemplatesSection";
+import { DolaresArSection } from "./DolaresArSection";
 import type { PipelineStage, CustomerTypeRow } from "../../lib/db/types";
 // Paleta unificada — la misma que usa el kanban del pipeline para el
 // color de cada etapa. Cualquier cambio acá se refleja allá.
@@ -20,7 +21,7 @@ import { PALETTE_LIST as COLORS, colorCss } from "../../lib/colorPalette";
 
 // ── Shared ────────────────────────────────────────────────────────
 
-type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "wa-templates" | "data";
+type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "wa-templates" | "dolares" | "data";
 
 const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "general", label: "General" },
@@ -32,6 +33,7 @@ const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "catalog-pricing", label: "Precios del catálogo" },
   { id: "catalog-featured", label: "Productos destacados" },
   { id: "wa-templates", label: "Plantillas WhatsApp" },
+  { id: "dolares", label: "Cotizaciones del dólar" },
   { id: "data", label: "Datos y backup" },
 ];
 
@@ -1063,6 +1065,7 @@ export default function SettingsScreen() {
       case "catalog-pricing": return <CatalogPricingSection wid={wid} />;
       case "catalog-featured": return <FeaturedModelsSection wid={wid} />;
       case "wa-templates": return <WhatsAppTemplatesSection wid={wid} />;
+      case "dolares": return <DolaresArSection />;
       case "data": return <DataSection wid={wid} />;
     }
   };

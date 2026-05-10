@@ -628,6 +628,22 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
   await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_cust_tag_assign_tag ON customer_tag_assignments (tag_id)`));
 
   // ════════════════════════════════════════════════════════════
+  // 032 — dolar_rates (snapshot de cotizaciones AR desde dolarapi.com)
+  // ════════════════════════════════════════════════════════════
+  // Las cotizaciones son globales (no dependen del workspace), así que
+  // una sola fila por tipo es suficiente. Las refrescamos contra
+  // dolarapi.com en background y se usan offline desde acá.
+  await safe(() => dbExecute(`
+    CREATE TABLE IF NOT EXISTS dolar_rates (
+      kind                TEXT PRIMARY KEY,
+      nombre              TEXT NOT NULL,
+      compra              REAL,
+      venta               REAL NOT NULL,
+      source_updated_at   TEXT NOT NULL,
+      fetched_at          TEXT NOT NULL
+    )`));
+
+  // ════════════════════════════════════════════════════════════
   // 031 — workspace_settings (KV) + wholesale code en pipeline
   // ════════════════════════════════════════════════════════════
   // KV genérico por workspace: plantillas WhatsApp, contadores, etc.

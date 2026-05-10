@@ -5,9 +5,11 @@ import type { CashSummary } from '../../../types/domain';
 
 interface CashFlowCardsProps {
   summary: CashSummary;
+  /** Sufijo descriptivo del período (ej: "del día", "de esta semana"). */
+  periodSuffix?: string;
 }
 
-export function CashFlowCards({ summary }: CashFlowCardsProps) {
+export function CashFlowCards({ summary, periodSuffix = 'del día' }: CashFlowCardsProps) {
   const incomeArs = summary.totalIncome.ars + summary.totalIncome.usd * summary.usdRate;
   const expenseArs = summary.totalExpense.ars + summary.totalExpense.usd * summary.usdRate;
 
@@ -17,14 +19,14 @@ export function CashFlowCards({ summary }: CashFlowCardsProps) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: space[3] }}>
       <FlowCard
-        label="Ingresos del día"
+        label={`Ingresos ${periodSuffix}`}
         amount={incomeArs}
         currencyDetails={{ ars: summary.totalIncome.ars, usd: summary.totalIncome.usd }}
         count={incomeCount}
         kind="income"
       />
       <FlowCard
-        label="Egresos del día"
+        label={`Egresos ${periodSuffix}`}
         amount={expenseArs}
         currencyDetails={{ ars: summary.totalExpense.ars, usd: summary.totalExpense.usd }}
         count={expenseCount}

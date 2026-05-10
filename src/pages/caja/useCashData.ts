@@ -9,31 +9,61 @@ import { dbCashMovementToDomain, cashCategoryToDb } from "../../lib/mappers";
 import { qk, invalidate } from "../../lib/queryKeys";
 import type { CashSummary, CashMovementKind, CashCategory } from "../../types/domain";
 
-export function useCashSummary() {
+export type CashPeriod = "today" | "week" | "month";
+
+/**
+ * Devuelve el rango {from, to} del período en formato YYYY-MM-DD (local time).
+ * Hoy = un solo día. Esta semana = lunes…hoy. Este mes = día 1…hoy.
+ */
+export function periodRange(period: CashPeriod): { from: string; to: string } {
+  const today = new Date();
+  const to = today.toISOString().slice(0, 10);
+  const from = new Date(today);
+  if (period === "today") {
+    // mismo día
+  } else if (period === "week") {
+    // Lunes de esta semana (getDay: 0=domingo, 1=lunes…6=sábado).
+    const dow = from.getDay();
+    const offset = dow === 0 ? 6 : dow - 1; // domingo cuenta como fin de semana pasada
+    from.setDate(from.getDate() - offset);
+  } else {
+    from.setDate(1);
+  }
+  return { from: from.toISOString().slice(0, 10), to };
+}
+
+/**
+ * Carga el summary de caja para el período pedido. El balance de apertura
+ * (`openingBalance`) siempre es el del día actual — sólo cambian los totales,
+ * los movimientos listados y el balance "actual" (que para períodos largos
+ * representa el balance acumulado del rango).
+ */
+export function useCashSummary(period: CashPeriod = "today") {
   const { activeWorkspace } = useWorkspaceStore();
   const { activeBusiness } = useBusinessStore();
   const { usdToArs } = useExchangeRateStore();
   const wid = activeWorkspace?.id ?? "";
   const bid = activeBusiness?.id ?? "";
   const today = getTodayISO();
+  const { from, to } = periodRange(period);
 
   return useQuery({
-    queryKey: qk.cashSummary(wid, bid, today),
+    queryKey: qk.cashSummary(wid, bid, from, to),
     queryFn: async (): Promise<CashSummary> => {
-      const [session, movementsToday, byCurrency] = await Promise.all([
+      const [session, movementsRange, byCurrency] = await Promise.all([
         cashSessionsDb.ensureForDay(wid, bid, today),
-        cashDb.getMovements(wid, bid, { from: today, to: today }),
-        cashDb.getSummaryByCurrency(wid, bid, { from: today, to: today }),
+        cashDb.getMovements(wid, bid, { from, to }),
+        cashDb.getSummaryByCurrency(wid, bid, { from, to }),
       ]);
 
-      const movements = movementsToday.map(dbCashMovementToDomain);
+      const movements = movementsRange.map(dbCashMovementToDomain);
       const opening = {
         ars: session.opened_balance_ars,
         usd: session.opened_balance_usd,
       };
 
       return {
-        date: today,
+        date: to,
         openingBalance: opening,
         totalIncome: { ars: byCurrency.ars.ingresos, usd: byCurrency.usd.ingresos },
         totalExpense: { ars: byCurrency.ars.egresos, usd: byCurrency.usd.egresos },
@@ -73,6 +103,20 @@ export function useCreateMovement() {
         description: input.description,
       });
     },
+    onSuccess: () => invalidate.afterCashChange(qc),
+  });
+}
+
+/**
+ * Borra un movimiento de caja. Si el movimiento vino de una venta
+ * (reference_type='sale'), igual lo borra — el caller decide si confirmar
+ * o no antes (ej: window.confirm). La invalidación reactiva summary y
+ * arqueos asociados.
+ */
+export function useDeleteMovement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => cashDb.remove(id),
     onSuccess: () => invalidate.afterCashChange(qc),
   });
 }

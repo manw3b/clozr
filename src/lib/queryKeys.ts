@@ -39,8 +39,8 @@ export const qk = {
 
   // ── Caja ───────────────────────────────────────────────
   cashAll: () => ["caja"] as const,
-  cashSummary: (wid: string, bid: string, date: string) =>
-    ["caja", "summary", wid, bid, date] as const,
+  cashSummary: (wid: string, bid: string, from: string, to: string) =>
+    ["caja", "summary", wid, bid, from, to] as const,
 } as const;
 
 /**

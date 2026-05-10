@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Plus, Download, Calendar, Copy } from 'lucide-react';
+import { Plus, Copy, Trash2, Wallet } from 'lucide-react';
 import { PageHeader } from '../../components/PageHeader';
 import { Button } from '../../components/Button';
 import { Tabs } from '../../components/Tabs';
+import { EmptyState } from '../../components/EmptyState';
 import {
   ContextMenu,
   ContextMenuItem,
+  ContextMenuDivider,
   ContextMenuLabel,
   useContextMenu,
 } from '../../components/ContextMenu';
@@ -16,7 +18,12 @@ import { CashMovementsList } from './components/CashMovementsList';
 import { NewMovementModal } from './components/NewMovementModal';
 import { space } from '../../tokens';
 import { formatMoney } from '../../lib/format';
-import { useCashSummary, useCreateMovement } from './useCashData';
+import {
+  useCashSummary,
+  useCreateMovement,
+  useDeleteMovement,
+  type CashPeriod,
+} from './useCashData';
 import type { CashSummary, CashMovement, CashMovementKind, CashCategory, PaymentMethod } from '../../types/domain';
 
 const EMPTY_SUMMARY: CashSummary = {
@@ -29,7 +36,7 @@ const EMPTY_SUMMARY: CashSummary = {
   movements: [],
 };
 
-const periodFilters = [
+const periodFilters: { value: CashPeriod; label: string }[] = [
   { value: 'today', label: 'Hoy' },
   { value: 'week', label: 'Esta semana' },
   { value: 'month', label: 'Este mes' },
@@ -41,15 +48,26 @@ const kindFilters: { value: 'todos' | CashMovementKind; label: string }[] = [
   { value: 'expense', label: 'Egresos' },
 ];
 
+/** Labels que dependen del período seleccionado. Centralizados acá para
+ *  que el header, las cards y el título de la lista de movimientos digan
+ *  todos lo mismo. */
+const PERIOD_LABELS: Record<CashPeriod, { suffix: string; verbose: string }> = {
+  today: { suffix: 'del día', verbose: 'hoy' },
+  week: { suffix: 'de esta semana', verbose: 'esta semana' },
+  month: { suffix: 'de este mes', verbose: 'este mes' },
+};
+
 export function Caja() {
-  const { data: summary = EMPTY_SUMMARY } = useCashSummary();
+  const [period, setPeriod] = useState<CashPeriod>('today');
+  const { data: summary = EMPTY_SUMMARY } = useCashSummary(period);
   const createMovementMut = useCreateMovement();
-  const [period, setPeriod] = useState('today');
+  const deleteMovementMut = useDeleteMovement();
   const [kindFilter, setKindFilter] = useState<string>('todos');
   const [newMovOpen, setNewMovOpen] = useState(false);
   const ctxMenu = useContextMenu();
   const [ctxMov, setCtxMov] = useState<CashMovement | null>(null);
   const { showToast } = useUIStore();
+  const periodLabel = PERIOD_LABELS[period];
 
   useEffect(() => {
     const handler = () => setNewMovOpen(true);
@@ -86,24 +104,16 @@ export function Caja() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: space[5], height: '100%' }}>
       <PageHeader
         title="Caja"
-        subtitle="Balance dual ARS/USD · movimientos del día"
+        subtitle={`Balance dual ARS/USD · movimientos ${periodLabel.suffix}`}
         actions={
-          <>
-            <Button variant="secondary" size="md" iconLeft={<Calendar size={14} />}>
-              Cerrar caja
-            </Button>
-            <Button variant="secondary" size="md" iconLeft={<Download size={14} />}>
-              Exportar
-            </Button>
-            <Button
-              variant="primary"
-              size="md"
-              iconLeft={<Plus size={16} />}
-              onClick={() => setNewMovOpen(true)}
-            >
-              Nuevo movimiento
-            </Button>
-          </>
+          <Button
+            variant="primary"
+            size="md"
+            iconLeft={<Plus size={16} />}
+            onClick={() => setNewMovOpen(true)}
+          >
+            Nuevo movimiento
+          </Button>
         }
       />
 
@@ -116,7 +126,7 @@ export function Caja() {
         }}
       >
         <CashBalanceCard summary={summary} />
-        <CashFlowCards summary={summary} />
+        <CashFlowCards summary={summary} periodSuffix={periodLabel.suffix} />
       </div>
 
       {/* Filtros */}
@@ -128,7 +138,13 @@ export function Caja() {
           flexWrap: 'wrap',
         }}
       >
-        <Tabs variant="pills" size="sm" value={period} onChange={setPeriod} items={periodFilters} />
+        <Tabs
+          variant="pills"
+          size="sm"
+          value={period}
+          onChange={(v) => setPeriod(v as CashPeriod)}
+          items={periodFilters}
+        />
         <div style={{ flex: 1 }} />
         <Tabs
           variant="pills"
@@ -143,11 +159,31 @@ export function Caja() {
       <div style={{ flex: 1, minHeight: 0 }}>
         <CashMovementsList
           movements={filteredMovements}
+          title="Movimientos"
+          subtitle={periodLabel.suffix}
           onMovementClick={() => { /* Detalle de movimiento: próxima iteración */ }}
           onMovementContextMenu={(m, e) => {
             setCtxMov(m);
             ctxMenu.openAt(e);
           }}
+          emptyState={
+            <EmptyState
+              icon={<Wallet size={28} />}
+              title={
+                kindFilter === 'todos'
+                  ? `Sin movimientos ${periodLabel.verbose}`
+                  : kindFilter === 'income'
+                  ? `Sin ingresos ${periodLabel.verbose}`
+                  : `Sin egresos ${periodLabel.verbose}`
+              }
+              description="Cargá un ingreso o un egreso para que se refleje en el balance."
+              action={{
+                label: 'Cargar movimiento',
+                iconLeft: <Plus size={14} />,
+                onClick: () => setNewMovOpen(true),
+              }}
+            />
+          }
         />
       </div>
 
@@ -187,6 +223,30 @@ export function Caja() {
               Copiar descripción
             </ContextMenuItem>
           )}
+          <ContextMenuDivider />
+          <ContextMenuItem
+            tone="danger"
+            icon={<Trash2 size={14} />}
+            onClick={() => {
+              const m = ctxMov;
+              ctxMenu.close();
+              const sign = m.kind === 'income' ? '+' : '−';
+              const ok = window.confirm(
+                `¿Eliminar este movimiento?\n\n${sign}${formatMoney(m.amount, m.currency)} · ${m.description || 'sin descripción'}\n\nEsta acción no se puede deshacer.`,
+              );
+              if (!ok) return;
+              deleteMovementMut.mutate(m.id, {
+                onSuccess: () => showToast('Movimiento eliminado', 'success'),
+                onError: (e) =>
+                  showToast(
+                    e instanceof Error ? e.message : 'No se pudo eliminar',
+                    'error',
+                  ),
+              });
+            }}
+          >
+            Eliminar movimiento
+          </ContextMenuItem>
         </ContextMenu>
       )}
     </div>

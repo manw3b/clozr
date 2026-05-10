@@ -19,6 +19,12 @@ interface CashMovementsListProps {
   movements: CashMovement[];
   onMovementClick?: (m: CashMovement) => void;
   onMovementContextMenu?: (m: CashMovement, e: React.MouseEvent) => void;
+  /** Título del header de la lista. Default: "Movimientos". */
+  title?: string;
+  /** Sub-label opcional al lado del título (ej: "del día", "de esta semana"). */
+  subtitle?: string;
+  /** Render custom cuando la lista está vacía (ej: EmptyState con CTA). */
+  emptyState?: React.ReactNode;
 }
 
 const categoryIcons: Record<
@@ -53,7 +59,7 @@ const toneFgMap = {
   neutral: color.textMuted,
 };
 
-export function CashMovementsList({ movements, onMovementClick, onMovementContextMenu }: CashMovementsListProps) {
+export function CashMovementsList({ movements, onMovementClick, onMovementContextMenu, title = 'Movimientos', subtitle, emptyState }: CashMovementsListProps) {
   // Sort por fecha desc
   const sorted = [...movements].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -91,16 +97,21 @@ export function CashMovementsList({ movements, onMovementClick, onMovementContex
               color: color.text,
             }}
           >
-            Movimientos del día
+            {title}{subtitle ? ` · ${subtitle}` : ''}
           </h2>
           <div style={{ fontSize: text.xs, color: color.textMuted, marginTop: 2 }}>
-            {sorted.length} movimientos · ordenados por fecha
+            {sorted.length} {sorted.length === 1 ? 'movimiento' : 'movimientos'} · ordenados por fecha
           </div>
         </div>
       </header>
 
       {/* Lista */}
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        {sorted.length === 0 && emptyState ? (
+          emptyState
+        ) : (
+          <></>
+        )}
         {sorted.map((m, idx) => (
           <MovementRow
             key={m.id}

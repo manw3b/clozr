@@ -73,7 +73,10 @@ function bump(current, kind) {
 
 const argv = process.argv.slice(2);
 const dryRun = argv.includes('--dry-run');
-const arg = argv.find((a) => !a.startsWith('--'));
+const isCheck = argv.includes('--check');
+// El "arg" es el primer token positional (no flag). --check es un caso
+// especial: lo tratamos como el comando en sí, no como flag.
+const arg = isCheck ? '--check' : argv.find((a) => !a.startsWith('--'));
 if (!arg) {
   console.error('Uso: node scripts/bump-version.mjs <patch|minor|major|X.Y.Z|--check> [--dry-run]');
   process.exit(1);

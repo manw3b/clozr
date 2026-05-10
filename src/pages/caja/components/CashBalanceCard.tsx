@@ -24,6 +24,7 @@ export function CashBalanceCard({ summary }: CashBalanceCardProps) {
 
   return (
     <div
+      className="clozr-caja-card"
       style={{
         background: `linear-gradient(135deg, ${color.surface} 0%, var(--surface-2) 100%)`,
         border: `1px solid ${color.border}`,

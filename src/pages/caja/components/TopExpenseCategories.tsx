@@ -60,11 +60,13 @@ export function TopExpenseCategories({ movements, topN = 3, periodSuffix = 'del 
 
   return (
     <div
+      className="clozr-caja-card"
       style={{
         background: color.surface,
         border: `1px solid ${color.border}`,
         borderRadius: radius.lg,
         padding: `${space[3]} ${space[4]}`,
+        animationDelay: '160ms',
       }}
     >
       <div

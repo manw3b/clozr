@@ -118,6 +118,10 @@ export function CashMovementsList({ movements, onMovementClick, onMovementContex
             key={m.id}
             movement={m}
             isLast={idx === sorted.length - 1}
+            // Stagger sutil: las primeras 8 filas cascadean al aparecer.
+            // De ahí en adelante todas se muestran con el mismo delay para
+            // no demorar listas grandes.
+            staggerDelay={Math.min(idx, 8) * 35}
             onClick={() => onMovementClick?.(m)}
             onContextMenu={
               onMovementContextMenu ? (e) => onMovementContextMenu(m, e) : undefined
@@ -132,11 +136,14 @@ export function CashMovementsList({ movements, onMovementClick, onMovementContex
 function MovementRow({
   movement,
   isLast,
+  staggerDelay = 0,
   onClick,
   onContextMenu,
 }: {
   movement: CashMovement;
   isLast: boolean;
+  /** Delay (ms) para la animación de entrada — habilita el efecto cascada. */
+  staggerDelay?: number;
   onClick?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
 }) {
@@ -145,6 +152,7 @@ function MovementRow({
 
   return (
     <div
+      className="clozr-caja-row"
       onClick={onClick}
       onContextMenu={onContextMenu}
       style={{
@@ -154,13 +162,20 @@ function MovementRow({
         alignItems: 'center',
         gap: space[3],
         cursor: onClick ? 'pointer' : 'default',
-        transition: 'background 100ms',
+        transition: 'background 120ms ease, transform 120ms ease',
+        animationDelay: `${staggerDelay}ms`,
       }}
       onMouseEnter={(e) => {
-        if (onClick) e.currentTarget.style.background = color.surfaceHover;
+        if (onClick) {
+          e.currentTarget.style.background = color.surfaceHover;
+          e.currentTarget.style.transform = 'translateX(2px)';
+        }
       }}
       onMouseLeave={(e) => {
-        if (onClick) e.currentTarget.style.background = 'transparent';
+        if (onClick) {
+          e.currentTarget.style.background = 'transparent';
+          e.currentTarget.style.transform = 'translateX(0)';
+        }
       }}
     >
       {/* Icon */}

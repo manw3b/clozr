@@ -153,6 +153,46 @@ export function Caja() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: space[5], height: '100%' }}>
+      {/* Animaciones globales de Caja — entrada de cards/filas + hover lift.
+          Centralizadas acá para que todos los componentes hijos compartan
+          el mismo lenguaje visual sin duplicar keyframes por archivo. */}
+      <style>{`
+        @keyframes clozr-caja-pop {
+          from { opacity: 0; transform: translateY(10px) scale(0.985); }
+          to   { opacity: 1; transform: translateY(0)    scale(1);     }
+        }
+        @keyframes clozr-caja-row {
+          from { opacity: 0; transform: translateX(-8px); }
+          to   { opacity: 1; transform: translateX(0);    }
+        }
+        @keyframes clozr-caja-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(48,209,88,0); }
+          50%      { box-shadow: 0 0 0 6px rgba(48,209,88,0.18); }
+        }
+        @keyframes clozr-caja-pulse-danger {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(232,0,29,0); }
+          50%      { box-shadow: 0 0 0 6px rgba(232,0,29,0.18); }
+        }
+        .clozr-caja-card {
+          animation: clozr-caja-pop 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+                      box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1),
+                      border-color 240ms;
+        }
+        .clozr-caja-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+        }
+        .clozr-caja-row {
+          animation: clozr-caja-row 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .clozr-caja-pulse-income {
+          animation: clozr-caja-pulse 2.4s ease-in-out infinite;
+        }
+        .clozr-caja-pulse-expense {
+          animation: clozr-caja-pulse-danger 2.4s ease-in-out infinite;
+        }
+      `}</style>
       <PageHeader
         title={
           <span style={{ display: 'inline-flex', alignItems: 'center' }}>

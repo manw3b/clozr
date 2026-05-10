@@ -20,6 +20,11 @@ export function CashFlowCards({ summary, periodSuffix = 'del día', onQuickAdd }
   const incomeCount = summary.movements.filter((m) => m.kind === 'income').length;
   const expenseCount = summary.movements.filter((m) => m.kind === 'expense').length;
 
+  // Si todavía no hay nada en el período, los CTAs "Cargar" hacen un
+  // pulso sutil para llamar la atención del usuario nuevo. Cuando ya
+  // cargó algo, dejamos el pulso para no distraer.
+  const pulseEmpty = summary.movements.length === 0;
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: space[3] }}>
       <FlowCard
@@ -29,6 +34,8 @@ export function CashFlowCards({ summary, periodSuffix = 'del día', onQuickAdd }
         count={incomeCount}
         kind="income"
         onQuickAdd={onQuickAdd ? () => onQuickAdd('income') : undefined}
+        pulseQuickAdd={pulseEmpty}
+        animationDelay={40}
       />
       <FlowCard
         label={`Egresos ${periodSuffix}`}
@@ -37,11 +44,14 @@ export function CashFlowCards({ summary, periodSuffix = 'del día', onQuickAdd }
         count={expenseCount}
         kind="expense"
         onQuickAdd={onQuickAdd ? () => onQuickAdd('expense') : undefined}
+        pulseQuickAdd={pulseEmpty}
+        animationDelay={80}
       />
       <FlowCard
         label={`Neto ${periodSuffix}`}
         amount={netArs}
         kind="net"
+        animationDelay={120}
       />
     </div>
   );
@@ -54,6 +64,8 @@ function FlowCard({
   count,
   kind,
   onQuickAdd,
+  pulseQuickAdd,
+  animationDelay = 0,
 }: {
   label: string;
   amount: number;
@@ -61,6 +73,11 @@ function FlowCard({
   count?: number;
   kind: 'income' | 'expense' | 'net';
   onQuickAdd?: () => void;
+  /** Aplica un pulso visual al botón quick-add para llamar la atención
+   *  cuando todavía no hay movimientos cargados. */
+  pulseQuickAdd?: boolean;
+  /** Stagger de entrada en ms (la card aparece con un retraso). */
+  animationDelay?: number;
 }) {
   const isIncome = kind === 'income';
   const isExpense = kind === 'expense';
@@ -91,12 +108,14 @@ function FlowCard({
 
   return (
     <div
+      className="clozr-caja-card"
       style={{
         background: color.surface,
         border: `1px solid ${color.border}`,
         borderRadius: radius.lg,
         padding: space[4],
         position: 'relative',
+        animationDelay: `${animationDelay}ms`,
       }}
     >
       <div
@@ -140,7 +159,16 @@ function FlowCard({
         {onQuickAdd && (
           // Botón visible desde el arranque (tono coloreado, no sólo hover).
           // Da affordance clara: cada card tiene su propio "+ cargar".
+          // Si pulseQuickAdd está activo (caja sin movimientos), aplicamos
+          // un halo pulsante para guiar al usuario nuevo.
           <button
+            className={
+              pulseQuickAdd
+                ? isIncome
+                  ? 'clozr-caja-pulse-income'
+                  : 'clozr-caja-pulse-expense'
+                : undefined
+            }
             onClick={onQuickAdd}
             aria-label={`Agregar ${isIncome ? 'ingreso' : 'egreso'}`}
             title={`Agregar ${isIncome ? 'ingreso' : 'egreso'}`}

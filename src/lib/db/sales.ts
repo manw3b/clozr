@@ -190,21 +190,43 @@ export async function createSale(
     );
   }
 
-  // Auto-register cash movement
-  if (data.business_id && subtotal > 0) {
-    await dbExecute(
-      `INSERT INTO cash_movements
-         (id, workspace_id, business_id, type, direction, amount, currency, description,
-          customer_id, customer_name, reference_id, reference_type, created_at)
-       VALUES (?, ?, ?, 'venta', 'in', ?, 'ARS', ?, ?, ?, ?, 'sale', ?)`,
-      [
-        crypto.randomUUID(), workspaceId, data.business_id,
-        subtotal,
-        data.customer_name ? `Venta — ${data.customer_name}` : "Venta",
-        data.customer_id ?? null, data.customer_name ?? null,
-        id, now,
-      ],
-    );
+  // Auto-register cash movements — UNO POR MONEDA del payment, no uno
+  // por venta con el subtotal en USD hard-codeado a ARS (bug histórico).
+  //
+  // Lógica:
+  //   - Agrupamos los payments por currency, sumando amounts.
+  //   - cuenta-corriente NO va a caja (es deuda del cliente, no efectivo).
+  //   - El amount del movement queda EN LA MONEDA del payment (sin
+  //     convertir): si pagaron US$1.100 efectivo, el movement es
+  //     currency=USD amount=1100; si pagaron $1.500.000 transferencia,
+  //     currency=ARS amount=1500000.
+  //   - Si una venta tiene pagos en mixto (parte USD efectivo + parte
+  //     ARS transferencia), generamos 2 movements distintos pero ambos
+  //     con reference_id = saleId, así "Ver venta original" sigue
+  //     funcionando para los dos.
+  if (data.business_id) {
+    const cashByCurrency: Record<"ARS" | "USD", number> = { ARS: 0, USD: 0 };
+    for (const p of data.payments) {
+      if (p.method === "cuenta-corriente") continue; // deuda, no caja
+      const currency = (p.currency ?? "ARS") as "ARS" | "USD";
+      cashByCurrency[currency] += p.amount;
+    }
+    for (const [currency, amount] of Object.entries(cashByCurrency) as Array<["ARS" | "USD", number]>) {
+      if (amount <= 0) continue;
+      await dbExecute(
+        `INSERT INTO cash_movements
+           (id, workspace_id, business_id, type, direction, amount, currency, description,
+            customer_id, customer_name, reference_id, reference_type, created_at)
+         VALUES (?, ?, ?, 'venta', 'in', ?, ?, ?, ?, ?, ?, 'sale', ?)`,
+        [
+          crypto.randomUUID(), workspaceId, data.business_id,
+          amount, currency,
+          data.customer_name ? `Venta — ${data.customer_name}` : "Venta",
+          data.customer_id ?? null, data.customer_name ?? null,
+          id, now,
+        ],
+      );
+    }
   }
 
   return {

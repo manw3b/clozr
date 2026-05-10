@@ -98,11 +98,17 @@ export async function createMovement(
   };
 }
 
+/**
+ * Helper que NO se usa hoy (sales.ts hace el insert inline para crear
+ * un movement por moneda). Lo dejo por si lo necesitamos desde otro
+ * caller, pero ahora respeta la moneda recibida en lugar de hard-codear.
+ */
 export async function createMovementFromSale(
   workspaceId: string,
   businessId: string,
   saleId: string,
   amount: number,
+  currency: "ARS" | "USD",
   customerName: string | null,
   customerId: string | null,
 ): Promise<void> {
@@ -112,9 +118,9 @@ export async function createMovementFromSale(
     `INSERT INTO cash_movements
        (id, workspace_id, business_id, type, direction, amount, currency, description,
         customer_id, customer_name, reference_id, reference_type, created_at)
-     VALUES (?, ?, ?, 'venta', 'in', ?, 'ARS', ?, ?, ?, ?, 'sale', ?)`,
+     VALUES (?, ?, ?, 'venta', 'in', ?, ?, ?, ?, ?, ?, 'sale', ?)`,
     [
-      id, workspaceId, businessId, amount,
+      id, workspaceId, businessId, amount, currency,
       customerName ? `Venta — ${customerName}` : "Venta",
       customerId ?? null, customerName ?? null,
       saleId, now,

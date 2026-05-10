@@ -10,7 +10,86 @@ permissions:
   contents: write
 
 jobs:
+  # Verify gate: si los tests/lint/build de frontend fallan, no buildeamos
+  # los nativos ni publicamos el release. Evita liberar versiones rotas.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Versiones sincronizadas
+        run: npm run version:check
+      - run: npm run lint
+      - name: Typecheck + frontend build
+        run: npm run build
+      - run: npm test
+
+  # Genera el cuerpo del release a partir de los commits desde el último
+  # tag. Output va en `outputs.body` y se inyecta en el release de abajo.
+  changelog:
+    needs: verify
+    runs-on: ubuntu-latest
+    outputs:
+      body: ${{ steps.gen.outputs.body }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: gen
+        name: Generar changelog
+        run: |
+          # Encontrar el tag previo (el inmediatamente anterior al actual).
+          CURRENT_TAG="${GITHUB_REF_NAME}"
+          PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${CURRENT_TAG}$" | head -n 1 || true)
+          echo "Current: $CURRENT_TAG, Prev: $PREV_TAG"
+
+          if [ -z "$PREV_TAG" ]; then
+            RANGE=""
+            HEADER="### Cambios"
+          else
+            RANGE="${PREV_TAG}..${CURRENT_TAG}"
+            HEADER="### Cambios desde ${PREV_TAG}"
+          fi
+
+          # Lista de commits formateada — saltea los chore: release.
+          COMMITS=$(git log --no-merges --pretty=format:"- %s" $RANGE | grep -v "^- chore: release" || true)
+          if [ -z "$COMMITS" ]; then
+            COMMITS="- (sin cambios visibles)"
+          fi
+
+          # Multi-line output para GitHub Actions
+          {
+            echo "body<<EOF"
+            echo "## Clozr ${CURRENT_TAG}"
+            echo ""
+            echo "$HEADER"
+            echo ""
+            echo "$COMMITS"
+            echo ""
+            echo "---"
+            echo ""
+            echo "### Instaladores"
+            echo "- **Windows**: \`.msi\` o \`.exe\`"
+            echo "- **macOS Apple Silicon**: \`.dmg\` para aarch64"
+            echo "- **macOS Intel**: \`.dmg\` para x86_64"
+            echo "- **Linux**: \`.deb\` (Ubuntu/Debian) o \`.AppImage\`"
+            echo ""
+            echo "### Auto-update"
+            echo "Si ya tenés Clozr instalado, la app va a detectar esta versión automáticamente al abrirse."
+            echo ""
+            echo "### Instalación Windows"
+            echo "1. Descargá el archivo \`.msi\`"
+            echo "2. Doble click para instalar"
+            echo "3. Si Windows muestra advertencia: click en \"Más información\" → \"Ejecutar de todas formas\""
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
   build-tauri:
+    needs: [verify, changelog]
     strategy:
       fail-fast: false
       matrix:
@@ -59,23 +138,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Clozr ${{ github.ref_name }}'
-          releaseBody: |
-            ## Clozr Beta
-
-            ### Instaladores disponibles
-            - **Windows**: descargá el archivo `.msi` o `.exe`
-            - **Linux**: descargá el archivo `.deb` (Ubuntu/Debian) o `.AppImage`
-            - **Mac (Apple Silicon)**: descargá el `.dmg` para aarch64
-            - **Mac (Intel)**: descargá el `.dmg` para x86_64
-
-            ### Instalación Windows
-            1. Descargá el archivo `.msi`
-            2. Doble click para instalar
-            3. Si Windows muestra advertencia: click en "Más información" → "Ejecutar de todas formas"
-
-            ### Instalación Linux
-            Ubuntu/Debian: `sudo dpkg -i clozr_0.1.0-beta_amd64.deb`
-            O usar el AppImage: hacerlo ejecutable y correrlo directamente
+          releaseBody: ${{ needs.changelog.outputs.body }}
           releaseDraft: false
           prerelease: true
           args: ${{ matrix.args }}

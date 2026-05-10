@@ -28,7 +28,7 @@ export function exportToCsv<T>(
   const body = rows
     .map((row) => columns.map(([, get]) => escape(get(row))).join(","))
     .join("\n");
-  const csv = "﻿" + headers + "\n" + body; // BOM for Excel UTF-8
+  const csv = "\uFEFF" + headers + "\n" + body; // BOM for Excel UTF-8
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -67,8 +67,11 @@ export function parseTsv(text: string): string[][] {
 }
 
 function autoDetectDelimiter(text: string): "," | "\t" {
-  // Mirar la primera línea no-vacía
-  const sample = text.replace(/^﻿/, "").split(/\r?\n/).find((l) => l.trim().length > 0) ?? "";
+  // Mirar la primera línea no-vacía. Quitamos el BOM (U+FEFF) si está al
+  // principio. Escapamos como \uFEFF en lugar de ponerlo literal porque
+  // ESLint con no-irregular-whitespace marca el caracter literal como
+  // error y rompe el verify del CI.
+  const sample = text.replace(/^\uFEFF/, "").split(/\r?\n/).find((l) => l.trim().length > 0) ?? "";
   const tabs = (sample.match(/\t/g) ?? []).length;
   const commas = (sample.match(/,/g) ?? []).length;
   // Si hay tabs y no comas (o más tabs que comas), es TSV

@@ -5,6 +5,7 @@ import {
   VISIT_TEMPLATE_KEYS,
   DEFAULT_VISIT_TEMPLATES,
   PLACEHOLDER_HELP,
+  POSTSALE_PLACEHOLDER_HELP,
   applyVisitTemplate,
 } from "../../lib/visitTemplates";
 import { useUIStore } from "../../store/uiStore";
@@ -41,6 +42,8 @@ const KEYS = [
   VISIT_TEMPLATE_KEYS.address,
   VISIT_TEMPLATE_KEYS.codePrefix,
   VISIT_TEMPLATE_KEYS.codeCounter,
+  VISIT_TEMPLATE_KEYS.postSale,
+  VISIT_TEMPLATE_KEYS.postSaleDiscount,
 ];
 
 /**
@@ -66,6 +69,8 @@ export function WhatsAppTemplatesSection({ wid }: Props) {
   const [address, setAddress] = useState("");
   const [codePrefix, setCodePrefix] = useState("");
   const [codeCounter, setCodeCounter] = useState("");
+  const [templatePostSale, setTemplatePostSale] = useState("");
+  const [postSaleDiscount, setPostSaleDiscount] = useState("");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
@@ -81,6 +86,12 @@ export function WhatsAppTemplatesSection({ wid }: Props) {
       settings[VISIT_TEMPLATE_KEYS.codePrefix] ?? DEFAULT_VISIT_TEMPLATES.codePrefix,
     );
     setCodeCounter(settings[VISIT_TEMPLATE_KEYS.codeCounter] ?? "");
+    setTemplatePostSale(
+      settings[VISIT_TEMPLATE_KEYS.postSale] ?? DEFAULT_VISIT_TEMPLATES.postSale,
+    );
+    setPostSaleDiscount(
+      settings[VISIT_TEMPLATE_KEYS.postSaleDiscount] ?? DEFAULT_VISIT_TEMPLATES.postSaleDiscount,
+    );
     setDirty(false);
   }, [settings]);
 
@@ -93,6 +104,8 @@ export function WhatsAppTemplatesSection({ wid }: Props) {
         [VISIT_TEMPLATE_KEYS.address]: address,
         [VISIT_TEMPLATE_KEYS.codePrefix]: codePrefix.trim() || "B",
         [VISIT_TEMPLATE_KEYS.codeCounter]: codeCounter.trim() || null,
+        [VISIT_TEMPLATE_KEYS.postSale]: templatePostSale,
+        [VISIT_TEMPLATE_KEYS.postSaleDiscount]: postSaleDiscount.trim() || "30",
       });
       qc.invalidateQueries({ queryKey: ["workspace-settings", wid] });
       showToast("Plantillas guardadas", "success");
@@ -119,6 +132,13 @@ export function WhatsAppTemplatesSection({ wid }: Props) {
   });
   const previewMayorista = applyVisitTemplate(templateMayorista, {
     codigo: `${(codePrefix.trim() || "B")}1202`,
+  });
+  const previewPostSale = applyVisitTemplate(templatePostSale, {
+    nombre: "Carlos",
+    producto: "iPhone 15 Pro Max 256GB",
+    monto: "USD 1.300",
+    descuento: postSaleDiscount.trim() || "30",
+    negocio: "iPhone Club",
   });
 
   return (
@@ -269,6 +289,76 @@ export function WhatsAppTemplatesSection({ wid }: Props) {
               </p>
             </div>
           </div>
+        </section>
+
+        {/* Mensaje post-venta — agradecimiento + descuento por etiqueta en redes */}
+        <section style={{ paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>
+            Mensaje post-venta
+          </h3>
+          <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 8 }}>
+            Se envía desde el menú contextual de una venta (botón ⋯ o
+            click derecho en la tabla de Ventas). Sirve para agradecer la
+            compra y ofrecer un descuento en accesorios a cambio de que
+            te etiqueten en redes.
+          </p>
+          <div
+            style={{
+              padding: 10,
+              marginBottom: 12,
+              background: "var(--surface-2)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+            }}
+          >
+            <div style={{ fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 }}>
+              Placeholders disponibles
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {POSTSALE_PLACEHOLDER_HELP.map((p) => (
+                <span
+                  key={p.token}
+                  title={p.label}
+                  style={{
+                    padding: "3px 8px",
+                    background: "var(--surface)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 6,
+                    fontSize: 11,
+                    color: "var(--text-muted)",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {p.token}
+                </span>
+              ))}
+            </div>
+          </div>
+          <textarea
+            value={templatePostSale}
+            onChange={(e) => onChange<string>(setTemplatePostSale)(e.target.value)}
+            rows={8}
+            style={inputStyle}
+          />
+          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "120px 1fr", gap: 12, alignItems: "end" }}>
+            <div>
+              <label style={labelStyle}>Descuento %</label>
+              <input
+                type="number"
+                value={postSaleDiscount}
+                onChange={(e) => onChange<string>(setPostSaleDiscount)(e.target.value)}
+                placeholder="30"
+                min={0}
+                max={100}
+                style={inputStyle}
+              />
+            </div>
+            <p style={{ fontSize: 11, color: "var(--text-dim)", margin: 0 }}>
+              Reemplaza <code style={{ fontFamily: "monospace" }}>{"{descuento}"}</code> en el cuerpo
+              del mensaje. Cambialo según la promo del momento.
+            </p>
+          </div>
+          <PreviewBox text={previewPostSale} />
         </section>
       </div>
     </div>

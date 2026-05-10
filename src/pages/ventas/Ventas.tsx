@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Search, Plus, Download, MoreHorizontal, Check, Copy, Eye } from 'lucide-react';
+import { WhatsAppIcon } from '../../components/icons/WhatsAppIcon';
+import { workspaceSettings } from '../../lib/db/workspaceSettings';
+import {
+  VISIT_TEMPLATE_KEYS,
+  DEFAULT_VISIT_TEMPLATES,
+  applyVisitTemplate,
+} from '../../lib/visitTemplates';
+import { useClientsList } from '../clientes/useClientsData';
+import { useWorkspaceStore } from '../../store/workspaceStore';
+import { openWhatsApp } from '../../lib/openExternal';
 import { PageHeader } from '../../components/PageHeader';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -47,6 +57,9 @@ const periodFilters = [
 
 export function Ventas() {
   const { data: sales = [] } = useSalesList();
+  const { data: allClients = [] } = useClientsList();
+  const { activeWorkspace } = useWorkspaceStore();
+  const wid = activeWorkspace?.id ?? '';
   const markPaidMut = useMarkSalePaid();
   const createSaleMut = useCreateSale();
   const { showToast, setActiveScreen } = useUIStore();
@@ -160,6 +173,35 @@ export function Ventas() {
   async function handleNewSale(data: import('./useSalesData').NewSalePayload) {
     await createSaleMut.mutateAsync(data);
     showToast(data.outOfStock ? 'Venta fuera de stock registrada' : 'Venta registrada', 'success');
+  }
+
+  /**
+   * Manda el mensaje post-venta por WhatsApp: agradecimiento + recordatorio
+   * de etiquetar al negocio en redes a cambio del descuento configurable
+   * en accesorios. Usa la plantilla del workspace (Ajustes → Plantillas
+   * WhatsApp), con fallback al default si nunca la editaron.
+   */
+  async function handlePostSaleMessage(sale: import('../../types/domain').Sale) {
+    const client = allClients.find((c) => c.id === sale.clientId);
+    if (!client?.phone) {
+      showToast('Este cliente no tiene teléfono registrado', 'error');
+      return;
+    }
+    const settings = await workspaceSettings.getMany(wid, [
+      VISIT_TEMPLATE_KEYS.postSale,
+      VISIT_TEMPLATE_KEYS.postSaleDiscount,
+    ]);
+    const body = applyVisitTemplate(
+      settings[VISIT_TEMPLATE_KEYS.postSale] ?? DEFAULT_VISIT_TEMPLATES.postSale,
+      {
+        nombre: sale.clientName,
+        producto: sale.product,
+        monto: formatMoney(sale.amount, sale.currency),
+        descuento: settings[VISIT_TEMPLATE_KEYS.postSaleDiscount] ?? DEFAULT_VISIT_TEMPLATES.postSaleDiscount,
+        negocio: activeWorkspace?.name ?? '',
+      },
+    );
+    openWhatsApp(client.phone, body);
   }
 
   return (
@@ -336,6 +378,18 @@ export function Ventas() {
               Marcar como pagada
             </ContextMenuItem>
           )}
+          <ContextMenuItem
+            icon={<WhatsAppIcon size={13} color="var(--success)" />}
+            onClick={() => {
+              const sale = ctxSale;
+              ctxMenu.close();
+              handlePostSaleMessage(sale).catch((e) => {
+                showToast(e instanceof Error ? e.message : 'No se pudo abrir WhatsApp', 'error');
+              });
+            }}
+          >
+            Mensaje post-venta
+          </ContextMenuItem>
           <ContextMenuDivider />
           <ContextMenuItem
             icon={<Copy size={14} />}

@@ -24,6 +24,11 @@ export const VISIT_TEMPLATE_KEYS = {
   address: "wa_visit_address",
   codePrefix: "wa_wholesale_code_prefix",
   codeCounter: "wa_wholesale_code_counter",
+  // Mensaje post-venta: agradecimiento + recordatorio de etiquetarnos en
+  // redes a cambio de un descuento en accesorios. Se manda desde el menú
+  // contextual de una venta. Editable desde Ajustes.
+  postSale: "wa_postsale_template",
+  postSaleDiscount: "wa_postsale_discount_pct",
 } as const;
 
 export const DEFAULT_VISIT_TEMPLATES = {
@@ -43,6 +48,12 @@ VUELTO:`,
 
   address: "calle 44 e/ 17 y 18 Número 1136 (Timbre 101)",
   codePrefix: "B",
+  postSale: `¡Hola {nombre}! Gracias por elegirnos en {negocio} para tu {producto} 🙌
+
+Si te gustó la experiencia, te re agradezco si nos etiquetás en tus redes — y como gracias te damos {descuento}% OFF en TODOS los accesorios para tu próxima compra.
+
+¡Cualquier consulta o ayuda con el equipo escribime!`,
+  postSaleDiscount: "30",
 } as const;
 
 export const PLACEHOLDER_HELP = [
@@ -52,6 +63,14 @@ export const PLACEHOLDER_HELP = [
   { token: "{hora}", label: 'Hora ("15:00hs")' },
   { token: "{direccion}", label: "Dirección del local" },
   { token: "{codigo}", label: "Código mayorista (solo mayorista)" },
+  { token: "{negocio}", label: "Nombre del negocio" },
+];
+
+export const POSTSALE_PLACEHOLDER_HELP = [
+  { token: "{nombre}", label: "Nombre del cliente" },
+  { token: "{producto}", label: "Producto comprado (primer ítem)" },
+  { token: "{monto}", label: "Total de la venta" },
+  { token: "{descuento}", label: "% de descuento (configurable)" },
   { token: "{negocio}", label: "Nombre del negocio" },
 ];
 
@@ -90,6 +109,12 @@ export interface VisitTemplateData {
   direccion?: string | null;
   codigo?: string | null;
   negocio?: string | null;
+  // Campos extra usados por la plantilla post-venta. Quedan acá en lugar
+  // de un tipo separado para que applyVisitTemplate sea un único renderer
+  // que ignora silenciosamente los placeholders no usados por la plantilla.
+  producto?: string | null;
+  monto?: string | null;
+  descuento?: string | null;
 }
 
 export function applyVisitTemplate(body: string, data: VisitTemplateData): string {
@@ -98,7 +123,10 @@ export function applyVisitTemplate(body: string, data: VisitTemplateData): strin
 
   return body
     .replace(/\{nombre\}/g, fb(data.nombre, "—"))
-    .replace(/\{equipo\}/g, fb(data.equipo, "—"))
+    .replace(/\{equipo\}/g, fb(data.equipo, fb(data.producto, "—")))
+    .replace(/\{producto\}/g, fb(data.producto, fb(data.equipo, "—")))
+    .replace(/\{monto\}/g, fb(data.monto, "—"))
+    .replace(/\{descuento\}/g, fb(data.descuento, "30"))
     .replace(/\{dia\}/g, fb(data.dia, "—"))
     .replace(/\{hora\}/g, fb(data.hora, "—"))
     .replace(/\{direccion\}/g, fb(data.direccion, ""))

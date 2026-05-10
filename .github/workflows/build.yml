@@ -130,7 +130,10 @@ jobs:
         run: npm ci
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
+        # Pin a v0.6.2 — el floating @v0 a veces traía versiones intermedias
+        # con el bug "Signature not found for the updater JSON. Skipping upload..."
+        # (issues #983, #1098). v0.6.2 ya genera correctamente latest.json.
+        uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}

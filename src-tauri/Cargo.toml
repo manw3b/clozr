@@ -1,6 +1,6 @@
 [package]
 name = "clozr"
-version = "1.3.4"
+version = "1.3.5"
 description = "Clozr — CRM de escritorio"
 authors = []
 edition = "2021"

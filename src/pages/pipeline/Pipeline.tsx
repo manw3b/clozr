@@ -61,6 +61,12 @@ import { NewSaleModal, type NewSalePreset } from '../ventas/components/NewSaleMo
 import { useCreateSale } from '../ventas/useSalesData';
 import { NewLeadModal } from './components/NewLeadModal';
 import { BulkActionBar } from './components/BulkActionBar';
+import {
+  AdvancedFiltersModal,
+  countActiveFilters,
+  EMPTY_FILTERS,
+  type AdvancedFilters,
+} from './components/AdvancedFiltersModal';
 
 /** IDs únicos de los filtros rápidos. Persistimos el activo en
  *  localStorage para que sobreviva un reload del usuario. */
@@ -238,6 +244,31 @@ export function Pipeline() {
       localStorage.setItem(filterKey, f);
     } catch { /* ignore */ }
   };
+
+  // Filtros avanzados — persistidos por workspace en localStorage.
+  const advFilterKey = `clozr.pipeline.advFilters.${activeWorkspace?.id ?? 'default'}`;
+  const [advFilters, setAdvFiltersRaw] = useState<AdvancedFilters>(() => {
+    if (typeof window === 'undefined') return EMPTY_FILTERS;
+    try {
+      const raw = localStorage.getItem(advFilterKey);
+      if (!raw) return EMPTY_FILTERS;
+      const parsed = JSON.parse(raw) as Partial<AdvancedFilters>;
+      // Merge defensivo: si en el futuro agregamos campos nuevos, no
+      // rompe a quienes tienen filtros viejos en localStorage.
+      return { ...EMPTY_FILTERS, ...parsed };
+    } catch {
+      return EMPTY_FILTERS;
+    }
+  });
+  const setAdvFilters = (next: AdvancedFilters) => {
+    setAdvFiltersRaw(next);
+    try {
+      localStorage.setItem(advFilterKey, JSON.stringify(next));
+    } catch { /* ignore */ }
+  };
+  const [advFiltersOpen, setAdvFiltersOpen] = useState(false);
+  const activeFilterCount = countActiveFilters(advFilters);
+
   const [activeId, setActiveId] = useState<string | null>(null);
   const [openClientId, setOpenClientId] = useState<string | null>(null);
 
@@ -348,9 +379,18 @@ export function Pipeline() {
   };
 
   /* ---------- Filtrado ---------- */
+  // Lookup map cliente.id → cliente para resolver client.type en el filtro
+  // avanzado sin pagar O(n²) en arrays grandes.
+  const clientById = useMemo(() => {
+    const m = new Map(allClients.map((c) => [c.id, c]));
+    return m;
+  }, [allClients]);
+
   const filteredLeads = useMemo(() => {
     const now = Date.now();
+    const productQ = advFilters.productContains.trim().toLowerCase();
     return leads.filter((l) => {
+      // ── Búsqueda de texto (input arriba del kanban) ───────────────
       if (search.trim()) {
         const q = search.toLowerCase();
         if (
@@ -359,6 +399,8 @@ export function Pipeline() {
         )
           return false;
       }
+
+      // ── Quick filter (pills) ───────────────────────────────────────
       switch (priorityFilter) {
         case 'mis':
           if (l.ownerId !== userId) return false;
@@ -388,9 +430,27 @@ export function Pipeline() {
         default:
           break;
       }
+
+      // ── Filtros avanzados (cascada sobre lo anterior) ─────────────
+      if (advFilters.clientTypes.length > 0) {
+        const t = l.clientType ?? clientById.get(l.clientId)?.type;
+        if (!t || !advFilters.clientTypes.includes(t)) return false;
+      }
+      if (advFilters.amountMin !== null && (l.amount ?? 0) < advFilters.amountMin) return false;
+      if (advFilters.amountMax !== null && (l.amount ?? 0) > advFilters.amountMax) return false;
+      if (advFilters.stageIds.length > 0 && !advFilters.stageIds.includes(l.stage)) return false;
+      if (productQ && !(l.product ?? '').toLowerCase().includes(productQ)) return false;
+      if (advFilters.onlyWithVisit && !l.visitAt) return false;
+      if (advFilters.onlyDueThisWeek) {
+        if (!l.nextActionAt) return false;
+        const due = new Date(l.nextActionAt).getTime();
+        const days = (due - now) / 86_400_000;
+        if (days < 0 || days > 7) return false;
+      }
+
       return true;
     });
-  }, [leads, search, priorityFilter, userId]);
+  }, [leads, search, priorityFilter, userId, advFilters, clientById]);
 
   const grouped = useMemo(() => groupLeadsByStage(filteredLeads), [filteredLeads]);
   const activeLead = activeId ? leads.find((l) => l.id === activeId) : null;
@@ -560,12 +620,31 @@ export function Pipeline() {
         actions={
           <>
             <Button
-              variant="secondary"
+              variant={activeFilterCount > 0 ? 'primary' : 'secondary'}
               size="md"
               iconLeft={<Filter size={14} />}
-              onClick={() => showToast('Filtros avanzados: próximamente')}
+              onClick={() => setAdvFiltersOpen(true)}
+              title="Filtros avanzados"
             >
               Filtros
+              {activeFilterCount > 0 && (
+                <span
+                  style={{
+                    marginLeft: 6,
+                    padding: '0 6px',
+                    borderRadius: 999,
+                    background: 'rgba(255,255,255,0.25)',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    fontVariantNumeric: 'tabular-nums',
+                    minWidth: 18,
+                    textAlign: 'center',
+                    display: 'inline-block',
+                  }}
+                >
+                  {activeFilterCount}
+                </span>
+              )}
             </Button>
             <Button
               variant="primary"
@@ -753,6 +832,15 @@ export function Pipeline() {
         open={newLeadOpen}
         onClose={() => setNewLeadOpen(false)}
         initialStage={newLeadStage}
+      />
+
+      {/* Filtros avanzados (combo con búsqueda + quick filters) */}
+      <AdvancedFiltersModal
+        open={advFiltersOpen}
+        onClose={() => setAdvFiltersOpen(false)}
+        filters={advFilters}
+        onApply={setAdvFilters}
+        stages={STAGES}
       />
 
       {/* Convertir lead → venta */}

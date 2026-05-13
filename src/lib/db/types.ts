@@ -201,6 +201,9 @@ export interface PipelineItem {
   /** Migration 031 */
   wholesale_code: string | null;
   visit_at: string | null;
+  /** Migration 033 */
+  lead_source: string | null;
+  catalog_item_id: string | null;
 }
 
 /** KV de configuración por workspace (migration 031). */
@@ -388,6 +391,10 @@ export interface CreatePipelineItemInput {
   next_action_label?: string | null;
   short_note?: string | null;
   customer_name?: string | null;
+  /** De dónde llegó el lead (referido/walk-in/web/redes/otro). */
+  lead_source?: string | null;
+  /** Si el producto fue elegido del catálogo, su id queda asociado. */
+  catalog_item_id?: string | null;
 }
 
 export interface CreateActivityInput {

@@ -49,8 +49,9 @@ export async function create(
     `INSERT INTO pipeline_items (
       id, workspace_id, customer_id, customer_name, stage_id, stage_name, stage_order,
       status, estimated_value, currency, inactive_days, created_by, created_at, updated_at,
-      product, priority, next_action_at, next_action_label, short_note
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      product, priority, next_action_at, next_action_label, short_note,
+      lead_source, catalog_item_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       workspaceId,
@@ -69,6 +70,8 @@ export async function create(
       data.next_action_at ?? null,
       data.next_action_label ?? null,
       data.short_note ?? null,
+      data.lead_source ?? null,
+      data.catalog_item_id ?? null,
     ],
   );
   return {
@@ -98,6 +101,8 @@ export async function create(
     position: null,
     wholesale_code: null,
     visit_at: null,
+    lead_source: data.lead_source ?? null,
+    catalog_item_id: data.catalog_item_id ?? null,
   };
 }
 

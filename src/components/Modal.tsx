@@ -257,7 +257,9 @@ export function Modal({
 interface ModalFieldProps {
   label: string;
   required?: boolean;
-  hint?: string;
+  /** Hint debajo del campo. Acepta ReactNode para inyectar iconos o
+   *  fragmentos con tono (ej: ✨ Sugerido del catálogo). */
+  hint?: ReactNode;
   children: ReactNode;
 }
 

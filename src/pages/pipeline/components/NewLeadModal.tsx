@@ -1,22 +1,54 @@
-import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, UserPlus, Flame } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Search, UserPlus, Flame, Package, Sparkles } from "lucide-react";
 import { Modal, ModalField } from "../../../components/Modal";
 import { Button } from "../../../components/Button";
 import { Input, Select } from "../../../components/Input";
 import { DateTimePicker } from "../../../components/DateTimePicker";
 import { Avatar } from "../../../components/Avatar";
-import { Badge } from "../../../components/Badge";
+import { Badge, type BadgeTone } from "../../../components/Badge";
 import { customersDb } from "../../../lib/db/customers";
 import { pipelineDb } from "../../../lib/db/pipeline";
+import { catalogDb } from "../../../lib/db/catalog";
+import { pricingDb } from "../../../lib/db/pricing";
 import { useUIStore } from "../../../store/uiStore";
 import { useWorkspaceStore } from "../../../store/workspaceStore";
 import { useAuthStore } from "../../../store/authStore";
 import { useClientsList } from "../../clientes/useClientsData";
 import { invalidate } from "../../../lib/queryKeys";
 import { color, radius, space, text, weight } from "../../../tokens";
-import type { Client, LeadStage, LeadPriority } from "../../../types/domain";
+import type {
+  Client,
+  ClientType,
+  LeadStage,
+  LeadPriority,
+  LeadSource,
+} from "../../../types/domain";
+import { LEAD_SOURCE_LABELS } from "../../../types/domain";
 import { usePipelineStages } from "../usePipelineStages";
+
+/**
+ * Tono visual del badge según el tipo de cliente. Se decide acá una vez
+ * para que todas las partes del modal lo usen consistentemente.
+ *  - final → info (azul, consumidor común)
+ *  - revendedor → success (verde, negocio que recompra)
+ *  - mayorista → warning (amber, alto valor)
+ *  - empresa → primary (rojo Clozr, B2B)
+ */
+const CLIENT_TYPE_TONE: Record<ClientType, BadgeTone> = {
+  final: "info",
+  revendedor: "success",
+  mayorista: "warning",
+  empresa: "primary",
+};
+const CLIENT_TYPE_LABEL: Record<ClientType, string> = {
+  final: "Final",
+  revendedor: "Revendedor",
+  mayorista: "Mayorista",
+  empresa: "Empresa",
+};
+
+const LEAD_SOURCES: LeadSource[] = ["referido", "walk-in", "web", "redes", "otro"];
 
 interface Props {
   open: boolean;
@@ -39,13 +71,28 @@ export function NewLeadModal({ open, onClose, initialStage = "prospecto" }: Prop
 
   const [stage, setStage] = useState<LeadStage>(initialStage);
   const [product, setProduct] = useState("");
+  // Si el producto fue elegido del catálogo, guardamos el id para
+  // poder mostrar el "auto-precio" + asociar el lead al catalog item.
+  const [catalogItemId, setCatalogItemId] = useState<string | null>(null);
   const [estimatedUsd, setEstimatedUsd] = useState("");
+  /** Marca si el "Valor estimado" fue auto-completado a partir del
+   *  precio del catálogo (para mostrar un hint sutil al usuario). */
+  const [priceAutoFilled, setPriceAutoFilled] = useState(false);
   const [priority, setPriority] = useState<LeadPriority>("medium");
+  const [source, setSource] = useState<LeadSource | null>(null);
   const [nextActionLabel, setNextActionLabel] = useState("");
   const [nextActionAt, setNextActionAt] = useState("");
   const [shortNote, setShortNote] = useState("");
 
   const { data: allClients = [] } = useClientsList();
+
+  // Catálogo del workspace para sugerir productos al tipear.
+  const { data: catalogItems = [] } = useQuery({
+    queryKey: ["catalog-for-leads", wid],
+    queryFn: () => catalogDb.getAll(wid),
+    enabled: open && !!wid,
+    staleTime: 60_000,
+  });
 
   // reset al abrir + sincronizar etapa inicial
   useEffect(() => {
@@ -55,13 +102,43 @@ export function NewLeadModal({ open, onClose, initialStage = "prospecto" }: Prop
       setClientSearch("");
       setCreatingClient(false);
       setProduct("");
+      setCatalogItemId(null);
       setEstimatedUsd("");
+      setPriceAutoFilled(false);
       setPriority("medium");
+      setSource(null);
       setNextActionLabel("");
       setNextActionAt("");
       setShortNote("");
     }
   }, [open, initialStage]);
+
+  /**
+   * Cuando el usuario elige un producto del catálogo Y hay un cliente
+   * con tipo, intentamos resolver el precio sugerido para ese tipo.
+   * Sólo escribimos en estimatedUsd si el campo está vacío o si lo
+   * llenamos nosotros mismos antes — nunca pisamos un valor que el
+   * usuario tipeó a mano.
+   */
+  useEffect(() => {
+    if (!catalogItemId || !client?.type) return;
+    let cancelled = false;
+    pricingDb
+      .resolvePrice(catalogItemId, client.type as string)
+      .then((res) => {
+        if (cancelled) return;
+        if (res.priceUsd === null) return;
+        // Si el usuario tipeó un valor manual (no auto), respetamos.
+        if (estimatedUsd && !priceAutoFilled) return;
+        setEstimatedUsd(String(res.priceUsd));
+        setPriceAutoFilled(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogItemId, client?.type]);
 
   const filteredClients = useMemo(() => {
     if (!clientSearch.trim()) return allClients.slice(0, 5);
@@ -95,6 +172,8 @@ export function NewLeadModal({ open, onClose, initialStage = "prospecto" }: Prop
         currency: "USD",
         priority,
         product: product.trim() || null,
+        catalog_item_id: catalogItemId,
+        lead_source: source,
         next_action_at: nextActionAt || null,
         next_action_label: nextActionLabel.trim() || null,
         short_note: shortNote.trim() || null,
@@ -116,7 +195,8 @@ export function NewLeadModal({ open, onClose, initialStage = "prospecto" }: Prop
     !!estimatedUsd.trim() ||
     !!shortNote.trim() ||
     !!nextActionLabel.trim() ||
-    !!nextActionAt;
+    !!nextActionAt ||
+    !!source;
 
   return (
     <Modal
@@ -182,20 +262,67 @@ export function NewLeadModal({ open, onClose, initialStage = "prospecto" }: Prop
 
       {/* PRODUCTO + VALOR */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 160px", gap: space[3] }}>
-        <ModalField label="Producto / interés">
-          <Input
+        <ModalField
+          label="Producto / interés"
+          hint={
+            catalogItemId
+              ? "Del catálogo — el valor se sugiere automáticamente"
+              : product.trim()
+              ? "Texto libre (no está en el catálogo)"
+              : undefined
+          }
+        >
+          <ProductPicker
             value={product}
-            onChange={(e) => setProduct(e.target.value)}
-            placeholder="Ej: iPhone 17 Pro Max"
+            catalogItemId={catalogItemId}
+            catalogItems={catalogItems}
+            onPick={(p) => {
+              setProduct(p.name);
+              setCatalogItemId(p.id);
+              // Permitir que el efecto auto-llene el precio.
+              setPriceAutoFilled(false);
+            }}
+            onType={(s) => {
+              setProduct(s);
+              // Si están tipeando libre, despegar del catálogo.
+              if (catalogItemId) {
+                setCatalogItemId(null);
+                if (priceAutoFilled) {
+                  setEstimatedUsd("");
+                  setPriceAutoFilled(false);
+                }
+              }
+            }}
+            onClearCatalog={() => {
+              setCatalogItemId(null);
+              if (priceAutoFilled) {
+                setEstimatedUsd("");
+                setPriceAutoFilled(false);
+              }
+            }}
           />
         </ModalField>
-        <ModalField label="Valor estimado (USD)">
+        <ModalField
+          label="Valor estimado (USD)"
+          hint={
+            priceAutoFilled ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: color.success }}>
+                <Sparkles size={11} /> Sugerido del catálogo
+              </span>
+            ) : undefined
+          }
+        >
           <Input
             type="number"
             step="0.01"
             value={estimatedUsd}
-            onChange={(e) => setEstimatedUsd(e.target.value)}
+            onChange={(e) => {
+              setEstimatedUsd(e.target.value);
+              // Si el usuario edita manualmente, dejamos de marcar "auto".
+              if (priceAutoFilled) setPriceAutoFilled(false);
+            }}
             placeholder="Ej: 1300"
+            iconLeft={<span style={{ fontSize: 12, fontWeight: weight.semibold }}>US$</span>}
           />
         </ModalField>
       </div>
@@ -253,6 +380,37 @@ export function NewLeadModal({ open, onClose, initialStage = "prospecto" }: Prop
                   />
                 )}
                 {labels[p]}
+              </button>
+            );
+          })}
+        </div>
+      </ModalField>
+
+      {/* ORIGEN DEL LEAD */}
+      <ModalField
+        label="Origen del lead"
+        hint="Opcional — de dónde llegó el cliente (útil para reportes)"
+      >
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {LEAD_SOURCES.map((s) => {
+            const active = source === s;
+            return (
+              <button
+                key={s}
+                onClick={() => setSource(active ? null : s)}
+                style={{
+                  padding: "5px 11px",
+                  borderRadius: radius.full,
+                  border: `1px solid ${active ? color.primary : color.border}`,
+                  background: active ? color.primaryBg : "transparent",
+                  color: active ? color.primary : color.textMuted,
+                  fontSize: text.xs,
+                  fontWeight: weight.semibold,
+                  cursor: "pointer",
+                  transition: "all 120ms cubic-bezier(0.22, 1, 0.36, 1)",
+                }}
+              >
+                {LEAD_SOURCE_LABELS[s]}
               </button>
             );
           })}
@@ -340,9 +498,32 @@ function ClientPicker({
             >
               <Avatar name={c.name} size={28} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: weight.semibold }}>{c.name}</div>
+                <div
+                  style={{
+                    fontWeight: weight.semibold,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: space[2],
+                    minWidth: 0,
+                  }}
+                >
+                  <span
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {c.name}
+                  </span>
+                  {c.type && (
+                    <Badge tone={CLIENT_TYPE_TONE[c.type]} size="sm">
+                      {CLIENT_TYPE_LABEL[c.type]}
+                    </Badge>
+                  )}
+                </div>
                 <div style={{ fontSize: text.xs, color: color.textMuted }}>
-                  {c.phone ?? "—"} · {c.type}
+                  {c.phone ?? "—"}
                 </div>
               </div>
             </button>
@@ -412,8 +593,8 @@ function SelectedClientCard({
             {client.name}
           </span>
           {client.type && (
-            <Badge tone="info" size="sm">
-              {client.type}
+            <Badge tone={CLIENT_TYPE_TONE[client.type]} size="sm">
+              {CLIENT_TYPE_LABEL[client.type]}
             </Badge>
           )}
         </div>
@@ -528,6 +709,161 @@ function InlineCreateClient({
           Crear y usar
         </Button>
       </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+ * ProductPicker — input con autocompletar contra catalog_items.
+ * Si el usuario elige una opción del dropdown, se "engancha" al
+ * catálogo y onPick se dispara con id+name. Si tipea libre y no elige
+ * nada, sigue siendo texto libre (onType).
+ * ──────────────────────────────────────────────────────────────────── */
+
+interface CatalogItemLite {
+  id: string;
+  name: string;
+  category: string | null;
+  price: number | null;
+}
+
+function ProductPicker({
+  value,
+  catalogItemId,
+  catalogItems,
+  onPick,
+  onType,
+  onClearCatalog,
+}: {
+  value: string;
+  catalogItemId: string | null;
+  catalogItems: CatalogItemLite[];
+  onPick: (item: CatalogItemLite) => void;
+  onType: (text: string) => void;
+  onClearCatalog: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar dropdown al hacer click afuera.
+  useEffect(() => {
+    if (!open) return;
+    function onClick(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  const matches = useMemo(() => {
+    const q = value.trim().toLowerCase();
+    const items = catalogItems.filter((c) => c.name);
+    if (!q) return items.slice(0, 6);
+    return items
+      .filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          (c.category ?? "").toLowerCase().includes(q),
+      )
+      .slice(0, 6);
+  }, [catalogItems, value]);
+
+  return (
+    <div ref={wrapRef} style={{ position: "relative" }}>
+      <Input
+        value={value}
+        onChange={(e) => {
+          onType(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        placeholder="Ej: iPhone 17 Pro Max"
+        iconLeft={
+          catalogItemId ? (
+            <Package size={13} color={color.success} />
+          ) : (
+            <Search size={13} />
+          )
+        }
+        iconRight={
+          catalogItemId ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onClearCatalog();
+              }}
+              aria-label="Quitar producto del catálogo"
+              title="Volver a texto libre"
+              style={{
+                background: "transparent",
+                color: color.textMuted,
+                fontSize: 11,
+                padding: 0,
+                cursor: "pointer",
+              }}
+            >
+              ✕
+            </button>
+          ) : undefined
+        }
+      />
+      {open && matches.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            left: 0,
+            right: 0,
+            background: color.surface2,
+            border: `1px solid ${color.border}`,
+            borderRadius: radius.md,
+            overflow: "hidden",
+            zIndex: 20,
+            boxShadow: "0 10px 24px rgba(0,0,0,0.35)",
+            maxHeight: 240,
+            overflowY: "auto",
+          }}
+        >
+          {matches.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => {
+                onPick(m);
+                setOpen(false);
+              }}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                gap: space[2],
+                padding: `${space[2]} ${space[3]}`,
+                background: "transparent",
+                color: color.text,
+                fontSize: text.sm,
+                textAlign: "left",
+                borderBottom: `1px solid ${color.border}`,
+                cursor: "pointer",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = color.surfaceHover;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
+            >
+              <Package size={12} color={color.textMuted} />
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {m.name}
+              </span>
+              {m.category && (
+                <span style={{ fontSize: text.xs, color: color.textDim }}>{m.category}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

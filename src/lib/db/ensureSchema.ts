@@ -628,6 +628,17 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
   await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_cust_tag_assign_tag ON customer_tag_assignments (tag_id)`));
 
   // ════════════════════════════════════════════════════════════
+  // 033 — pipeline_items.lead_source + catalog_item_id
+  // ════════════════════════════════════════════════════════════
+  // Origen del lead (referido/walk-in/web/redes/otro) — sirve para
+  // reportes "¿de qué canal me llegan los leads que cierran?".
+  await safe(() => dbExecute(`ALTER TABLE pipeline_items ADD COLUMN lead_source TEXT`));
+  // Producto del catálogo asociado al lead. Si está, el "product" string
+  // se mantiene como descripción legible pero acá guardamos el id para
+  // poder traer precios sugeridos según el tipo de cliente.
+  await safe(() => dbExecute(`ALTER TABLE pipeline_items ADD COLUMN catalog_item_id TEXT`));
+
+  // ════════════════════════════════════════════════════════════
   // 032 — dolar_rates (snapshot de cotizaciones AR desde dolarapi.com)
   // ════════════════════════════════════════════════════════════
   // Las cotizaciones son globales (no dependen del workspace), así que

@@ -80,7 +80,21 @@ export interface Lead {
   visitAt?: string;
   /** Código mayorista asignado al agendar (ej "B1202"). */
   wholesaleCode?: string;
+  /** De dónde llegó el lead — sirve para reportes "qué canal me trae plata". */
+  source?: LeadSource;
+  /** Si el producto fue elegido del catálogo, su id queda asociado al
+   *  lead para poder traer precios sugeridos al convertir a venta. */
+  catalogItemId?: string;
 }
+
+export type LeadSource = 'referido' | 'walk-in' | 'web' | 'redes' | 'otro';
+export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
+  referido: 'Referido',
+  'walk-in': 'Walk-in',
+  web: 'Web',
+  redes: 'Redes',
+  otro: 'Otro',
+};
 
 /* ============================================================
  *  Tareas

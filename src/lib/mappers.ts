@@ -273,6 +273,8 @@ export function dbItemToLead(p: DbPipelineItem): Lead {
     shortNote: p.short_note ?? undefined,
     visitAt: p.visit_at ?? undefined,
     wholesaleCode: p.wholesale_code ?? undefined,
+    source: (p.lead_source as Lead["source"]) ?? undefined,
+    catalogItemId: p.catalog_item_id ?? undefined,
     createdAt: p.created_at,
     stageChangedAt: p.updated_at,
   };

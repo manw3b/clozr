@@ -40,6 +40,7 @@ import { CommandPalette } from "./components/CommandPalette";
 import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { useGlobalShortcuts } from "./lib/useGlobalShortcuts";
 import { checkForUpdate, downloadAndInstall, type UpdateStatus } from "./lib/updater";
+import { SplashScreen } from "./components/SplashScreen";
 import logoIsotipo from "./assets/logo-isotipo.svg";
 
 // ─── Update banner ────────────────────────────────────────────────
@@ -130,6 +131,7 @@ export function WorkspaceLogo({ logoPath, emoji, name }: { logoPath: string | nu
 // ─── App ──────────────────────────────────────────────────────────
 
 export default function App() {
+  const [splashDone, setSplashDone] = useState(false);
   const { workspaces, activeWorkspace, isLoading, loadWorkspaces } = useWorkspaceStore();
   const { activeBusiness, loadBusinesses } = useBusinessStore();
   const { activeScreen, setActiveScreen } = useUIStore();
@@ -210,20 +212,40 @@ export default function App() {
     return () => window.removeEventListener("clozr:invalidate", handler);
   }, [queryClient]);
 
-  if (isLoading) return <LoadingScreen />;
+  // El splash se renderea como overlay (position fixed, z-index 9999) en
+  // CUALQUIER caso debajo, así no parpadea si la app cambia de pantalla
+  // mientras se desvanece. Lo extraigo como nodo reutilizable.
+  const splashOverlay = !splashDone ? (
+    <SplashScreen ready={!isLoading} onDone={() => setSplashDone(true)} />
+  ) : null;
+
+  if (isLoading) {
+    return (
+      <>
+        {splashOverlay}
+        <LoadingScreen />
+      </>
+    );
+  }
   if (!activeWorkspace || workspaces.length === 0) {
     return (
-      <Suspense fallback={<LoadingScreen />}>
-        <OnboardingScreen />
-      </Suspense>
+      <>
+        {splashOverlay}
+        <Suspense fallback={<LoadingScreen />}>
+          <OnboardingScreen />
+        </Suspense>
+      </>
     );
   }
   // Sin sesión activa → LoginScreen.
   if (!userId) {
     return (
-      <Suspense fallback={<LoadingScreen />}>
-        <LoginScreen />
-      </Suspense>
+      <>
+        {splashOverlay}
+        <Suspense fallback={<LoadingScreen />}>
+          <LoginScreen />
+        </Suspense>
+      </>
     );
   }
 
@@ -248,6 +270,7 @@ export default function App() {
 
   return (
     <>
+      {splashOverlay}
       <UpdateBanner />
       <AppShell
         active={activeScreen}

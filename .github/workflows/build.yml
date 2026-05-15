@@ -143,5 +143,9 @@ jobs:
           releaseName: 'Clozr ${{ github.ref_name }}'
           releaseBody: ${{ needs.changelog.outputs.body }}
           releaseDraft: false
-          prerelease: true
+          # IMPORTANTE: stable (no prerelease) — GitHub excluye los
+          # prereleases de `releases/latest`, y el updater de Tauri pega
+          # justo a esa URL para resolver el latest.json. Si esto se pone
+          # en `true`, el auto-update no funciona (404 silencioso).
+          prerelease: false
           args: ${{ matrix.args }}

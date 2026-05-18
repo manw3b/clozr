@@ -5,7 +5,7 @@ import {
   Clock,
   AlertCircle,
   Flame,
-  ShoppingCart,
+  DollarSign,
   MoreVertical,
   ArrowRight,
   Trophy,
@@ -327,20 +327,21 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
         </span>
 
         <div style={{ display: 'flex', gap: 2 }}>
-          {/* Convertir a venta: solo etapas tardías (presupuestado, negociando)
+          {/* Cerrar venta: solo etapas tardías (presupuestado, negociando)
               donde el lead está cerca del cierre. En etapas tempranas el botón
-              es ruido — el vendedor todavía está calificando, no cobrando. */}
+              es ruido — el vendedor todavía está calificando, no cobrando.
+              Icono $ es más claro que el carrito (que se confunde con stock). */}
           {onConvertToSale &&
             (lead.stage === 'presupuestado' || lead.stage === 'negociando') && (
             <CardActionBtn
               tone="primary"
-              ariaLabel="Convertir a venta"
+              ariaLabel="Cerrar venta"
               onClick={(e) => {
                 e.stopPropagation();
                 onConvertToSale(lead);
               }}
             >
-              <ShoppingCart size={13} strokeWidth={2.2} />
+              <DollarSign size={13} strokeWidth={2.4} />
             </CardActionBtn>
           )}
           {onWhatsApp && (

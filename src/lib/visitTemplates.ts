@@ -29,6 +29,11 @@ export const VISIT_TEMPLATE_KEYS = {
   // contextual de una venta. Editable desde Ajustes.
   postSale: "wa_postsale_template",
   postSaleDiscount: "wa_postsale_discount_pct",
+  // Outreach rápido: la plantilla del WhatsApp diario, la más usada.
+  // Aparece como opción en el WhatsAppQuickPicker (junto a "vacío"). Una
+  // sola plantilla configurable porque la decisión del Sprint 2 fue
+  // mantener el picker simple — 2 opciones max.
+  quickOutreach: "wa_quick_outreach_template",
 } as const;
 
 export const DEFAULT_VISIT_TEMPLATES = {
@@ -54,6 +59,7 @@ Si te gustó la experiencia, te re agradezco si nos etiquetás en tus redes — 
 
 ¡Cualquier consulta o ayuda con el equipo escribime!`,
   postSaleDiscount: "30",
+  quickOutreach: `¡Hola {nombre}! ¿Cómo estás? Te escribo de {negocio}, ¿en qué te puedo ayudar?`,
 } as const;
 
 export const PLACEHOLDER_HELP = [
@@ -71,6 +77,11 @@ export const POSTSALE_PLACEHOLDER_HELP = [
   { token: "{producto}", label: "Producto comprado (primer ítem)" },
   { token: "{monto}", label: "Total de la venta" },
   { token: "{descuento}", label: "% de descuento (configurable)" },
+  { token: "{negocio}", label: "Nombre del negocio" },
+];
+
+export const QUICK_OUTREACH_PLACEHOLDER_HELP = [
+  { token: "{nombre}", label: "Nombre del cliente" },
   { token: "{negocio}", label: "Nombre del negocio" },
 ];
 

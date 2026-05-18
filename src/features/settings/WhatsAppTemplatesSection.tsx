@@ -6,6 +6,7 @@ import {
   DEFAULT_VISIT_TEMPLATES,
   PLACEHOLDER_HELP,
   POSTSALE_PLACEHOLDER_HELP,
+  QUICK_OUTREACH_PLACEHOLDER_HELP,
   applyVisitTemplate,
 } from "../../lib/visitTemplates";
 import { useUIStore } from "../../store/uiStore";
@@ -44,6 +45,7 @@ const KEYS = [
   VISIT_TEMPLATE_KEYS.codeCounter,
   VISIT_TEMPLATE_KEYS.postSale,
   VISIT_TEMPLATE_KEYS.postSaleDiscount,
+  VISIT_TEMPLATE_KEYS.quickOutreach,
 ];
 
 /**
@@ -71,6 +73,7 @@ export function WhatsAppTemplatesSection({ wid }: Props) {
   const [codeCounter, setCodeCounter] = useState("");
   const [templatePostSale, setTemplatePostSale] = useState("");
   const [postSaleDiscount, setPostSaleDiscount] = useState("");
+  const [templateQuickOutreach, setTemplateQuickOutreach] = useState("");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
@@ -92,6 +95,9 @@ export function WhatsAppTemplatesSection({ wid }: Props) {
     setPostSaleDiscount(
       settings[VISIT_TEMPLATE_KEYS.postSaleDiscount] ?? DEFAULT_VISIT_TEMPLATES.postSaleDiscount,
     );
+    setTemplateQuickOutreach(
+      settings[VISIT_TEMPLATE_KEYS.quickOutreach] ?? DEFAULT_VISIT_TEMPLATES.quickOutreach,
+    );
     setDirty(false);
   }, [settings]);
 
@@ -106,6 +112,7 @@ export function WhatsAppTemplatesSection({ wid }: Props) {
         [VISIT_TEMPLATE_KEYS.codeCounter]: codeCounter.trim() || null,
         [VISIT_TEMPLATE_KEYS.postSale]: templatePostSale,
         [VISIT_TEMPLATE_KEYS.postSaleDiscount]: postSaleDiscount.trim() || "30",
+        [VISIT_TEMPLATE_KEYS.quickOutreach]: templateQuickOutreach,
       });
       qc.invalidateQueries({ queryKey: ["workspace-settings", wid] });
       showToast("Plantillas guardadas", "success");
@@ -138,6 +145,10 @@ export function WhatsAppTemplatesSection({ wid }: Props) {
     producto: "iPhone 15 Pro Max 256GB",
     monto: "USD 1.300",
     descuento: postSaleDiscount.trim() || "30",
+    negocio: "iPhone Club",
+  });
+  const previewQuickOutreach = applyVisitTemplate(templateQuickOutreach, {
+    nombre: "Carlos",
     negocio: "iPhone Club",
   });
 
@@ -289,6 +300,60 @@ export function WhatsAppTemplatesSection({ wid }: Props) {
               </p>
             </div>
           </div>
+        </section>
+
+        {/* Mensaje rápido — outreach diario. Es la plantilla del WhatsApp
+            cotidiano (no visita, no post-venta). Aparece como opción en el
+            WhatsAppQuickPicker que se dispara desde la tabla de Clientes
+            y el drawer. La otra opción siempre disponible es 'Mensaje vacío'. */}
+        <section style={{ paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>
+            Mensaje rápido
+          </h3>
+          <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 8 }}>
+            Se usa desde el botón de WhatsApp de la tabla de Clientes y del
+            drawer de cliente. El vendedor elige entre esta plantilla o
+            "Mensaje vacío" antes de abrir WhatsApp.
+          </p>
+          <div
+            style={{
+              padding: 10,
+              marginBottom: 12,
+              background: "var(--surface-2)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+            }}
+          >
+            <div style={{ fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 }}>
+              Placeholders disponibles
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {QUICK_OUTREACH_PLACEHOLDER_HELP.map((p) => (
+                <span
+                  key={p.token}
+                  title={p.label}
+                  style={{
+                    padding: "3px 8px",
+                    background: "var(--surface)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 6,
+                    fontSize: 11,
+                    color: "var(--text-muted)",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {p.token}
+                </span>
+              ))}
+            </div>
+          </div>
+          <textarea
+            value={templateQuickOutreach}
+            onChange={(e) => onChange<string>(setTemplateQuickOutreach)(e.target.value)}
+            rows={3}
+            style={inputStyle}
+          />
+          <PreviewBox text={previewQuickOutreach} />
         </section>
 
         {/* Mensaje post-venta — agradecimiento + descuento por etiqueta en redes */}

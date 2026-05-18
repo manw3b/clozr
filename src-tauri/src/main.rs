@@ -11,6 +11,11 @@ fn main() {
     // Los archivos SQL viven ahora en src-tauri/migrations-archive/ como
     // changelog histórico (ver README.md ahí mismo).
     tauri::Builder::default()
+        // window-state primero — debe registrarse antes del resto para
+        // poder hookear los eventos de close de la ventana y guardar el
+        // estado (tamaño, posición, maximizado, fullscreen) en disco.
+        // Al abrir la app restaura lo que estaba guardado.
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())

@@ -131,11 +131,38 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
     methodName: string;
   }>(null);
 
+  // Ref a la sección "¿Cómo paga el cliente?". Cuando llega un preset con
+  // cliente + producto + precio (típico desde Pipeline "Cerrar venta"),
+  // hacemos auto-scroll para que el vendedor vea directo lo que tiene que
+  // decidir. Sin saltar pasos ni esconder secciones — el modal sigue siendo
+  // una pantalla única; solo movemos el viewport.
+  const paymentSectionRef = useRef<HTMLDivElement>(null);
+
   // Si llega un preset nuevo mientras el modal está cerrado, lo aplicamos al abrir
   useEffect(() => {
     if (open && preset) {
       setItems([presetToItem(preset)]);
       if (preset.client) setClient(preset.client);
+
+      // Preset completo (cliente + producto + precio) ⇒ todos los campos
+      // obligatorios de la parte superior ya están resueltos. Scroll suave
+      // a la sección de pago para que se vea directo.
+      const presetComplete =
+        !!preset.client &&
+        !!preset.catalogItem &&
+        typeof preset.unitPriceUsd === 'number' &&
+        preset.unitPriceUsd > 0;
+      if (presetComplete) {
+        // Esperamos a que el modal pinte + cargue queries antes de scrollear.
+        // 200ms cubre el render del PaymentMethodCard grid (depende de paymentsQ).
+        const t = setTimeout(() => {
+          paymentSectionRef.current?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        }, 200);
+        return () => clearTimeout(t);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, preset?.catalogItem?.id, preset?.imei, preset?.client?.id, preset?.unitPriceUsd]);
@@ -467,7 +494,9 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
         Agregar otro producto
       </button>
 
-      {/* ¿CÓMO PAGA EL CLIENTE? — cards visuales */}
+      {/* ¿CÓMO PAGA EL CLIENTE? — cards visuales.
+          El wrapper con ref permite el auto-scroll cuando viene preset completo. */}
+      <div ref={paymentSectionRef} style={{ scrollMarginTop: 12 }}>
       <ModalField label="¿Cómo paga el cliente?" required>
         {paymentsQ.data && paymentsQ.data.length === 0 ? (
           <div
@@ -520,6 +549,7 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
           </div>
         )}
       </ModalField>
+      </div>
 
       {/* TOTAL DUAL */}
       <div

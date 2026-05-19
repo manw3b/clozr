@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Copy, Trash2, Wallet, Search, Calendar, ExternalLink, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { useUndoableActions } from '../../store/useUndoableActions';
 import { PageHeader } from '../../components/PageHeader';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -73,6 +75,8 @@ export function Caja() {
   const closeCashMut = useCloseCashSession();
   const [closeOpen, setCloseOpen] = useState(false);
   const isClosed = !!session?.closed_at;
+  const qc = useQueryClient();
+  const registerUndo = useUndoableActions((s) => s.register);
   const [kindFilter, setKindFilter] = useState<string>('todos');
   const [currencyFilter, setCurrencyFilter] = useState<'todas' | 'ARS' | 'USD'>('todas');
   const [search, setSearch] = useState('');
@@ -435,23 +439,46 @@ export function Caja() {
             onClick={() => {
               const m = ctxMov;
               ctxMenu.close();
+
+              // Optimistic remove: snapshot la query del summary, sacamos
+              // el movement de movements[] y recalculamos los totales en
+              // memoria (Ingresos/Egresos/Balance se actualizan al toque).
+              // Si el usuario apreta Deshacer, restauramos el snapshot.
+              const summaryQueries = qc.getQueriesData<CashSummary>({
+                queryKey: ['caja', 'summary'],
+              });
+              const snapshots = summaryQueries.map(([key, data]) => ({ key, data }));
+
+              summaryQueries.forEach(([key, data]) => {
+                if (!data) return;
+                const next = removeMovementFromSummary(data, m.id);
+                qc.setQueryData(key, next);
+              });
+
               const sign = m.kind === 'income' ? '+' : '−';
-              // Si vino de una venta, avisar que la venta NO se borra —
-              // sólo el movement de caja.
-              const saleWarning = m.saleId
-                ? `\n\n⚠ Este movimiento vino de una venta. La venta original NO se borra — sólo este registro de caja.`
-                : '';
-              const ok = window.confirm(
-                `¿Eliminar este movimiento?\n\n${sign}${formatMoney(m.amount, m.currency)} · ${m.description || 'sin descripción'}${saleWarning}\n\nEsta acción no se puede deshacer.`,
-              );
-              if (!ok) return;
-              deleteMovementMut.mutate(m.id, {
-                onSuccess: () => showToast('Movimiento eliminado', 'success'),
-                onError: (e) =>
-                  showToast(
-                    e instanceof Error ? e.message : 'No se pudo eliminar',
-                    'error',
-                  ),
+              registerUndo({
+                label: `Movimiento eliminado`,
+                sublabel: `${sign}${formatMoney(m.amount, m.currency)} · ${m.description || 'sin descripción'}`,
+                onUndo: () => {
+                  // Restaurar el cache tal cual estaba.
+                  snapshots.forEach(({ key, data }) => {
+                    qc.setQueryData(key, data);
+                  });
+                },
+                commit: async () => {
+                  try {
+                    await deleteMovementMut.mutateAsync(m.id);
+                  } catch (e) {
+                    // Si la DB rechaza el delete, restaurar cache y avisar.
+                    snapshots.forEach(({ key, data }) => {
+                      qc.setQueryData(key, data);
+                    });
+                    showToast(
+                      e instanceof Error ? e.message : 'No se pudo eliminar',
+                      'error',
+                    );
+                  }
+                },
               });
             }}
           >
@@ -461,4 +488,44 @@ export function Caja() {
       )}
     </div>
   );
+}
+
+/**
+ * Aplica un optimistic remove de un movement sobre un CashSummary del
+ * query cache. Saca el movement de la lista Y RECALCULA los totales
+ * para que las cards de Ingresos/Egresos/Neto/Balance reflejen el
+ * cambio al toque (sin esperar al refetch del commit).
+ *
+ * Si el movement no está en este summary (caso multi-período), devuelve
+ * el summary sin cambios.
+ */
+function removeMovementFromSummary(summary: CashSummary, movementId: string): CashSummary {
+  const target = summary.movements.find((m) => m.id === movementId);
+  if (!target) return summary;
+  const movements = summary.movements.filter((m) => m.id !== movementId);
+  const currency = target.currency === 'USD' ? 'usd' : 'ars';
+  const isIncome = target.kind === 'income';
+  return {
+    ...summary,
+    movements,
+    totalIncome: {
+      ...summary.totalIncome,
+      [currency]: isIncome
+        ? summary.totalIncome[currency] - target.amount
+        : summary.totalIncome[currency],
+    },
+    totalExpense: {
+      ...summary.totalExpense,
+      [currency]: !isIncome
+        ? summary.totalExpense[currency] - target.amount
+        : summary.totalExpense[currency],
+    },
+    currentBalance: {
+      ...summary.currentBalance,
+      // Income aumenta el balance, expense lo disminuye. Al eliminar
+      // un movement invertimos esa dirección.
+      [currency]:
+        summary.currentBalance[currency] + (isIncome ? -target.amount : target.amount),
+    },
+  };
 }

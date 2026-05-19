@@ -7,6 +7,8 @@ import { useUIStore, type ScreenId } from "./store/uiStore";
 import { useAuthStore } from "./store/authStore";
 import { useExchangeRateStore } from "./store/exchangeRateStore";
 import { useSyncActiveDolarToExchangeRate } from "./store/useDolaresAr";
+import { UndoToastHost } from "./components/UndoToastHost";
+import { WhatsNewModal } from "./components/WhatsNewModal";
 import { seedAppleCatalog, seedWatchAndMac, refreshIphoneCatalog, refreshIpadCatalog } from "./lib/db/quickStock";
 import { paymentMethodsDb } from "./lib/db/paymentMethods";
 import { followupsDb } from "./lib/db/followups";
@@ -272,6 +274,8 @@ export default function App() {
     <>
       {splashOverlay}
       <UpdateBanner />
+      <UndoToastHost />
+      <WhatsNewModal />
       <AppShell
         active={activeScreen}
         onNavigate={(id) => setActiveScreen(id as ScreenId)}

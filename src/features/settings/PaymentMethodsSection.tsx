@@ -10,6 +10,7 @@ import { Input, Select } from "../../components/Input";
 import { Badge } from "../../components/Badge";
 import { EmptyState } from "../../components/EmptyState";
 import { useUIStore } from "../../store/uiStore";
+import { useUndoableActions } from "../../store/useUndoableActions";
 import { color, radius, space, text, weight } from "../../tokens";
 import type { PaymentMethodKind, PaymentMethodRow } from "../../lib/db/types";
 
@@ -52,6 +53,7 @@ const EMPTY_FORM: FormState = {
 export function PaymentMethodsSection({ wid }: { wid: string }) {
   const qc = useQueryClient();
   const { showToast } = useUIStore();
+  const registerUndo = useUndoableActions((s) => s.register);
   const [editing, setEditing] = useState<PaymentMethodRow | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -69,9 +71,11 @@ export function PaymentMethodsSection({ wid }: { wid: string }) {
       assertCan(role, "managePaymentMethods");
       return paymentMethodsDb.remove(id);
     },
+    // No invalidamos acá ni toast: el undoable se encarga del optimistic
+    // y el toast con "Deshacer". Sólo invalidamos al final por si hay
+    // queries derivadas que dependen.
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["payment-methods"] });
-      showToast("Método eliminado", "success");
     },
   });
 
@@ -160,9 +164,34 @@ export function PaymentMethodsSection({ wid }: { wid: string }) {
               isLast={idx === methods.length - 1}
               onEdit={() => setEditing(m)}
               onDelete={() => {
-                if (window.confirm(`¿Eliminar el método "${m.name}"? Esto no afecta a las ventas ya registradas.`)) {
-                  removeMut.mutate(m.id);
-                }
+                // Optimistic remove: sacamos el método del cache para
+                // que desaparezca del UI inmediatamente. Si el usuario
+                // apreta Deshacer, restauramos. Si no, al expirar el
+                // toast hacemos el delete real en DB.
+                if (!allowed) return;
+                const queryKey = ["payment-methods", wid] as const;
+                const snapshot = qc.getQueryData<PaymentMethodRow[]>(queryKey);
+                qc.setQueryData<PaymentMethodRow[]>(queryKey, (prev) =>
+                  prev ? prev.filter((x) => x.id !== m.id) : prev,
+                );
+                registerUndo({
+                  label: `Método eliminado: ${m.name}`,
+                  sublabel: `${KIND_LABELS[m.kind]} · ${m.currency}`,
+                  onUndo: () => {
+                    if (snapshot) qc.setQueryData(queryKey, snapshot);
+                  },
+                  commit: async () => {
+                    try {
+                      await removeMut.mutateAsync(m.id);
+                    } catch (e) {
+                      if (snapshot) qc.setQueryData(queryKey, snapshot);
+                      showToast(
+                        e instanceof Error ? e.message : "No se pudo eliminar",
+                        "error",
+                      );
+                    }
+                  },
+                });
               }}
               onToggleActive={(active) => toggleActiveMut.mutate({ id: m.id, active })}
               onMoveUp={() => move(idx, -1)}

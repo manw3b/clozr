@@ -20,6 +20,7 @@ import { tasksDb } from "../../lib/db/tasks";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
+import { useUndoableActions } from "../../store/useUndoableActions";
 import { qk, invalidate } from "../../lib/queryKeys";
 import { usePersistedState } from "../../lib/usePersistedState";
 import { color, space, text, weight } from "../../tokens";
@@ -59,11 +60,38 @@ export function Tareas() {
 
   const removeMut = useMutation({
     mutationFn: (id: string) => tasksDb.remove(id),
-    onSuccess: () => {
-      invalidate.afterTaskChange(qc, wid);
-      showToast("Tarea eliminada", "success");
-    },
+    // Toast e invalidate los maneja el undoable. Sólo invalidamos al final
+    // por consistencia con queries derivadas.
+    onSuccess: () => invalidate.afterTaskChange(qc, wid),
   });
+  const registerUndo = useUndoableActions((s) => s.register);
+
+  // Helper para los dos call sites (row delete + context menu delete).
+  function undoableDeleteTask(t: DbTask) {
+    const queryKey = qk.tasks(wid);
+    const snapshot = qc.getQueryData<DbTask[]>(queryKey);
+    qc.setQueryData<DbTask[]>(queryKey, (prev) =>
+      prev ? prev.filter((x) => x.id !== t.id) : prev,
+    );
+    registerUndo({
+      label: `Tarea eliminada: ${t.title}`,
+      sublabel: t.due_at ? `Vencía ${new Date(t.due_at).toLocaleDateString("es-AR")}` : undefined,
+      onUndo: () => {
+        if (snapshot) qc.setQueryData(queryKey, snapshot);
+      },
+      commit: async () => {
+        try {
+          await removeMut.mutateAsync(t.id);
+        } catch (e) {
+          if (snapshot) qc.setQueryData(queryKey, snapshot);
+          showToast(
+            e instanceof Error ? e.message : "No se pudo eliminar",
+            "error",
+          );
+        }
+      },
+    });
+  }
 
   const filtered = useMemo(() => {
     return tasks.filter((t) => {
@@ -155,7 +183,7 @@ export function Tareas() {
           iconLeft={<Trash2 size={13} />}
           onClick={(e) => {
             e.stopPropagation();
-            if (window.confirm(`¿Eliminar tarea "${t.title}"?`)) removeMut.mutate(t.id);
+            undoableDeleteTask(t);
           }}
         />
       ),
@@ -247,10 +275,9 @@ export function Tareas() {
             tone="danger"
             icon={<Trash2 size={14} />}
             onClick={() => {
-              if (window.confirm(`¿Eliminar tarea "${ctxTask.title}"?`)) {
-                removeMut.mutate(ctxTask.id);
-              }
+              const t = ctxTask;
               ctxMenu.close();
+              undoableDeleteTask(t);
             }}
           >
             Eliminar

@@ -7,6 +7,7 @@ import { Input } from "../../../components/Input";
 import { Badge } from "../../../components/Badge";
 import { catalogDb } from "../../../lib/db/catalog";
 import { useUIStore } from "../../../store/uiStore";
+import { useUndoableActions } from "../../../store/useUndoableActions";
 import { useWorkspaceStore } from "../../../store/workspaceStore";
 import { useAuthStore, assertCan, can } from "../../../store/authStore";
 import { color, radius, space, text, weight } from "../../../tokens";
@@ -101,17 +102,18 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onLoadAnotherVarian
   const role = useAuthStore((s) => s.userRole);
 
   const deleteProductMut = useMutation({
-    mutationFn: () => {
+    mutationFn: (id: string) => {
       assertCan(role, "deleteCatalogItem");
-      return item ? catalogDb.softDelete(wid, item.id) : Promise.resolve();
+      return catalogDb.softDelete(wid, id);
     },
+    // Toast e invalidate via el undoable. Sólo invalidamos al final por
+    // consistencia con queries derivadas.
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["inventario"] });
       qc.invalidateQueries({ queryKey: ["catalog"] });
-      showToast("Producto eliminado", "success");
-      onClose();
     },
   });
+  const registerUndo = useUndoableActions((s) => s.register);
 
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -179,9 +181,49 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onLoadAnotherVarian
                 danger
                 onClick={() => {
                   setMenuOpen(false);
-                  if (window.confirm(`¿Eliminar "${item.name}"? Las ventas pasadas no se ven afectadas.`)) {
-                    deleteProductMut.mutate();
+                  const target = item;
+                  // Optimistic remove: cerramos el drawer + sacamos del cache.
+                  // 6 segundos para deshacer.
+                  const queryKeys = [
+                    ["inventario", "catalog", wid] as const,
+                    ["catalog", wid] as const,
+                  ];
+                  const snapshots = queryKeys.map((k) => ({
+                    key: k,
+                    data: qc.getQueryData(k),
+                  }));
+                  // Filtramos defensivamente — varias queries pueden tener
+                  // arrays distintos pero todas comparten el shape "items[]".
+                  for (const k of queryKeys) {
+                    qc.setQueryData(k, (prev: unknown) => {
+                      if (!Array.isArray(prev)) return prev;
+                      return prev.filter(
+                        (x): x is { id: string } =>
+                          !!x && typeof x === "object" && "id" in x && (x as { id: string }).id !== target.id,
+                      );
+                    });
                   }
+                  onClose();
+                  registerUndo({
+                    label: `Producto eliminado: ${target.name}`,
+                    sublabel: "Las ventas pasadas no se ven afectadas",
+                    onUndo: () => {
+                      snapshots.forEach(({ key, data }) => qc.setQueryData(key, data));
+                    },
+                    commit: async () => {
+                      try {
+                        await deleteProductMut.mutateAsync(target.id);
+                      } catch (e) {
+                        snapshots.forEach(({ key, data }) =>
+                          qc.setQueryData(key, data),
+                        );
+                        showToast(
+                          e instanceof Error ? e.message : "No se pudo eliminar",
+                          "error",
+                        );
+                      }
+                    },
+                  });
                 }}
               />
               )}

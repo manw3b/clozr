@@ -14,6 +14,7 @@ import { FeaturedModelsSection } from "./FeaturedModelsSection";
 import { CustomerTagsSection } from "./CustomerTagsSection";
 import { WhatsAppTemplatesSection } from "./WhatsAppTemplatesSection";
 import { DolaresArSection } from "./DolaresArSection";
+import { AboutSection } from "./AboutSection";
 import type { PipelineStage, CustomerTypeRow } from "../../lib/db/types";
 // Paleta unificada — la misma que usa el kanban del pipeline para el
 // color de cada etapa. Cualquier cambio acá se refleja allá.
@@ -21,7 +22,7 @@ import { PALETTE_LIST as COLORS, colorCss } from "../../lib/colorPalette";
 
 // ── Shared ────────────────────────────────────────────────────────
 
-type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "wa-templates" | "dolares" | "data";
+type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "wa-templates" | "dolares" | "data" | "about";
 
 const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "general", label: "General" },
@@ -35,6 +36,7 @@ const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "wa-templates", label: "Plantillas WhatsApp" },
   { id: "dolares", label: "Cotizaciones del dólar" },
   { id: "data", label: "Datos y backup" },
+  { id: "about", label: "Acerca de Clozr" },
 ];
 
 function SectionHeader({ title, description }: { title: string; description?: string }) {
@@ -1067,6 +1069,7 @@ export default function SettingsScreen() {
       case "wa-templates": return <WhatsAppTemplatesSection wid={wid} />;
       case "dolares": return <DolaresArSection />;
       case "data": return <DataSection wid={wid} />;
+      case "about": return <AboutSection />;
     }
   };
 

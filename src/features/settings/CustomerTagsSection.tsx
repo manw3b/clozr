@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Tag as TagIcon } from "lucide-react";
 import { customerTagsDb } from "../../lib/db/customerTags";
 import { useUIStore } from "../../store/uiStore";
+import { useUndoableActions } from "../../store/useUndoableActions";
 import { useAuthStore, assertCan, can } from "../../store/authStore";
 import { color, radius, space, text, weight } from "../../tokens";
 import { PALETTE_LIST, colorCss } from "../../lib/colorPalette";
@@ -21,6 +22,7 @@ import { EmptyState } from "../../components/EmptyState";
 export function CustomerTagsSection({ wid }: { wid: string }) {
   const qc = useQueryClient();
   const { showToast } = useUIStore();
+  const registerUndo = useUndoableActions((s) => s.register);
   const role = useAuthStore((s) => s.userRole);
   const allowed = can(role, "manageCustomerTypes");
 
@@ -64,10 +66,11 @@ export function CustomerTagsSection({ wid }: { wid: string }) {
       assertCan(role, "manageCustomerTypes");
       return customerTagsDb.remove(id);
     },
+    // El toast + invalidate vienen vía el undoable. Sólo invalidamos al
+    // final por consistencia con otros mutations.
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customer-tags-with-count"] });
       qc.invalidateQueries({ queryKey: ["customer-tags"] });
-      showToast("Etiqueta eliminada", "success");
     },
   });
 
@@ -174,15 +177,33 @@ export function CustomerTagsSection({ wid }: { wid: string }) {
               editable={allowed}
               onUpdate={(patch) => updateMut.mutate({ id: t.id, ...patch })}
               onRemove={() => {
-                if (
-                  window.confirm(
+                if (!allowed) return;
+                const queryKey = ["customer-tags-with-count", wid] as const;
+                const snapshot = qc.getQueryData<typeof tags>(queryKey);
+                qc.setQueryData<typeof tags>(queryKey, (prev) =>
+                  prev ? prev.filter((x) => x.id !== t.id) : prev,
+                );
+                registerUndo({
+                  label: `Etiqueta eliminada: ${t.name}`,
+                  sublabel:
                     t.customer_count > 0
-                      ? `Eliminar la etiqueta "${t.name}"? Está asignada a ${t.customer_count} ${t.customer_count === 1 ? "cliente" : "clientes"} y se les va a quitar.`
-                      : `Eliminar la etiqueta "${t.name}"?`,
-                  )
-                ) {
-                  removeMut.mutate(t.id);
-                }
+                      ? `Estaba asignada a ${t.customer_count} ${t.customer_count === 1 ? "cliente" : "clientes"}`
+                      : "Sin clientes asignados",
+                  onUndo: () => {
+                    if (snapshot) qc.setQueryData(queryKey, snapshot);
+                  },
+                  commit: async () => {
+                    try {
+                      await removeMut.mutateAsync(t.id);
+                    } catch (e) {
+                      if (snapshot) qc.setQueryData(queryKey, snapshot);
+                      showToast(
+                        e instanceof Error ? e.message : "No se pudo eliminar",
+                        "error",
+                      );
+                    }
+                  },
+                });
               }}
             />
           ))}

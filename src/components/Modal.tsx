@@ -7,8 +7,9 @@ interface ModalProps {
   open?: boolean;
   isOpen?: boolean;
   onClose: () => void;
-  title?: string;
-  subtitle?: string;
+  /** Título del modal. Acepta ReactNode para inyectar iconos al lado. */
+  title?: ReactNode;
+  subtitle?: ReactNode;
   /** Ancho máx (px). Default 520 */
   maxWidth?: number;
   /** Acciones del footer */

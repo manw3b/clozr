@@ -27,6 +27,7 @@ import { ImportClientsModal } from './components/ImportClientsModal';
 import { NewSaleModal } from '../ventas/components/NewSaleModal';
 import { useCreateSale } from '../ventas/useSalesData';
 import { CustomerWaQuickPicker } from '../../components/CustomerWaQuickPicker';
+import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal';
 import { useUIStore } from '../../store/uiStore';
 import { openWhatsApp, openTel, openMail } from '../../lib/openExternal';
 import { exportToCsv as exportCsv, timestamp as csvTimestamp } from '../../lib/exportCsv';
@@ -75,6 +76,15 @@ export function Clientes() {
   // Disparado desde el botón $ de la fila, del context menu y del footer del
   // drawer — todas son la misma acción mental: "venta para ESTE cliente".
   const [saleClient, setSaleClient] = useState<Client | null>(null);
+  // Estado para el modal de confirmación de borrado:
+  //  - { kind: 'single', client } → borrar UNO con su nombre como confirm
+  //  - { kind: 'bulk', ids }      → borrar VARIOS, requiere tipear "ELIMINAR N"
+  // null = cerrado.
+  const [confirmDelete, setConfirmDelete] = useState<
+    | { kind: 'single'; client: Client }
+    | { kind: 'bulk'; ids: string[] }
+    | null
+  >(null);
   const { showToast } = useUIStore();
   const createSaleMut = useCreateSale();
 
@@ -103,13 +113,7 @@ export function Clientes() {
   function handleBulkDelete() {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
-    if (!window.confirm(`¿Eliminar ${ids.length} cliente${ids.length === 1 ? '' : 's'}? Esta acción no se puede deshacer.`)) return;
-    deleteMut.mutate(ids, {
-      onSuccess: () => {
-        showToast(`${ids.length} cliente${ids.length === 1 ? '' : 's'} eliminado${ids.length === 1 ? '' : 's'}`, 'success');
-        setSelected(new Set());
-      },
-    });
+    setConfirmDelete({ kind: 'bulk', ids });
   }
 
   function handleBulkExport() {
@@ -421,6 +425,81 @@ export function Clientes() {
         }}
       />
 
+      {/* Confirm estricto de borrado. Cartera de clientes = valor real, así
+          que pedimos tipear el nombre (single) o "ELIMINAR N" (bulk) antes
+          de borrar. Reemplaza el window.confirm que era muy fácil de aceptar
+          por accidente. */}
+      {confirmDelete?.kind === 'single' && (
+        <ConfirmDeleteModal
+          open
+          onClose={() => setConfirmDelete(null)}
+          title={`Eliminar a ${confirmDelete.client.name}`}
+          description={
+            <>
+              Vas a eliminar <strong>{confirmDelete.client.name}</strong> de tu
+              cartera. {confirmDelete.client.phone && (
+                <>Su teléfono ({confirmDelete.client.phone}) deja de estar disponible para WhatsApp/llamada rápida. </>
+              )}
+              {confirmDelete.client.totalPurchases ? (
+                <>Tiene <strong>{confirmDelete.client.totalPurchases}</strong> {confirmDelete.client.totalPurchases === 1 ? 'venta registrada' : 'ventas registradas'} — el historial queda en la DB pero sin nombre asociado.</>
+              ) : null}
+            </>
+          }
+          confirmText={confirmDelete.client.name}
+          confirmLabel={`Eliminar a ${confirmDelete.client.name.split(' ')[0]}`}
+          onConfirm={async () => {
+            await new Promise<void>((resolve, reject) =>
+              deleteMut.mutate([confirmDelete.client.id], {
+                onSuccess: () => {
+                  showToast('Cliente eliminado', 'success');
+                  resolve();
+                },
+                onError: (err) => {
+                  showToast(err instanceof Error ? err.message : 'Error al eliminar', 'error');
+                  reject(err);
+                },
+              }),
+            );
+          }}
+        />
+      )}
+
+      {confirmDelete?.kind === 'bulk' && (
+        <ConfirmDeleteModal
+          open
+          onClose={() => setConfirmDelete(null)}
+          title={`Eliminar ${confirmDelete.ids.length} clientes`}
+          description={
+            <>
+              Vas a borrar <strong>{confirmDelete.ids.length} clientes</strong> de
+              tu cartera en una sola pasada. Para borrados masivos pedimos un
+              tipeo más explícito porque no se pueden recuperar uno por uno.
+            </>
+          }
+          confirmText={`ELIMINAR ${confirmDelete.ids.length}`}
+          confirmLabel={`Eliminar ${confirmDelete.ids.length} clientes`}
+          onConfirm={async () => {
+            const ids = confirmDelete.ids;
+            await new Promise<void>((resolve, reject) =>
+              deleteMut.mutate(ids, {
+                onSuccess: () => {
+                  showToast(
+                    `${ids.length} cliente${ids.length === 1 ? '' : 's'} eliminado${ids.length === 1 ? '' : 's'}`,
+                    'success',
+                  );
+                  setSelected(new Set());
+                  resolve();
+                },
+                onError: (err) => {
+                  showToast(err instanceof Error ? err.message : 'Error al eliminar', 'error');
+                  reject(err);
+                },
+              }),
+            );
+          }}
+        />
+      )}
+
       {/* Context menu (click derecho en una fila) */}
       {ctxMenu.open && ctxClient && (
         <ContextMenu position={ctxMenu.position} onClose={ctxMenu.close}>
@@ -512,11 +591,7 @@ export function Clientes() {
             tone="danger"
             icon={<Trash2 size={14} />}
             onClick={() => {
-              if (window.confirm(`¿Eliminar a ${ctxClient.name}?`)) {
-                deleteMut.mutate([ctxClient.id], {
-                  onSuccess: () => showToast('Cliente eliminado', 'success'),
-                });
-              }
+              setConfirmDelete({ kind: 'single', client: ctxClient });
               ctxMenu.close();
             }}
           >

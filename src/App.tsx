@@ -301,9 +301,11 @@ export default function App() {
               break;
             case "lead":
               setActiveScreen("pipeline");
+              window.dispatchEvent(new CustomEvent("clozr:open-new-lead"));
               break;
             case "tarea":
               setActiveScreen("tasks");
+              window.dispatchEvent(new CustomEvent("clozr:open-new-task"));
               break;
             case "movimiento":
               setActiveScreen("cash");

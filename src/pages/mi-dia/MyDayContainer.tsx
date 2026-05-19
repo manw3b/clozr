@@ -192,6 +192,14 @@ export function MyDayContainer() {
       onSetSalesGoal={(count) => setGoalMut.mutate({ salesCount: count })}
       onToggleTask={(id) => toggleTaskMut.mutate(id)}
       onMarkPaid={(id) => markPaidMut.mutate(id)}
+      onCreateTask={() => {
+        // Mi Día y Tareas son pantallas distintas: navegamos primero a
+        // tareas y luego pedimos abrir el form. El listener vive en
+        // Tareas.tsx. Sin la navegación previa el form se montaría
+        // pero no se vería porque seguís en Mi Día.
+        setActiveScreen("tasks");
+        window.dispatchEvent(new CustomEvent("clozr:open-new-task"));
+      }}
       onWhatsApp={(clientId, opts) => {
         const customer = customersQ.data?.find((c) => c.id === clientId);
         if (customer?.phone) {

@@ -138,6 +138,18 @@ export function Pipeline() {
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [newLeadStage, setNewLeadStage] = useState<LeadStage>('prospecto');
 
+  // Listener para abrir el modal "Nuevo lead" desde topbar (Nuevo > Lead)
+  // y otros disparadores globales. Sin esto el menú navegaba acá pero no
+  // abría nada y parecía que no funcionaba.
+  useEffect(() => {
+    const handler = () => {
+      setNewLeadStage('prospecto');
+      setNewLeadOpen(true);
+    };
+    window.addEventListener('clozr:open-new-lead', handler);
+    return () => window.removeEventListener('clozr:open-new-lead', handler);
+  }, []);
+
   // Estado para "Agendar visita"
   const [scheduleLead, setScheduleLead] = useState<Lead | null>(null);
 

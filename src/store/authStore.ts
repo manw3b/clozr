@@ -81,7 +81,7 @@ export function can(role: UserRole, permission: Permission): boolean {
 export function assertCan(role: UserRole, permission: Permission): void {
   if (!can(role, permission)) {
     throw new Error(
-      `Permiso denegado: tu rol "${role}" no puede "${permission}". Pedí al owner/admin.`,
+      `Permiso denegado: tu rol "${role}" no puede "${permission}". Pedí al dueño o encargado.`,
     );
   }
 }

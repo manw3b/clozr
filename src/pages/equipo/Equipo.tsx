@@ -26,8 +26,8 @@ import { qk } from "../../lib/queryKeys";
 import type { WorkspaceMember, MemberRole } from "../../lib/db/types";
 
 const ROLE_LABEL: Record<MemberRole, string> = {
-  owner: "Propietario",
-  admin: "Admin",
+  owner: "Dueño",
+  admin: "Encargado",
   vendedor: "Vendedor",
   viewer: "Solo lectura",
 };
@@ -149,7 +149,7 @@ export function Equipo() {
                 })
               }
             >
-              <option value="admin">Admin</option>
+              <option value="admin">Encargado</option>
               <option value="vendedor">Vendedor</option>
               <option value="viewer">Solo lectura</option>
             </Select>
@@ -343,7 +343,7 @@ function AddMemberModal({
       <ModalField label="Rol" required>
         <Select value={role} onChange={(e) => setRole(e.target.value as Exclude<MemberRole, "owner">)}>
           <option value="vendedor">Vendedor</option>
-          <option value="admin">Admin</option>
+          <option value="admin">Encargado</option>
           <option value="viewer">Solo lectura</option>
         </Select>
       </ModalField>

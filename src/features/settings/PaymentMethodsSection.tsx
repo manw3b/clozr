@@ -12,6 +12,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { useUIStore } from "../../store/uiStore";
 import { useUndoableActions } from "../../store/useUndoableActions";
 import { color, radius, space, text, weight } from "../../tokens";
+import { qk } from "../../lib/queryKeys";
 import type { PaymentMethodKind, PaymentMethodRow } from "../../lib/db/types";
 
 const KIND_LABELS: Record<PaymentMethodKind, string> = {
@@ -58,7 +59,7 @@ export function PaymentMethodsSection({ wid }: { wid: string }) {
   const [creating, setCreating] = useState(false);
 
   const methodsQ = useQuery({
-    queryKey: ["payment-methods", wid],
+    queryKey: qk.paymentMethods.list(wid),
     queryFn: () => paymentMethodsDb.getAll(wid),
     enabled: !!wid,
   });
@@ -75,7 +76,7 @@ export function PaymentMethodsSection({ wid }: { wid: string }) {
     // y el toast con "Deshacer". Sólo invalidamos al final por si hay
     // queries derivadas que dependen.
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["payment-methods"] });
+      qc.invalidateQueries({ queryKey: qk.paymentMethods.all() });
     },
   });
 
@@ -84,7 +85,7 @@ export function PaymentMethodsSection({ wid }: { wid: string }) {
       assertCan(role, "managePaymentMethods");
       return paymentMethodsDb.update(id, { active });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["payment-methods"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.paymentMethods.all() }),
   });
 
   const reorderMut = useMutation({
@@ -92,7 +93,7 @@ export function PaymentMethodsSection({ wid }: { wid: string }) {
       assertCan(role, "managePaymentMethods");
       return paymentMethodsDb.update(id, { sort_order });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["payment-methods"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.paymentMethods.all() }),
   });
 
   const methods = methodsQ.data ?? [];
@@ -169,7 +170,7 @@ export function PaymentMethodsSection({ wid }: { wid: string }) {
                 // apreta Deshacer, restauramos. Si no, al expirar el
                 // toast hacemos el delete real en DB.
                 if (!allowed) return;
-                const queryKey = ["payment-methods", wid] as const;
+                const queryKey = qk.paymentMethods.list(wid);
                 const snapshot = qc.getQueryData<PaymentMethodRow[]>(queryKey);
                 qc.setQueryData<PaymentMethodRow[]>(queryKey, (prev) =>
                   prev ? prev.filter((x) => x.id !== m.id) : prev,
@@ -397,7 +398,7 @@ function PaymentMethodFormModal({
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["payment-methods"] });
+      qc.invalidateQueries({ queryKey: qk.paymentMethods.all() });
       showToast(editing ? "Método actualizado" : "Método creado", "success");
       onClose();
     },

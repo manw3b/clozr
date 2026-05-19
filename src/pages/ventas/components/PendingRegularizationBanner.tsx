@@ -9,7 +9,7 @@ import { catalogDb } from "../../../lib/db/catalog";
 import { useWorkspaceStore } from "../../../store/workspaceStore";
 import { useAuthStore } from "../../../store/authStore";
 import { useUIStore } from "../../../store/uiStore";
-import { invalidate } from "../../../lib/queryKeys";
+import { invalidate, qk } from "../../../lib/queryKeys";
 import { color, radius, space, text, weight } from "../../../tokens";
 import { formatMoney } from "../../../lib/format";
 import type { Sale, CatalogItem } from "../../../lib/db/types";
@@ -20,7 +20,7 @@ export function PendingRegularizationBanner() {
   const [open, setOpen] = useState(false);
 
   const pendingQ = useQuery({
-    queryKey: ["pending-regularization", wid],
+    queryKey: qk.ventas.pendingRegularization(wid),
     queryFn: () => salesDb.getPendingRegularization(wid),
     enabled: !!wid,
     refetchInterval: 30_000,
@@ -107,7 +107,7 @@ function PendingRow({ sale, wid }: { sale: Sale; wid: string }) {
   const [imei, setImei] = useState("");
 
   const catalogQ = useQuery({
-    queryKey: ["catalog-items-search", wid],
+    queryKey: qk.catalog.itemsSearch(wid),
     queryFn: () => catalogDb.getAll(wid),
     enabled: linking && !!wid,
   });
@@ -119,7 +119,7 @@ function PendingRow({ sale, wid }: { sale: Sale; wid: string }) {
   const mut = useMutation({
     mutationFn: () => salesDb.regularizeSale(sale.id, picked?.id ?? null, imei.trim() || null, userId ?? null),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["pending-regularization"] });
+      qc.invalidateQueries({ queryKey: qk.ventas.pendingRegularizationAll() });
       invalidate.afterSaleChange(qc);
       showToast("Venta regularizada", "success");
       setLinking(false);

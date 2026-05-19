@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { settingsDb } from "../../lib/db/settings";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { STAGES as FALLBACK_STAGES } from "../../types/domain";
+import { qk } from "../../lib/queryKeys";
 import type { StageConfig } from "../../types/domain";
 
 /**
@@ -20,7 +21,7 @@ export function usePipelineStages(): {
 } {
   const wid = useWorkspaceStore((s) => s.activeWorkspace?.id ?? "");
   const q = useQuery({
-    queryKey: ["pipeline-stages", wid],
+    queryKey: qk.pipeline.stages(wid),
     queryFn: () => settingsDb.getPipelineStages(wid),
     enabled: !!wid,
     // Las etapas cambian rara vez — cache largo evita re-fetch innecesario.
@@ -62,10 +63,9 @@ export function usePipelineStages(): {
 /** Helper sync para callers fuera de React (mutaciones). Devuelve la última
  *  query cacheada o el fallback hard-coded. */
 export function getCachedStages(qc: import("@tanstack/react-query").QueryClient, wid: string): StageConfig[] {
-  const rows = qc.getQueryData<import("../../lib/db/types").PipelineStage[]>([
-    "pipeline-stages",
-    wid,
-  ]);
+  const rows = qc.getQueryData<import("../../lib/db/types").PipelineStage[]>(
+    qk.pipeline.stages(wid),
+  );
   if (!rows || rows.length === 0) return FALLBACK_STAGES;
   return rows.map<StageConfig>((r) => ({
     id: r.id,

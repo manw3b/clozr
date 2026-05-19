@@ -10,6 +10,7 @@ import {
   applyVisitTemplate,
 } from "../../lib/visitTemplates";
 import { useUIStore } from "../../store/uiStore";
+import { qk } from "../../lib/queryKeys";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -61,7 +62,7 @@ export function WhatsAppTemplatesSection({ wid }: Props) {
   const { showToast } = useUIStore();
 
   const { data: settings = {} } = useQuery({
-    queryKey: ["workspace-settings", wid, "wa-templates"],
+    queryKey: qk.workspaceSettings.waTemplates(wid),
     queryFn: () => workspaceSettings.getMany(wid, KEYS),
     enabled: !!wid,
   });
@@ -114,7 +115,7 @@ export function WhatsAppTemplatesSection({ wid }: Props) {
         [VISIT_TEMPLATE_KEYS.postSaleDiscount]: postSaleDiscount.trim() || "30",
         [VISIT_TEMPLATE_KEYS.quickOutreach]: templateQuickOutreach,
       });
-      qc.invalidateQueries({ queryKey: ["workspace-settings", wid] });
+      qc.invalidateQueries({ queryKey: qk.workspaceSettings.all(wid) });
       showToast("Plantillas guardadas", "success");
       setDirty(false);
     } catch (e) {

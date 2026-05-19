@@ -14,6 +14,7 @@ import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchAllRates, type DolarRate } from '../lib/dolaresAr';
 import { dolaresArDb } from '../lib/db/dolaresAr';
+import { qk } from '../lib/queryKeys';
 import { workspaceSettings } from '../lib/db/workspaceSettings';
 import { useWorkspaceStore } from './workspaceStore';
 import { useExchangeRateStore } from './exchangeRateStore';
@@ -27,7 +28,7 @@ const REFRESH_INTERVAL_MS = 30 * 60 * 1000;
 /** Trae todas las cotizaciones — combina cache + remote. */
 export function useDolaresAr() {
   return useQuery({
-    queryKey: ['dolaresAr'],
+    queryKey: qk.dolaresAr.rates(),
     queryFn: async (): Promise<DolarRate[]> => {
       try {
         const fresh = await fetchAllRates();
@@ -51,7 +52,7 @@ export function useDolaresAr() {
 /** Timestamp del último fetch exitoso (sirve para "Actualizado hace X"). */
 export function useDolaresLastFetched() {
   return useQuery({
-    queryKey: ['dolaresAr', 'lastFetched'],
+    queryKey: qk.dolaresAr.lastFetched(),
     queryFn: () => dolaresArDb.getLastFetchedAt(),
     refetchInterval: 60_000, // refrescar cada minuto para que el "hace X" se mueva
   });
@@ -62,7 +63,7 @@ export function useActiveDolarKind() {
   const wid = useWorkspaceStore((s) => s.activeWorkspace?.id ?? '');
   const qc = useQueryClient();
   const q = useQuery({
-    queryKey: ['active-dolar-kind', wid],
+    queryKey: qk.dolaresAr.activeKind(wid),
     queryFn: async () => {
       if (!wid) return DEFAULT_ACTIVE;
       const v = await workspaceSettings.get(wid, ACTIVE_KIND_KEY);
@@ -76,7 +77,7 @@ export function useActiveDolarKind() {
       await workspaceSettings.set(wid, ACTIVE_KIND_KEY, kind);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['active-dolar-kind', wid] });
+      qc.invalidateQueries({ queryKey: qk.dolaresAr.activeKind(wid) });
     },
   });
   return {

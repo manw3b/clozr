@@ -11,6 +11,7 @@ import {
 } from '../lib/visitTemplates';
 import { workspaceSettings } from '../lib/db/workspaceSettings';
 import { useWorkspaceStore } from '../store/workspaceStore';
+import { qk } from '../lib/queryKeys';
 
 /**
  * CustomerWaQuickPicker — botón de WhatsApp con popover de 2 opciones para
@@ -79,7 +80,7 @@ export function CustomerWaQuickPicker({
   // que usa WhatsAppTemplatesSection — si el vendedor lo edita allá,
   // este picker se entera por invalidación automática.
   const tplQ = useQuery({
-    queryKey: ['workspace-settings', wid, 'wa-templates'],
+    queryKey: qk.workspaceSettings.waTemplates(wid),
     queryFn: () =>
       workspaceSettings.getMany(wid, [VISIT_TEMPLATE_KEYS.quickOutreach]),
     enabled: !!wid,

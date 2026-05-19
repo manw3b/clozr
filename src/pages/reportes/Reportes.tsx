@@ -10,6 +10,7 @@ import { useExchangeRateStore } from "../../store/exchangeRateStore";
 import { color, radius, space, text, weight } from "../../tokens";
 import { formatMoney } from "../../lib/format";
 import { getTemplateImageUrl } from "../../lib/templates/productImageMap";
+import { qk } from "../../lib/queryKeys";
 
 export function Reportes() {
   const { activeWorkspace } = useWorkspaceStore();
@@ -17,43 +18,43 @@ export function Reportes() {
   const wid = activeWorkspace?.id ?? "";
 
   const metricsQ = useQuery({
-    queryKey: ["reportes", "metrics", wid],
+    queryKey: qk.reportes.metrics(wid),
     queryFn: () => salesDb.getSalesMetrics(wid),
     enabled: !!wid,
   });
 
   const marginQ = useQuery({
-    queryKey: ["reportes", "margin", wid],
+    queryKey: qk.reportes.margin(wid),
     queryFn: () => salesDb.getMarginMetrics(wid),
     enabled: !!wid,
   });
 
   const topCustomersQ = useQuery({
-    queryKey: ["reportes", "top-customers", wid],
+    queryKey: qk.reportes.topCustomers(wid),
     queryFn: () => salesDb.getTopCustomers(wid, 8),
     enabled: !!wid,
   });
 
   const topProductsQ = useQuery({
-    queryKey: ["reportes", "top-products", wid],
+    queryKey: qk.reportes.topProducts(wid),
     queryFn: () => salesDb.getTopProducts(wid, 10, 6),
     enabled: !!wid,
   });
 
   const byCategoryQ = useQuery({
-    queryKey: ["reportes", "by-category", wid],
+    queryKey: qk.reportes.byCategory(wid),
     queryFn: () => salesDb.getMarginByCategory(wid, 6),
     enabled: !!wid,
   });
 
   const byVendorQ = useQuery({
-    queryKey: ["reportes", "by-vendor-margin", wid],
+    queryKey: qk.reportes.byVendorMargin(wid),
     queryFn: () => salesDb.getMarginByVendor(wid),
     enabled: !!wid,
   });
 
   const byMonthQ = useQuery({
-    queryKey: ["reportes", "by-month-margin", wid],
+    queryKey: qk.reportes.byMonthMargin(wid),
     queryFn: () => salesDb.getMarginByMonth(wid, 6),
     enabled: !!wid,
   });

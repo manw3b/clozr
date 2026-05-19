@@ -9,7 +9,7 @@ import { Badge } from "../../../components/Badge";
 import { Stepper } from "../../../components/Stepper";
 import { color, radius, space, text, weight } from "../../../tokens";
 import { formatMoney } from "../../../lib/format";
-import { invalidate } from "../../../lib/queryKeys";
+import { invalidate, qk } from "../../../lib/queryKeys";
 import { useClientsList } from "../../clientes/useClientsData";
 import { paymentMethodsDb } from "../../../lib/db/paymentMethods";
 import { customersDb } from "../../../lib/db/customers";
@@ -170,13 +170,13 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
   const { data: allClients = [] } = useClientsList();
 
   const customerTypesQ = useQuery({
-    queryKey: ["customer-types", wid],
+    queryKey: qk.customerTypes.list(wid),
     queryFn: () => settingsDb.getCustomerTypes(wid),
     enabled: open && !!wid,
   });
 
   const paymentsQ = useQuery({
-    queryKey: ["payment-methods-active", wid],
+    queryKey: qk.paymentMethods.active(wid),
     queryFn: () => paymentMethodsDb.getActive(wid),
     enabled: open && !!wid,
   });
@@ -193,7 +193,7 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
   }, [open, wid, paymentsQ.data, paymentsQ]);
 
   const catalogQ = useQuery({
-    queryKey: ["catalog-items-search", wid],
+    queryKey: qk.catalog.itemsSearch(wid),
     queryFn: () => catalogDb.getAll(wid),
     enabled: open && !!wid,
   });
@@ -787,7 +787,7 @@ function ItemRowEditor({
 
   // Precio sugerido USD del catálogo (sin modificador, sin conversión)
   const priceQ = useQuery({
-    queryKey: ["resolve-price", item.catalogItem?.id, customerType?.id],
+    queryKey: qk.pricing.resolve(item.catalogItem?.id, customerType?.id),
     queryFn: () => {
       if (!item.catalogItem || !customerType) return Promise.resolve({ priceUsd: null, source: "none" as const });
       return pricingDb.resolvePrice(item.catalogItem.id, customerType.id);

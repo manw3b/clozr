@@ -13,6 +13,7 @@ import { useExchangeRateStore } from "../../store/exchangeRateStore";
 import { useAuthStore, canEditPricing, assertCan } from "../../store/authStore";
 import { color, radius, space, text, weight } from "../../tokens";
 import { formatMoney } from "../../lib/format";
+import { qk } from "../../lib/queryKeys";
 import type { CatalogItemWithImeis, CustomerTypeRow } from "../../lib/db/types";
 
 export function CatalogPricingSection({ wid }: { wid: string }) {
@@ -22,7 +23,7 @@ export function CatalogPricingSection({ wid }: { wid: string }) {
   const [editing, setEditing] = useState<CatalogItemWithImeis | null>(null);
 
   const itemsQ = useQuery({
-    queryKey: ["catalog-pricing-list", wid],
+    queryKey: qk.pricing.catalogList(wid),
     queryFn: () => catalogDb.getAll(wid),
     enabled: !!wid && allowed,
   });
@@ -142,13 +143,13 @@ function PricingModal({
   const [prices, setPrices] = useState<Record<string, string>>({});
 
   const typesQ = useQuery({
-    queryKey: ["customer-types", wid],
+    queryKey: qk.customerTypes.list(wid),
     queryFn: () => settingsDb.getCustomerTypes(wid),
     enabled: open && !!wid,
   });
 
   const existingQ = useQuery({
-    queryKey: ["catalog-prices", item?.id],
+    queryKey: qk.pricing.forItem(item?.id),
     queryFn: () => (item ? pricingDb.getCatalogPrices(item.id) : Promise.resolve([])),
     enabled: open && !!item,
   });
@@ -183,9 +184,9 @@ function PricingModal({
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["catalog-pricing-list"] });
-      qc.invalidateQueries({ queryKey: ["catalog-prices"] });
-      qc.invalidateQueries({ queryKey: ["resolve-price"] });
+      qc.invalidateQueries({ queryKey: qk.pricing.catalogListAll() });
+      qc.invalidateQueries({ queryKey: qk.pricing.forItemAll() });
+      qc.invalidateQueries({ queryKey: qk.pricing.resolveAll() });
       showToast("Precios guardados", "success");
       onClose();
     },

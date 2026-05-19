@@ -48,7 +48,7 @@ export function Tareas() {
   }, []);
 
   const { data: tasks = [] } = useQuery({
-    queryKey: qk.tasks(wid),
+    queryKey: qk.tasks.list(wid),
     queryFn: () => tasksDb.getAll(wid),
     enabled: !!wid,
   });
@@ -68,7 +68,7 @@ export function Tareas() {
 
   // Helper para los dos call sites (row delete + context menu delete).
   function undoableDeleteTask(t: DbTask) {
-    const queryKey = qk.tasks(wid);
+    const queryKey = qk.tasks.list(wid);
     const snapshot = qc.getQueryData<DbTask[]>(queryKey);
     qc.setQueryData<DbTask[]>(queryKey, (prev) =>
       prev ? prev.filter((x) => x.id !== t.id) : prev,

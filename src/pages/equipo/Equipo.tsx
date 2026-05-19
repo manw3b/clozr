@@ -22,6 +22,7 @@ import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useAuthStore, assertCan } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import { color, space, text, weight } from "../../tokens";
+import { qk } from "../../lib/queryKeys";
 import type { WorkspaceMember, MemberRole } from "../../lib/db/types";
 
 const ROLE_LABEL: Record<MemberRole, string> = {
@@ -49,7 +50,7 @@ export function Equipo() {
   const [ctxMember, setCtxMember] = useState<WorkspaceMember | null>(null);
 
   const { data: members = [] } = useQuery({
-    queryKey: ["team", wid],
+    queryKey: qk.team.list(wid),
     queryFn: () => teamDb.getMembers(wid),
     enabled: !!wid,
   });
@@ -60,7 +61,7 @@ export function Equipo() {
       return teamDb.removeMember(wid, userId);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["team"] });
+      qc.invalidateQueries({ queryKey: qk.team.all() });
       showToast("Miembro eliminado", "success");
     },
   });
@@ -71,7 +72,7 @@ export function Equipo() {
       return teamDb.updateRole(wid, userId, role);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["team"] });
+      qc.invalidateQueries({ queryKey: qk.team.all() });
       showToast("Rol actualizado", "success");
     },
   });
@@ -286,7 +287,7 @@ function AddMemberModal({
       );
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["team"] });
+      qc.invalidateQueries({ queryKey: qk.team.all() });
       showToast("Miembro agregado", "success");
       setName("");
       setEmail("");

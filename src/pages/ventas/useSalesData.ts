@@ -12,7 +12,7 @@ export function useSalesList() {
   const { activeWorkspace } = useWorkspaceStore();
   const wid = activeWorkspace?.id ?? "";
   return useQuery({
-    queryKey: qk.salesByPeriod(wid, "all"),
+    queryKey: qk.ventas.byPeriod(wid, "all"),
     queryFn: async () => {
       const rows = await salesDb.getRows(wid, "all");
       return rows.map(dbSaleRowToDomain);
@@ -128,7 +128,7 @@ export function useCreateSale() {
     onSuccess: () => {
       invalidate.afterSaleChange(qc);
       // Invalidar followups también
-      qc.invalidateQueries({ queryKey: ["followups"] });
+      qc.invalidateQueries({ queryKey: qk.followups.all() });
     },
   });
 }

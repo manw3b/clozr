@@ -30,6 +30,7 @@ import { groupLeadsByStage } from '../../lib/groupings';
 import { usePipelineLeads, useMoveLead, useSnoozeLead, useAddLeadNote, useScheduleVisit } from './usePipelineData';
 import { ScheduleVisitModal, type ScheduleVisitFormData } from './components/ScheduleVisitModal';
 import { workspaceSettings } from '../../lib/db/workspaceSettings';
+import { qk } from '../../lib/queryKeys';
 import {
   VISIT_TEMPLATE_KEYS,
   DEFAULT_VISIT_TEMPLATES,
@@ -517,7 +518,7 @@ export function Pipeline() {
       // Optimistic: actualizamos la query cache para que el render
       // muestre el orden nuevo de inmediato; persistimos en background.
       const wid = activeWorkspace?.id ?? '';
-      qcGlobal.setQueryData(['pipeline-stages', wid], (old: import('../../lib/db/types').PipelineStage[] | undefined) => {
+      qcGlobal.setQueryData(qk.pipeline.stages(wid), (old: import('../../lib/db/types').PipelineStage[] | undefined) => {
         if (!old) return old;
         const byId = new Map(old.map((r) => [r.id, r]));
         return reordered
@@ -528,17 +529,17 @@ export function Pipeline() {
           .filter((r): r is import('../../lib/db/types').PipelineStage => r !== null);
       });
       // Persistir
-      const cached = qcGlobal.getQueryData<import('../../lib/db/types').PipelineStage[]>(['pipeline-stages', wid]);
+      const cached = qcGlobal.getQueryData<import('../../lib/db/types').PipelineStage[]>(qk.pipeline.stages(wid));
       if (cached) {
         settingsDb
           .savePipelineStages(wid, cached)
           .then(() => {
-            qcGlobal.invalidateQueries({ queryKey: ['pipeline-stages', wid] });
+            qcGlobal.invalidateQueries({ queryKey: qk.pipeline.stages(wid) });
             showToast('Orden de etapas guardado', 'success');
           })
           .catch((err) => {
             showToast(err instanceof Error ? err.message : 'No se pudo guardar', 'error');
-            qcGlobal.invalidateQueries({ queryKey: ['pipeline-stages', wid] });
+            qcGlobal.invalidateQueries({ queryKey: qk.pipeline.stages(wid) });
           });
       }
       return;

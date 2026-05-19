@@ -123,7 +123,7 @@ export function useNotifications() {
   const { activeWorkspace } = useWorkspaceStore();
   const wid = activeWorkspace?.id ?? "";
   return useQuery({
-    queryKey: ["notifications", wid],
+    queryKey: qk.notifications.list(wid),
     queryFn: () => getCounts(wid),
     enabled: !!wid,
     refetchInterval: 5 * 60_000, // refetch cada 5 min

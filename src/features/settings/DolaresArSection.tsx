@@ -9,6 +9,7 @@ import {
 import { DOLAR_KIND_LABELS } from '../../lib/dolaresAr';
 import { useUIStore } from '../../store/uiStore';
 import { formatMoney } from '../../lib/format';
+import { qk } from '../../lib/queryKeys';
 
 const cardStyle: React.CSSProperties = {
   padding: 14,
@@ -42,7 +43,7 @@ export function DolaresArSection() {
   async function handleRefresh() {
     setRefreshing(true);
     try {
-      await qc.invalidateQueries({ queryKey: ['dolaresAr'] });
+      await qc.invalidateQueries({ queryKey: qk.dolaresAr.rates() });
       await refetch();
       showToast('Cotizaciones actualizadas', 'success');
     } catch (e) {

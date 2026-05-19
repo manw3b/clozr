@@ -23,6 +23,7 @@ import { TopExpenseCategories } from './components/TopExpenseCategories';
 import { CashSessionChip } from './components/CashSessionChip';
 import { CloseCashModal } from './components/CloseCashModal';
 import { CASH_CATEGORY_LABELS } from '../../types/domain';
+import { qk } from '../../lib/queryKeys';
 import { space } from '../../tokens';
 import { formatMoney } from '../../lib/format';
 import {
@@ -445,7 +446,7 @@ export function Caja() {
               // memoria (Ingresos/Egresos/Balance se actualizan al toque).
               // Si el usuario apreta Deshacer, restauramos el snapshot.
               const summaryQueries = qc.getQueriesData<CashSummary>({
-                queryKey: ['caja', 'summary'],
+                queryKey: qk.caja.summaryAll(),
               });
               const snapshots = summaryQueries.map(([key, data]) => ({ key, data }));
 

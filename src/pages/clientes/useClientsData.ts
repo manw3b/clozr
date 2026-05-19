@@ -13,7 +13,7 @@ export function useClientsList() {
   const { activeWorkspace } = useWorkspaceStore();
   const wid = activeWorkspace?.id ?? "";
   return useQuery({
-    queryKey: qk.clientsList(wid),
+    queryKey: qk.clientes.list(wid),
     queryFn: async () => {
       const [dbCustomers, lastContactMap] = await Promise.all([
         customersDb.getAll(wid),
@@ -42,7 +42,7 @@ export function useCustomerTags() {
   const { activeWorkspace } = useWorkspaceStore();
   const wid = activeWorkspace?.id ?? "";
   return useQuery({
-    queryKey: ["customer-tags", wid],
+    queryKey: qk.customerTags.list(wid),
     queryFn: () => customerTagsDb.getAll(wid),
     enabled: !!wid,
     staleTime: 60_000,
@@ -57,7 +57,7 @@ export function useSetCustomerTags() {
       customerTagsDb.setForCustomer(customerId, tagIds),
     onSuccess: () => {
       invalidate.afterClientChange(qc);
-      qc.invalidateQueries({ queryKey: ["customer-tags-with-count"] });
+      qc.invalidateQueries({ queryKey: qk.customerTags.withCountAll() });
     },
   });
 }
@@ -69,7 +69,7 @@ export function useClientDetail(clientId: string | null) {
   const wid = activeWorkspace?.id ?? "";
 
   return useQuery({
-    queryKey: qk.clientDetail(wid, clientId),
+    queryKey: qk.clientes.detail(wid, clientId),
     queryFn: async (): Promise<ClientDetail | null> => {
       if (!clientId || !wid) return null;
       const customer = await customersDb.getById(wid, clientId);

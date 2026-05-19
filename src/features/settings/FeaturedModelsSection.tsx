@@ -9,6 +9,7 @@ import { useAuthStore, canEditPricing, assertCan } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import { getTemplateImageUrl, resolveColorImage } from "../../lib/templates/productImageMap";
 import { color, radius, space, text, weight } from "../../tokens";
+import { qk } from "../../lib/queryKeys";
 
 export function FeaturedModelsSection({ wid }: { wid: string }) {
   const role = useAuthStore((s) => s.userRole);
@@ -19,14 +20,14 @@ export function FeaturedModelsSection({ wid }: { wid: string }) {
 
   // Tree para tener categorías + familias para mostrar todos los modelos
   const treeQ = useQuery({
-    queryKey: ["picker-tree", wid],
+    queryKey: qk.picker.tree(wid),
     queryFn: () => getCategoryFamilyTree(wid),
     enabled: allowed && !!wid,
   });
 
   // Set actual de destacados
   const featuredQ = useQuery({
-    queryKey: ["featured-models", wid],
+    queryKey: qk.picker.featuredModels(wid),
     queryFn: () => featuredModelsDb.getAll(wid),
     enabled: allowed && !!wid,
   });
@@ -41,7 +42,7 @@ export function FeaturedModelsSection({ wid }: { wid: string }) {
   }, [treeQ.data]);
 
   const modelsQ = useQuery({
-    queryKey: ["all-models", familyIds.join(",")],
+    queryKey: qk.picker.allModels(familyIds.join(",")),
     queryFn: async () => {
       const out: Array<{
         category: string;
@@ -65,8 +66,8 @@ export function FeaturedModelsSection({ wid }: { wid: string }) {
       return featuredModelsDb.toggle(wid, modelId);
     },
     onSuccess: (isNowFeatured) => {
-      qc.invalidateQueries({ queryKey: ["featured-models", wid] });
-      qc.invalidateQueries({ queryKey: ["picker-tree", wid] });
+      qc.invalidateQueries({ queryKey: qk.picker.featuredModels(wid) });
+      qc.invalidateQueries({ queryKey: qk.picker.tree(wid) });
       showToast(isNowFeatured ? "Marcado como destacado" : "Quitado de destacados", "success");
     },
   });
@@ -77,8 +78,8 @@ export function FeaturedModelsSection({ wid }: { wid: string }) {
       return featuredModelsDb.setFeatured(wid, modelId, c);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["featured-models", wid] });
-      qc.invalidateQueries({ queryKey: ["picker-tree", wid] });
+      qc.invalidateQueries({ queryKey: qk.picker.featuredModels(wid) });
+      qc.invalidateQueries({ queryKey: qk.picker.tree(wid) });
     },
   });
 
@@ -193,7 +194,7 @@ function FeaturedModelCard({
 }) {
   // Cargar colores del modelo solo si el card está destacado (lazy)
   const colorsQ = useQuery({
-    queryKey: ["model-colors", model.id],
+    queryKey: qk.picker.modelColors(model.id),
     queryFn: () => getColorsForModel(model.id),
     enabled: featured,
     staleTime: 5 * 60 * 1000,

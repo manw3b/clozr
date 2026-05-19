@@ -10,6 +10,7 @@ import { PALETTE_LIST, colorCss } from "../../lib/colorPalette";
 import { Button } from "../../components/Button";
 import { Input } from "../../components/Input";
 import { EmptyState } from "../../components/EmptyState";
+import { qk } from "../../lib/queryKeys";
 
 /**
  * CRUD de etiquetas de clientes. Mismo patrón que pipeline stages —
@@ -27,7 +28,7 @@ export function CustomerTagsSection({ wid }: { wid: string }) {
   const allowed = can(role, "manageCustomerTypes");
 
   const tagsQ = useQuery({
-    queryKey: ["customer-tags-with-count", wid],
+    queryKey: qk.customerTags.withCount(wid),
     queryFn: () => customerTagsDb.getAllWithCount(wid),
     enabled: !!wid,
   });
@@ -42,8 +43,8 @@ export function CustomerTagsSection({ wid }: { wid: string }) {
       return customerTagsDb.create(wid, { name: draftName.trim(), color: draftColor });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["customer-tags-with-count"] });
-      qc.invalidateQueries({ queryKey: ["customer-tags"] });
+      qc.invalidateQueries({ queryKey: qk.customerTags.withCountAll() });
+      qc.invalidateQueries({ queryKey: qk.customerTags.all() });
       setDraftName("");
       setCreating(false);
       showToast("Etiqueta creada", "success");
@@ -56,8 +57,8 @@ export function CustomerTagsSection({ wid }: { wid: string }) {
       return customerTagsDb.update(id, patch);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["customer-tags-with-count"] });
-      qc.invalidateQueries({ queryKey: ["customer-tags"] });
+      qc.invalidateQueries({ queryKey: qk.customerTags.withCountAll() });
+      qc.invalidateQueries({ queryKey: qk.customerTags.all() });
     },
   });
 
@@ -69,8 +70,8 @@ export function CustomerTagsSection({ wid }: { wid: string }) {
     // El toast + invalidate vienen vía el undoable. Sólo invalidamos al
     // final por consistencia con otros mutations.
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["customer-tags-with-count"] });
-      qc.invalidateQueries({ queryKey: ["customer-tags"] });
+      qc.invalidateQueries({ queryKey: qk.customerTags.withCountAll() });
+      qc.invalidateQueries({ queryKey: qk.customerTags.all() });
     },
   });
 
@@ -178,7 +179,7 @@ export function CustomerTagsSection({ wid }: { wid: string }) {
               onUpdate={(patch) => updateMut.mutate({ id: t.id, ...patch })}
               onRemove={() => {
                 if (!allowed) return;
-                const queryKey = ["customer-tags-with-count", wid] as const;
+                const queryKey = qk.customerTags.withCount(wid);
                 const snapshot = qc.getQueryData<typeof tags>(queryKey);
                 qc.setQueryData<typeof tags>(queryKey, (prev) =>
                   prev ? prev.filter((x) => x.id !== t.id) : prev,

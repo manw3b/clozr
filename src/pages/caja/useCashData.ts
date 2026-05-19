@@ -48,7 +48,7 @@ export function useCashSummary(period: CashPeriod = "today") {
   const { from, to } = periodRange(period);
 
   return useQuery({
-    queryKey: qk.cashSummary(wid, bid, from, to),
+    queryKey: qk.caja.summary(wid, bid, from, to),
     queryFn: async (): Promise<CashSummary> => {
       const [session, movementsRange, byCurrency] = await Promise.all([
         cashSessionsDb.ensureForDay(wid, bid, today),
@@ -130,7 +130,7 @@ export function useCashSession() {
   const bid = activeBusiness?.id ?? "";
   const today = getTodayISO();
   return useQuery({
-    queryKey: ["caja", "session", wid, bid, today],
+    queryKey: qk.caja.session(wid, bid, today),
     queryFn: () => cashSessionsDb.ensureForDay(wid, bid, today),
     enabled: !!wid && !!bid,
   });
@@ -158,7 +158,7 @@ export function useCloseCashSession() {
       });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["caja"] });
+      qc.invalidateQueries({ queryKey: qk.caja.all() });
     },
   });
 }

@@ -8,6 +8,7 @@ import { pricingDb } from "../../../lib/db/pricing";
 import { ensurePricingSchema } from "../../../lib/db/ensureSchema";
 import { useUIStore } from "../../../store/uiStore";
 import { space } from "../../../tokens";
+import { qk } from "../../../lib/queryKeys";
 import type { CatalogItemWithImeis } from "../../../lib/db/types";
 
 interface Props {
@@ -60,8 +61,8 @@ export function AddProductSimpleModal({ open, onClose, wid, onCreated }: Props) 
       return item;
     },
     onSuccess: (item) => {
-      qc.invalidateQueries({ queryKey: ["inventario"] });
-      qc.invalidateQueries({ queryKey: ["catalog"] });
+      qc.invalidateQueries({ queryKey: qk.inventario.all() });
+      qc.invalidateQueries({ queryKey: qk.catalog.all() });
       showToast("Producto creado", "success");
       const withImeis: CatalogItemWithImeis = {
         ...item,

@@ -14,6 +14,7 @@ import { color, radius, space, text, weight } from "../../../tokens";
 import { formatMoney } from "../../../lib/format";
 import { resolveImageUrl } from "../../../lib/images";
 import { getTemplateImageUrl } from "../../../lib/templates/productImageMap";
+import { qk } from "../../../lib/queryKeys";
 import type { CatalogItemWithImeis } from "../../../lib/db/types";
 
 interface Props {
@@ -49,13 +50,13 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onLoadAnotherVarian
   }, [item?.image_path]);
 
   const imeisQ = useQuery({
-    queryKey: ["catalog-item-imeis", item?.id],
+    queryKey: qk.catalog.itemImeis(item?.id),
     queryFn: () => (item ? catalogDb.getImeisForItem(item.id) : Promise.resolve([])),
     enabled: open && !!item,
   });
 
   const recentQ = useQuery({
-    queryKey: ["catalog-item-recent-sales", item?.id, wid],
+    queryKey: qk.catalog.itemRecentSales(item?.id, wid),
     queryFn: () =>
       item
         ? catalogDb.getRecentSalesForProduct(wid, item.id, 5)
@@ -73,8 +74,8 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onLoadAnotherVarian
       return catalogDb.addImeis(item.id, list);
     },
     onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: ["catalog-item-imeis", item?.id] });
-      qc.invalidateQueries({ queryKey: ["inventario"] });
+      qc.invalidateQueries({ queryKey: qk.catalog.itemImeis(item?.id) });
+      qc.invalidateQueries({ queryKey: qk.inventario.all() });
       showToast(`${res.added} ${res.added === 1 ? "unidad agregada" : "unidades agregadas"}`, "success");
       setImeisText("");
       setAdding(false);
@@ -84,8 +85,8 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onLoadAnotherVarian
   const deleteImeiMut = useMutation({
     mutationFn: (imeiId: string) => catalogDb.deleteImei(imeiId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["catalog-item-imeis", item?.id] });
-      qc.invalidateQueries({ queryKey: ["inventario"] });
+      qc.invalidateQueries({ queryKey: qk.catalog.itemImeis(item?.id) });
+      qc.invalidateQueries({ queryKey: qk.inventario.all() });
       showToast("Unidad eliminada", "success");
     },
   });
@@ -94,7 +95,7 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onLoadAnotherVarian
     mutationFn: ({ id, value }: { id: string; value: string }) =>
       catalogDb.updateImei(id, value),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["catalog-item-imeis", item?.id] });
+      qc.invalidateQueries({ queryKey: qk.catalog.itemImeis(item?.id) });
       showToast("IMEI actualizado", "success");
     },
   });
@@ -109,8 +110,8 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onLoadAnotherVarian
     // Toast e invalidate via el undoable. Sólo invalidamos al final por
     // consistencia con queries derivadas.
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["inventario"] });
-      qc.invalidateQueries({ queryKey: ["catalog"] });
+      qc.invalidateQueries({ queryKey: qk.inventario.all() });
+      qc.invalidateQueries({ queryKey: qk.catalog.all() });
     },
   });
   const registerUndo = useUndoableActions((s) => s.register);
@@ -184,10 +185,11 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onLoadAnotherVarian
                   const target = item;
                   // Optimistic remove: cerramos el drawer + sacamos del cache.
                   // 6 segundos para deshacer.
-                  const queryKeys = [
-                    ["inventario", "catalog", wid] as const,
-                    ["catalog", wid] as const,
-                  ];
+                  // Nota: antes invalidábamos también ["catalog", wid] pero
+                  // ningún useQuery del codebase guarda data en esa key
+                  // exacta (solo qk.inventario.catalog y qk.cmdk.catalog la
+                  // usan como sub-rama). Era un noop, lo sacamos.
+                  const queryKeys = [qk.inventario.catalog(wid)];
                   const snapshots = queryKeys.map((k) => ({
                     key: k,
                     data: qc.getQueryData(k),

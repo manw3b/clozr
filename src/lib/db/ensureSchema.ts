@@ -676,10 +676,36 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
   await safe(() => dbExecute(`ALTER TABLE pipeline_items ADD COLUMN visit_at TEXT`));
 }
 
+/**
+ * Patrones de error de SQLite que son ESPERADOS cuando el replayer corre
+ * sobre una DB que ya tiene parte del schema aplicado. Son benignos: la
+ * tabla/columna/índice ya existe, no hay nada que hacer.
+ *
+ * Cualquier otro error (typo de SQL, FK rota, syntax, columna sin tipo,
+ * etc.) se relanza para que el arranque falle ruidosamente. Esa es
+ * exactamente la señal que queremos: si introducís una migración nueva
+ * mal escrita, te enterás al primer boot, no semanas después cuando un
+ * query random tire "no such column".
+ */
+const EXPECTED_SQLITE_NOOPS = [
+  /duplicate column name/i,
+  /table .* already exists/i,
+  /index .* already exists/i,
+  /trigger .* already exists/i,
+  /view .* already exists/i,
+];
+
+function isExpectedNoop(message: string): boolean {
+  return EXPECTED_SQLITE_NOOPS.some((re) => re.test(message));
+}
+
 async function safe(fn: () => Promise<unknown>) {
   try {
     await fn();
-  } catch {
-    // SQLite tira "duplicate column name" o "table already exists" — ignoramos
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (isExpectedNoop(msg)) return;
+    // Bug real: relanzamos para que el arranque falle visible.
+    throw new Error(`[ensureSchema] SQL inesperado falló: ${msg}`);
   }
 }

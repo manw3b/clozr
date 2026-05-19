@@ -27,6 +27,7 @@ import { ensurePricingSchema } from "../../../lib/db/ensureSchema";
 import { useUIStore } from "../../../store/uiStore";
 import { getTemplateImageUrl, categoryEmoji, resolveColorImage } from "../../../lib/templates/productImageMap";
 import { color, radius, space, text, weight } from "../../../tokens";
+import { qk } from "../../../lib/queryKeys";
 import type { CatalogItemWithImeis } from "../../../lib/db/types";
 
 interface Props {
@@ -101,7 +102,7 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
 
   // Cargar tipos de cliente cuando llegamos al confirm
   const customerTypesQ = useQuery({
-    queryKey: ["customer-types", wid],
+    queryKey: qk.customerTypes.list(wid),
     queryFn: () => settingsDb.getCustomerTypes(wid),
     enabled: open && !!wid,
   });
@@ -118,45 +119,45 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
 
   // Tree de categoría → familia con representative model image
   const treeQ = useQuery({
-    queryKey: ["picker-tree", wid],
+    queryKey: qk.picker.tree(wid),
     queryFn: () => getCategoryFamilyTree(wid),
     enabled: open && !!wid,
   });
 
   const categoriesQ = useQuery({
-    queryKey: ["picker-categories"],
+    queryKey: qk.picker.categories(),
     queryFn: getCategories,
     enabled: open,
   });
 
   const familiesQ = useQuery({
-    queryKey: ["picker-families", picked.category?.id],
+    queryKey: qk.picker.families(picked.category?.id),
     queryFn: () => (picked.category ? getFamilies(picked.category.id) : Promise.resolve([])),
     enabled: open && !!picked.category,
   });
 
   // Set de modelos destacados del workspace
   const featuredQ = useQuery({
-    queryKey: ["featured-models", wid],
+    queryKey: qk.picker.featuredModels(wid),
     queryFn: () => featuredModelsDb.getAll(wid),
     enabled: open && !!wid,
   });
   const featuredMap = featuredQ.data ?? new Map<string, string | null>();
 
   const modelsQ = useQuery({
-    queryKey: ["picker-models", picked.family?.id],
+    queryKey: qk.picker.models(picked.family?.id),
     queryFn: () => (picked.family ? getModels(picked.family.id) : Promise.resolve([])),
     enabled: open && !!picked.family,
   });
 
   const colorsQ = useQuery({
-    queryKey: ["picker-colors", picked.model?.id],
+    queryKey: qk.picker.pickerColors(picked.model?.id),
     queryFn: () => (picked.model ? getColorsForModel(picked.model.id) : Promise.resolve([])),
     enabled: open && !!picked.model,
   });
 
   const storagesQ = useQuery({
-    queryKey: ["picker-storages", picked.model?.id, picked.color],
+    queryKey: qk.picker.storages(picked.model?.id, picked.color),
     queryFn: () =>
       picked.model && picked.color
         ? getStorageForColor(picked.model.id, picked.color)
@@ -232,10 +233,10 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
       return { item, addedImeis: added };
     },
     onSuccess: ({ item, addedImeis }) => {
-      qc.invalidateQueries({ queryKey: ["inventario"] });
-      qc.invalidateQueries({ queryKey: ["catalog"] });
-      qc.invalidateQueries({ queryKey: ["catalog-item-imeis", item.id] });
-      qc.invalidateQueries({ queryKey: ["picker-tree", wid] });
+      qc.invalidateQueries({ queryKey: qk.inventario.all() });
+      qc.invalidateQueries({ queryKey: qk.catalog.all() });
+      qc.invalidateQueries({ queryKey: qk.catalog.itemImeis(item.id) });
+      qc.invalidateQueries({ queryKey: qk.picker.tree(wid) });
       const msg = addedImeis > 0
         ? `Producto creado · ${addedImeis} ${addedImeis === 1 ? "unidad cargada" : "unidades cargadas"}`
         : "Producto creado";

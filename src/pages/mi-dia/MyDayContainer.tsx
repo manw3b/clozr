@@ -43,37 +43,37 @@ export function MyDayContainer() {
   const today = getTodayISO();
 
   const tasksQ = useQuery({
-    queryKey: qk.tasks(wid),
+    queryKey: qk.tasks.list(wid),
     queryFn: () => tasksDb.getAll(wid),
     enabled: !!wid,
   });
 
   const followupsQ = useQuery({
-    queryKey: qk.followupsForDay(wid, bid, today),
+    queryKey: qk.followups.forDay(wid, bid, today),
     queryFn: () => followupsDb.getForDay(wid, bid, today),
     enabled: !!wid && !!bid,
   });
 
   const salesTodayQ = useQuery({
-    queryKey: qk.salesByPeriod(wid, "today"),
+    queryKey: qk.ventas.byPeriod(wid, "today"),
     queryFn: () => salesDb.getRows(wid, "today"),
     enabled: !!wid,
   });
 
   const pendingCobrosQ = useQuery({
-    queryKey: qk.pendingCobros(wid),
+    queryKey: qk.ventas.pendingCobros(wid),
     queryFn: () => salesDb.getPendingCobros(wid, 5),
     enabled: !!wid,
   });
 
   const customersQ = useQuery({
-    queryKey: qk.clientsList(wid),
+    queryKey: qk.clientes.list(wid),
     queryFn: () => customersDb.getAll(wid),
     enabled: !!wid,
   });
 
   const scoreQ = useQuery({
-    queryKey: qk.dayScore(wid),
+    queryKey: qk.miDia.score(wid),
     queryFn: () => scoreDb.calculateDayScore(wid),
     enabled: !!wid,
     refetchInterval: 60_000,
@@ -86,16 +86,16 @@ export function MyDayContainer() {
       await tasksDb.toggleComplete(id, t.completed === 0);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.tasks(wid) });
-      qc.invalidateQueries({ queryKey: qk.dayScore(wid) });
+      qc.invalidateQueries({ queryKey: qk.tasks.list(wid) });
+      qc.invalidateQueries({ queryKey: qk.miDia.score(wid) });
     },
   });
 
   const markPaidMut = useMutation({
     mutationFn: (saleId: string) => salesDb.markAsPaid(saleId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["mi-dia"] });
-      qc.invalidateQueries({ queryKey: ["ventas"] });
+      qc.invalidateQueries({ queryKey: qk.miDia.all() });
+      qc.invalidateQueries({ queryKey: qk.ventas.all() });
     },
   });
 
@@ -125,7 +125,7 @@ export function MyDayContainer() {
     },
     onSuccess: () => {
       showToast("Objetivo actualizado", "success");
-      qc.invalidateQueries({ queryKey: qk.dayScore(wid) });
+      qc.invalidateQueries({ queryKey: qk.miDia.score(wid) });
     },
     onError: (err) => {
       showToast(err instanceof Error ? err.message : "Error al guardar", "error");

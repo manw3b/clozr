@@ -13,7 +13,7 @@ export function usePipelineLeads() {
   const { activeWorkspace } = useWorkspaceStore();
   const wid = activeWorkspace?.id ?? "";
   return useQuery({
-    queryKey: qk.pipelineLeads(wid),
+    queryKey: qk.pipeline.leads(wid),
     queryFn: async () => {
       const items = await pipelineDb.getAll(wid);
       return items.map(dbItemToLead);
@@ -40,7 +40,7 @@ export function useMoveLead() {
 
       // Auto-followup según la nueva etapa. Best-effort: si falla no
       // queremos romper el move (la persistencia del stage ya está hecha).
-      const lead = qc.getQueryData<Lead[]>(qk.pipelineLeads(wid))?.find((l) => l.id === leadId);
+      const lead = qc.getQueryData<Lead[]>(qk.pipeline.leads(wid))?.find((l) => l.id === leadId);
       if (lead && lead.clientId && bid) {
         const cfg = followupForStage(newStage, lead.clientName);
         if (cfg) {
@@ -51,9 +51,9 @@ export function useMoveLead() {
       }
     },
     onMutate: async ({ leadId, newStage }) => {
-      await qc.cancelQueries({ queryKey: qk.pipelineLeads(wid) });
-      const prev = qc.getQueryData<Lead[]>(qk.pipelineLeads(wid));
-      qc.setQueryData<Lead[]>(qk.pipelineLeads(wid), (old) =>
+      await qc.cancelQueries({ queryKey: qk.pipeline.leads(wid) });
+      const prev = qc.getQueryData<Lead[]>(qk.pipeline.leads(wid));
+      qc.setQueryData<Lead[]>(qk.pipeline.leads(wid), (old) =>
         old?.map((l) =>
           l.id === leadId ? { ...l, stage: newStage, stageChangedAt: new Date().toISOString() } : l,
         ),
@@ -61,7 +61,7 @@ export function useMoveLead() {
       return { prev };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) qc.setQueryData(qk.pipelineLeads(wid), ctx.prev);
+      if (ctx?.prev) qc.setQueryData(qk.pipeline.leads(wid), ctx.prev);
     },
     onSettled: () => invalidate.afterLeadChange(qc),
   });
@@ -76,7 +76,7 @@ export function useSnoozeLead() {
   return useMutation({
     mutationFn: async ({ leadId, days }: { leadId: string; days: number }) => {
       // Lead actual (para preservar la hora si ya había)
-      const cur = qc.getQueryData<Lead[]>(qk.pipelineLeads(wid))?.find((l) => l.id === leadId);
+      const cur = qc.getQueryData<Lead[]>(qk.pipeline.leads(wid))?.find((l) => l.id === leadId);
       const target = new Date();
       if (cur?.nextActionAt) {
         const prev = new Date(cur.nextActionAt);

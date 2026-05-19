@@ -15,6 +15,7 @@ import { CustomerTagsSection } from "./CustomerTagsSection";
 import { WhatsAppTemplatesSection } from "./WhatsAppTemplatesSection";
 import { DolaresArSection } from "./DolaresArSection";
 import { AboutSection } from "./AboutSection";
+import { qk } from "../../lib/queryKeys";
 import type { PipelineStage, CustomerTypeRow } from "../../lib/db/types";
 // Paleta unificada — la misma que usa el kanban del pipeline para el
 // color de cada etapa. Cualquier cambio acá se refleja allá.
@@ -453,7 +454,7 @@ function PipelineSection({ wid }: { wid: string }) {
   const [saving, setSaving] = useState(false);
 
   const { data: dbStages = [] } = useQuery({
-    queryKey: ["pipeline-stages", wid],
+    queryKey: qk.pipeline.stages(wid),
     queryFn: () => settingsDb.getPipelineStages(wid),
     enabled: !!wid,
   });
@@ -690,7 +691,7 @@ function CustomerTypesSection({ wid }: { wid: string }) {
   const [saving, setSaving] = useState(false);
 
   const { data: dbTypes = [] } = useQuery({
-    queryKey: ["customer-types", wid],
+    queryKey: qk.customerTypes.list(wid),
     queryFn: () => settingsDb.getCustomerTypes(wid),
     enabled: !!wid,
   });

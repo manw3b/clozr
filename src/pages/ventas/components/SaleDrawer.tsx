@@ -17,6 +17,7 @@ import { formatMoney, formatRelative, formatDateLong, formatTime } from '../../.
 import { salesDb } from '../../../lib/db/sales';
 import type { Sale, SaleStatus, PaymentMethod } from '../../../types/domain';
 import { PAYMENT_METHOD_LABELS } from '../../../types/domain';
+import { qk } from '../../../lib/queryKeys';
 import type { SaleItem } from '../../../lib/db/types';
 
 interface SaleDrawerProps {
@@ -42,11 +43,11 @@ export function SaleDrawer({
     sale.status !== 'paid' && sale.dueAt && new Date(sale.dueAt).getTime() < Date.now();
 
   const itemsQ = useQuery({
-    queryKey: ['sale-items', sale.id],
+    queryKey: qk.ventas.saleItems(sale.id),
     queryFn: () => salesDb.getItems(sale.id),
   });
   const paymentsQ = useQuery({
-    queryKey: ['sale-payments', sale.id],
+    queryKey: qk.ventas.salePayments(sale.id),
     queryFn: () => salesDb.getPayments(sale.id),
   });
 

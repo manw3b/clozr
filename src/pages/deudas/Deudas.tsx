@@ -21,7 +21,7 @@ import { salesDb } from "../../lib/db/sales";
 import { customersDb } from "../../lib/db/customers";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useUIStore } from "../../store/uiStore";
-import { invalidate } from "../../lib/queryKeys";
+import { invalidate, qk } from "../../lib/queryKeys";
 import { color, space, text, weight } from "../../tokens";
 import { formatMoney } from "../../lib/format";
 import { exportToCsv, timestamp } from "../../lib/exportCsv";
@@ -49,7 +49,7 @@ export function Deudas() {
   const recordContactMut = useRecordContact();
 
   const { data: pendingSales = [] } = useQuery({
-    queryKey: ["deudas", "all", wid],
+    queryKey: qk.deudas.list(wid),
     queryFn: async () => {
       const sales = await salesDb.getAll(wid);
       return sales.filter((s) => s.is_paid === 0 && s.balance > 0);
@@ -59,7 +59,7 @@ export function Deudas() {
 
   // Need phones — fetch customers once
   const { data: allCustomers = [] } = useQuery({
-    queryKey: ["deudas", "customers", wid],
+    queryKey: qk.deudas.customers(wid),
     queryFn: () => customersDb.getAll(wid),
     enabled: !!wid,
   });
@@ -68,7 +68,7 @@ export function Deudas() {
     mutationFn: (saleId: string) => salesDb.markAsPaid(saleId),
     onSuccess: () => {
       invalidate.afterSaleChange(qc);
-      qc.invalidateQueries({ queryKey: ["deudas"] });
+      qc.invalidateQueries({ queryKey: qk.deudas.all() });
       showToast("Cobrado", "success");
     },
   });

@@ -30,6 +30,7 @@ import { AddProductSimpleModal } from "./components/AddProductSimpleModal";
 import { VisualProductPicker } from "./components/VisualProductPicker";
 import { NewSaleModal, type NewSalePreset } from "../ventas/components/NewSaleModal";
 import { useCreateSale } from "../ventas/useSalesData";
+import { qk } from "../../lib/queryKeys";
 
 type StockFilter = "todos" | "disponibles" | "agotados";
 
@@ -53,13 +54,13 @@ export function Inventario() {
   const createSaleMut = useCreateSale();
 
   const productsQ = useQuery({
-    queryKey: ["inventario", "catalog", wid],
+    queryKey: qk.inventario.catalog(wid),
     queryFn: () => catalogDb.getAll(wid),
     enabled: !!wid,
   });
 
   const summaryQ = useQuery({
-    queryKey: ["inventario", "summary", wid],
+    queryKey: qk.inventario.summary(wid),
     queryFn: () => catalogDb.getInventorySummary(wid),
     enabled: !!wid,
   });
@@ -69,7 +70,7 @@ export function Inventario() {
   // todavía no agregó al catálogo — así "Agotados" responde a la pregunta
   // "¿qué iPhone podría tener para vender pero no tengo?".
   const iphoneTemplatesQ = useQuery({
-    queryKey: ["inventario", "iphone-templates"],
+    queryKey: qk.inventario.iphoneTemplates(),
     queryFn: () => getAllModelsByCategory("cat-iphone"),
     enabled: filter === "agotados",
     staleTime: 1000 * 60 * 60, // los templates no cambian, cache 1h

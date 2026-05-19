@@ -15,7 +15,7 @@ import { useUIStore } from "../../../store/uiStore";
 import { useWorkspaceStore } from "../../../store/workspaceStore";
 import { useAuthStore } from "../../../store/authStore";
 import { useClientsList } from "../../clientes/useClientsData";
-import { invalidate } from "../../../lib/queryKeys";
+import { invalidate, qk } from "../../../lib/queryKeys";
 import { color, radius, space, text, weight } from "../../../tokens";
 import type {
   Client,
@@ -88,7 +88,7 @@ export function NewLeadModal({ open, onClose, initialStage = "prospecto" }: Prop
 
   // Catálogo del workspace para sugerir productos al tipear.
   const { data: catalogItems = [] } = useQuery({
-    queryKey: ["catalog-for-leads", wid],
+    queryKey: qk.catalog.forLeads(wid),
     queryFn: () => catalogDb.getAll(wid),
     enabled: open && !!wid,
     staleTime: 60_000,

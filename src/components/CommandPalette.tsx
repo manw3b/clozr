@@ -19,6 +19,7 @@ import { useUIStore, type ScreenId } from "../store/uiStore";
 import { color, radius, space, text, weight } from "../tokens";
 import { formatMoney } from "../lib/format";
 import { getTemplateImageUrl } from "../lib/templates/productImageMap";
+import { qk } from "../lib/queryKeys";
 
 type ResultKind = "client" | "sale" | "lead" | "product" | "shortcut";
 
@@ -87,25 +88,25 @@ export function CommandPalette() {
 
   // Index data when palette is open
   const customersQ = useQuery({
-    queryKey: ["cmdk", "customers", wid],
+    queryKey: qk.cmdk.customers(wid),
     queryFn: () => customersDb.getAll(wid),
     enabled: open && !!wid,
     staleTime: 60_000,
   });
   const salesQ = useQuery({
-    queryKey: ["cmdk", "sales", wid],
+    queryKey: qk.cmdk.sales(wid),
     queryFn: () => salesDb.getRecent(wid, 30),
     enabled: open && !!wid,
     staleTime: 60_000,
   });
   const leadsQ = useQuery({
-    queryKey: ["cmdk", "leads", wid],
+    queryKey: qk.cmdk.leads(wid),
     queryFn: () => pipelineDb.getAll(wid),
     enabled: open && !!wid,
     staleTime: 60_000,
   });
   const catalogQ = useQuery({
-    queryKey: ["cmdk", "catalog", wid],
+    queryKey: qk.cmdk.catalog(wid),
     queryFn: () => catalogDb.getAll(wid),
     enabled: open && !!wid,
     staleTime: 60_000,

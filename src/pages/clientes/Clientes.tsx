@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, Plus, MoreHorizontal, Users, Download, Upload, Tag as TagIcon, ChevronDown } from 'lucide-react';
+import { Search, Plus, MoreHorizontal, Users, Download, Upload, Tag as TagIcon, ChevronDown, DollarSign } from 'lucide-react';
 import { colorCss } from '../../lib/colorPalette';
 import { PageHeader } from '../../components/PageHeader';
 import { Button } from '../../components/Button';
@@ -16,15 +16,17 @@ import {
   useContextMenu,
 } from '../../components/ContextMenu';
 import { WhatsAppIcon } from '../../components/icons/WhatsAppIcon';
-import { Phone, Pencil, Trash2, ShoppingCart, Mail, Copy } from 'lucide-react';
+import { Phone, Pencil, Trash2, Mail, Copy } from 'lucide-react';
 import { EmptyState } from '../../components/EmptyState';
 import { DataTable, applySort, ColumnDef } from '../../components/data-table';
-import { RowActions } from '../../components/data-table/RowActions';
 import { ClientDrawer } from './components/ClientDrawer';
 import { BulkActionBar } from './components/BulkActionBar';
 import { useClientsList, useClientDetail, useDeleteClients, useRecordContact, useCustomerTags } from './useClientsData';
 import { ClientFormModal } from './components/ClientFormModal';
 import { ImportClientsModal } from './components/ImportClientsModal';
+import { NewSaleModal } from '../ventas/components/NewSaleModal';
+import { useCreateSale } from '../ventas/useSalesData';
+import { CustomerWaQuickPicker } from '../../components/CustomerWaQuickPicker';
 import { useUIStore } from '../../store/uiStore';
 import { openWhatsApp, openTel, openMail } from '../../lib/openExternal';
 import { exportToCsv as exportCsv, timestamp as csvTimestamp } from '../../lib/exportCsv';
@@ -69,7 +71,12 @@ export function Clientes() {
   const [formOpen, setFormOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const { setActiveScreen, showToast } = useUIStore();
+  // Cierre rápido: cuando es no-null, abrimos NewSaleModal con preset.client.
+  // Disparado desde el botón $ de la fila, del context menu y del footer del
+  // drawer — todas son la misma acción mental: "venta para ESTE cliente".
+  const [saleClient, setSaleClient] = useState<Client | null>(null);
+  const { showToast } = useUIStore();
+  const createSaleMut = useCreateSale();
 
   // Context menu (right-click) state — sostiene el client objetivo y la
   // posición. Se cierra al elegir cualquier item o click outside.
@@ -157,6 +164,64 @@ export function Clientes() {
     });
   }, [clientsData, search, typeFilter, statusFilter, tagFilter]);
 
+  /* ---------- Columns con actions (cierre rápido + WA picker) ---------- */
+  // Mergeamos las columnas base con una columna de actions que tiene closure
+  // sobre las setters del componente (saleClient, recordContact, etc.). Las
+  // columnas base están a nivel módulo para que applySort las pueda usar.
+  const columns = useMemo<ColumnDef<Client>[]>(
+    () => [
+      ...baseColumns,
+      {
+        id: 'actions',
+        header: '',
+        width: '150px',
+        align: 'right',
+        cell: (c) => (
+          <div
+            className="row-quick-actions"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CustomerWaQuickPicker
+              client={{ id: c.id, name: c.name, phone: c.phone ?? null }}
+              variant="small"
+              onSend={(body) => {
+                if (!c.phone) return;
+                openWhatsApp(c.phone, body);
+                recordContactMut.mutate({ customerId: c.id, kind: 'whatsapp' });
+              }}
+            />
+            <RowIconBtn
+              ariaLabel="Llamar"
+              disabled={!c.phone}
+              onClick={() => {
+                if (!c.phone) return;
+                openTel(c.phone);
+                recordContactMut.mutate({ customerId: c.id, kind: 'call' });
+              }}
+            >
+              <Phone size={13} strokeWidth={2.2} color="var(--text-muted)" />
+            </RowIconBtn>
+            <RowIconBtn
+              ariaLabel="Nueva venta"
+              tone="success"
+              onClick={() => setSaleClient(c)}
+            >
+              <DollarSign size={13} strokeWidth={2.4} color="var(--success)" />
+            </RowIconBtn>
+            <RowIconBtn
+              ariaLabel="Más"
+              onClick={() => setOpenClientId(c.id)}
+            >
+              <MoreHorizontal size={14} strokeWidth={2.2} color="var(--text-muted)" />
+            </RowIconBtn>
+          </div>
+        ),
+      },
+    ],
+    [recordContactMut],
+  );
+
   /* ---------- Sort ---------- */
   const sortedRows = useMemo(() => {
     return applySort(filtered, columns, sort, (row, columnId) => {
@@ -178,7 +243,7 @@ export function Clientes() {
           return '';
       }
     });
-  }, [filtered, sort]);
+  }, [filtered, sort, columns]);
 
   /* ---------- Drawer ---------- */
   const openClient = openClientDetail ?? null;
@@ -324,7 +389,7 @@ export function Clientes() {
               recordContactMut.mutate({ customerId: openClient.id, kind: "email" });
             }
           }}
-          onNewSale={() => setActiveScreen("sales")}
+          onNewSale={() => setSaleClient(openClient)}
           onEdit={() => { setEditingClient(openClient); setFormOpen(true); }}
           onMarkPaid={() => {}}
         />
@@ -339,6 +404,21 @@ export function Clientes() {
       <ImportClientsModal
         open={importOpen}
         onClose={() => setImportOpen(false)}
+      />
+
+      {/* Cierre rápido desde Clientes: preset.client viene seteado, el resto
+          (producto + precio + pago) lo completa el vendedor. */}
+      <NewSaleModal
+        open={!!saleClient}
+        onClose={() => setSaleClient(null)}
+        preset={saleClient ? { client: saleClient } : null}
+        onSubmit={async (data) => {
+          await createSaleMut.mutateAsync(data);
+          showToast(
+            data.outOfStock ? 'Venta fuera de stock registrada' : 'Venta registrada',
+            'success',
+          );
+        }}
       />
 
       {/* Context menu (click derecho en una fila) */}
@@ -409,9 +489,9 @@ export function Clientes() {
           </ContextMenuItem>
           <ContextMenuDivider />
           <ContextMenuItem
-            icon={<ShoppingCart size={14} />}
+            icon={<DollarSign size={14} color="var(--success)" />}
             onClick={() => {
-              setOpenClientId(ctxClient.id);
+              setSaleClient(ctxClient);
               ctxMenu.close();
             }}
           >
@@ -452,7 +532,7 @@ export function Clientes() {
  *  Definición de columnas
  * ============================================================ */
 
-const columns: ColumnDef<Client>[] = [
+const baseColumns: ColumnDef<Client>[] = [
   {
     id: 'name',
     header: 'Cliente',
@@ -597,24 +677,57 @@ const columns: ColumnDef<Client>[] = [
         <span style={{ color: color.textDim, fontSize: text.sm }}>—</span>
       ),
   },
-  {
-    id: 'actions',
-    header: '',
-    width: '60px',
-    align: 'right',
-    cell: () => (
-      <RowActions
-        actions={[
-          {
-            icon: <MoreHorizontal size={14} strokeWidth={2.2} />,
-            label: 'Abrir',
-            onClick: () => {}, // Row click ya abre el drawer; este botón es decorativo
-          },
-        ]}
-      />
-    ),
-  },
+  // La columna 'actions' se inyecta dentro del componente para que tenga
+  // closure sobre los setters de venta rápida y el record-contact mut.
 ];
+
+/* ============================================================
+ *  RowIconBtn — botón cuadrado 26×26 para acciones de fila
+ * ============================================================ */
+
+interface RowIconBtnProps {
+  children: React.ReactNode;
+  ariaLabel: string;
+  onClick: () => void;
+  disabled?: boolean;
+  /** 'success' tinta el hover bg en verde (botón $). */
+  tone?: 'neutral' | 'success';
+}
+
+function RowIconBtn({ children, ariaLabel, onClick, disabled, tone = 'neutral' }: RowIconBtnProps) {
+  const hoverBg = tone === 'success' ? 'var(--success-bg)' : 'var(--surface-hover)';
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!disabled) onClick();
+      }}
+      disabled={disabled}
+      style={{
+        width: 26,
+        height: 26,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 6,
+        background: 'transparent',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: 'background 100ms',
+        opacity: disabled ? 0.4 : 1,
+      }}
+      onMouseEnter={(e) => {
+        if (!disabled) e.currentTarget.style.background = hoverBg;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent';
+      }}
+    >
+      {children}
+    </button>
+  );
+}
 
 function typeBadgeTone(type: ClientType): 'neutral' | 'info' | 'primary' | 'warning' {
   switch (type) {

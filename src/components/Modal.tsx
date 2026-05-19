@@ -189,24 +189,15 @@ export function Modal({
             <button
               onClick={() => attemptClose(true)}
               aria-label="Cerrar"
+              className="modal-close"
               style={{
                 width: 28,
                 height: 28,
                 borderRadius: radius.sm,
-                color: color.textMuted,
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: 'all 100ms',
                 flexShrink: 0,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = color.surfaceHover;
-                e.currentTarget.style.color = color.text;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = color.textMuted;
               }}
             >
               <X size={16} strokeWidth={2.2} />

@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode } from 'react';
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { color, radius, text, weight } from '../../tokens';
 
@@ -158,20 +158,15 @@ export function DataTable<T>({
               {col.sortable ? (
                 <button
                   onClick={() => handleSortClick(col.id)}
+                  className={`dt-sort-btn${isSorted ? ' sorted' : ''}`}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 4,
-                    color: isSorted ? color.text : color.textMuted,
                     fontWeight: weight.semibold,
                     fontSize: text.xs,
                     textTransform: 'uppercase',
                     letterSpacing: '0.6px',
-                    transition: 'color 100ms',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = color.text)}
-                  onMouseLeave={(e) => {
-                    if (!isSorted) e.currentTarget.style.color = color.textMuted;
                   }}
                 >
                   {col.header}
@@ -294,32 +289,21 @@ function Row({
   onContextMenu?: (e: React.MouseEvent) => void;
   isLast: boolean;
 }) {
-  const [hover, setHover] = useState(false);
-
-  const baseBg = isActive
-    ? color.primaryBg
-    : isSelected
-    ? 'rgba(225, 29, 72, 0.06)'
-    : hover
-    ? color.surfaceHover
-    : 'transparent';
+  const rowClass = `dt-row${isActive ? ' active' : ''}${isSelected ? ' selected' : ''}`;
 
   return (
     <div
       role="row"
       onClick={onClick}
       onContextMenu={onContextMenu}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className={rowClass}
       style={{
         display: 'grid',
         gridTemplateColumns: gridTemplate,
         alignItems: 'center',
         height,
-        background: baseBg,
         borderBottom: isLast ? 'none' : `1px solid ${color.border}`,
         cursor: onClick ? 'pointer' : 'default',
-        transition: 'background 100ms',
         position: 'relative',
         // Skip rendering off-screen rows. Es ~70% del beneficio de
         // virtualización con cero código JS — el browser hace lazy
@@ -386,32 +370,17 @@ interface CheckboxProps {
 }
 
 function Checkbox({ checked, indeterminate, onChange, onClick, ...rest }: CheckboxProps) {
-  const [hover, setHover] = useState(false);
   const filled = checked || indeterminate;
 
   return (
     <button
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
       onClick={(e) => {
         if (onClick) onClick(e);
         else onChange?.();
       }}
       role="checkbox"
       aria-checked={indeterminate ? 'mixed' : checked}
-      style={{
-        width: 18,
-        height: 18,
-        borderRadius: 4,
-        border: `1.5px solid ${filled ? color.primary : hover ? color.borderStrong : color.border}`,
-        background: filled ? color.primary : 'transparent',
-        color: '#FFFFFF',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        transition: 'all 100ms',
-        flexShrink: 0,
-      }}
+      className={`dt-checkbox${filled ? ' filled' : ''}`}
       {...rest}
     >
       {indeterminate ? (

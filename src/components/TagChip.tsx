@@ -50,6 +50,7 @@ export function TagChip({
             onRemove();
           }}
           aria-label={`Quitar ${tag.name}`}
+          className="tag-chip-close"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -58,14 +59,9 @@ export function TagChip({
             height: 12,
             padding: 0,
             color: css,
-            opacity: 0.7,
-            cursor: 'pointer',
-            background: 'transparent',
             fontSize: 14,
             lineHeight: 1,
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
         >
           ×
         </button>

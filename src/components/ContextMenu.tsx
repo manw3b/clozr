@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { color, radius, space, text, weight, duration, ease } from "../tokens";
+import { color, radius, space, text, weight } from "../tokens";
 
 /**
  * ContextMenu reusable — reemplaza el menu nativo del WebView con uno
@@ -135,7 +135,6 @@ export function ContextMenuItem({
   disabled?: boolean;
 }) {
   const c = tone === "danger" ? color.danger : color.text;
-  const hoverBg = tone === "danger" ? color.dangerBg : color.surfaceHover;
   return (
     <button
       role="menuitem"
@@ -143,27 +142,19 @@ export function ContextMenuItem({
         if (!disabled) onClick();
       }}
       disabled={disabled}
+      className={`ctx-item${tone === "danger" ? " danger" : ""}`}
       style={{
         display: "flex",
         alignItems: "center",
         gap: space[2],
         padding: `7px ${space[3]}`,
-        background: "transparent",
         color: c,
         fontSize: text.sm,
         fontWeight: weight.medium,
         textAlign: "left",
         borderRadius: radius.sm,
-        cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.5 : 1,
-        transition: `background ${duration.fast} ${ease}`,
         width: "100%",
-      }}
-      onMouseEnter={(e) => {
-        if (!disabled) e.currentTarget.style.background = hoverBg;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "transparent";
       }}
     >
       {icon && (

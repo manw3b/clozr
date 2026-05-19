@@ -24,27 +24,12 @@ export function Card({
     ...style,
   };
 
-  if (interactive) {
-    return (
-      <div
-        style={baseStyle}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = 'var(--border-strong)';
-          e.currentTarget.style.background = 'var(--surface-hover)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = 'var(--border)';
-          e.currentTarget.style.background = 'var(--surface)';
-        }}
-        {...rest}
-      >
-        {children}
-      </div>
-    );
-  }
-
   return (
-    <div style={baseStyle} {...rest}>
+    <div
+      style={baseStyle}
+      className={interactive ? 'card-hoverable' : undefined}
+      {...rest}
+    >
       {children}
     </div>
   );

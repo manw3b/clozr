@@ -118,23 +118,14 @@ export function Sidebar({ active, onNavigate, collapsed, onToggleCollapse, user,
             onClick={onToggleCollapse}
             aria-label="Colapsar sidebar"
             title="Colapsar (Cmd+B)"
+            className="sidebar-item"
             style={{
               width: 28,
               height: 28,
               borderRadius: radius.sm,
-              color: color.textDim,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: `color ${duration.fast} ${ease}, background ${duration.fast} ${ease}`,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = color.text;
-              e.currentTarget.style.background = color.surfaceHover;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = color.textDim;
-              e.currentTarget.style.background = 'transparent';
             }}
           >
             <ChevronLeft size={16} />
@@ -238,6 +229,7 @@ export function Sidebar({ active, onNavigate, collapsed, onToggleCollapse, user,
             onClick={onLogout}
             title="Cerrar sesión"
             aria-label="Cerrar sesión"
+            className="sidebar-item danger"
             style={{
               width: 28,
               height: 28,
@@ -245,19 +237,7 @@ export function Sidebar({ active, onNavigate, collapsed, onToggleCollapse, user,
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: radius.sm,
-              color: color.textDim,
-              background: 'transparent',
-              cursor: 'pointer',
               flexShrink: 0,
-              transition: `color ${duration.fast} ${ease}, background ${duration.fast} ${ease}`,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = color.danger;
-              e.currentTarget.style.background = color.surfaceHover;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = color.textDim;
-              e.currentTarget.style.background = 'transparent';
             }}
           >
             <LogOut size={14} />
@@ -284,6 +264,7 @@ function NavButton({
     <button
       onClick={onClick}
       title={collapsed ? item.label : undefined}
+      className={`sidebar-nav${active ? ' active' : ''}`}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -291,25 +272,10 @@ function NavButton({
         padding: collapsed ? `${space[2]} 0` : `${space[2]} ${space[3]}`,
         justifyContent: collapsed ? 'center' : 'flex-start',
         borderRadius: radius.md,
-        background: active ? color.primaryBg : 'transparent',
-        color: active ? color.primary : color.textMuted,
         fontSize: text.sm,
         fontWeight: active ? weight.semibold : weight.medium,
-        transition: `background ${duration.fast} ${ease}, color ${duration.fast} ${ease}`,
         position: 'relative',
         textAlign: 'left',
-      }}
-      onMouseEnter={(e) => {
-        if (!active) {
-          e.currentTarget.style.background = color.surfaceHover;
-          e.currentTarget.style.color = color.text;
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!active) {
-          e.currentTarget.style.background = 'transparent';
-          e.currentTarget.style.color = color.textMuted;
-        }
       }}
     >
       {/* Indicator vertical para item activo */}

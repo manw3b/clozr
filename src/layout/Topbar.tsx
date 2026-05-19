@@ -16,7 +16,7 @@ import {
   TrendingUp,
   Check,
 } from 'lucide-react';
-import { color, duration, ease, layout, radius, space, text, weight } from '../tokens';
+import { color, layout, radius, space, text, weight } from '../tokens';
 import { Button } from '../components/Button';
 import { Modal, ModalField } from '../components/Modal';
 import { Input } from '../components/Input';
@@ -177,26 +177,21 @@ function NotificationsMenu({ onNavigate }: { onNavigate: (s: NotifNavigate) => v
 }
 
 function NotificationRow({ item, onClick }: { item: NotificationItem; onClick: () => void }) {
-  const [hover, setHover] = useState(false);
   const Icon = item.kind === 'task' ? CheckSquare : item.kind === 'collection' ? AlertCircle : TrendingUp;
   const accent =
     item.kind === 'collection' ? color.danger : item.kind === 'lead' ? color.warning : color.info;
   return (
     <button
       onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className="row-hover"
       style={{
         width: '100%',
         textAlign: 'left',
         padding: `${space[3]} ${space[4]}`,
-        background: hover ? color.surfaceHover : 'transparent',
         borderBottom: `1px solid ${color.border}`,
         display: 'flex',
         alignItems: 'flex-start',
         gap: space[3],
-        cursor: 'pointer',
-        transition: `background ${duration.fast} ${ease}`,
       }}
     >
       <span
@@ -317,12 +312,10 @@ function NewMenuItem({
   Icon: typeof Users;
   onClick: () => void;
 }) {
-  const [hover, setHover] = useState(false);
   return (
     <button
       onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className="row-hover"
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -330,11 +323,9 @@ function NewMenuItem({
         width: '100%',
         padding: `${space[2]} ${space[3]}`,
         borderRadius: radius.sm,
-        background: hover ? color.surfaceHover : 'transparent',
         color: color.text,
         fontSize: text.sm,
         textAlign: 'left',
-        transition: `background ${duration.fast} ${ease}`,
       }}
     >
       <Icon size={14} color={color.textMuted} strokeWidth={2.2} />
@@ -364,7 +355,6 @@ function BusinessSwitcher() {
   const { activeWorkspace } = useWorkspaceStore();
   const { showToast } = useUIStore();
   const qc = useQueryClient();
-  const [hover, setHover] = useState(false);
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -393,18 +383,15 @@ function BusinessSwitcher() {
       <div ref={wrapRef} style={{ position: 'relative' }}>
         <button
           onClick={() => setOpen((v) => !v)}
-          onMouseEnter={() => setHover(true)}
-          onMouseLeave={() => setHover(false)}
+          className={`btn-bordered${open ? ' active' : ''}`}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: space[2],
             padding: `6px ${space[3]} 6px 6px`,
             borderRadius: radius.md,
-            background: hover || open ? color.surfaceHover : 'transparent',
-            border: `1px solid ${hover || open ? color.borderStrong : color.border}`,
-            transition: `background ${duration.fast} ${ease}, border-color ${duration.fast} ${ease}`,
-            cursor: 'pointer',
+            background: 'transparent',
+            border: `1px solid ${color.border}`,
           }}
         >
           <span
@@ -495,6 +482,7 @@ function BusinessSwitcher() {
                 setOpen(false);
                 setCreateOpen(true);
               }}
+              className="row-hover"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -502,14 +490,10 @@ function BusinessSwitcher() {
                 width: '100%',
                 padding: `${space[2]} ${space[3]}`,
                 borderRadius: radius.sm,
-                background: 'transparent',
                 color: color.text,
                 fontSize: text.sm,
                 textAlign: 'left',
-                cursor: 'pointer',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = color.surfaceHover)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
               <Plus size={14} color={color.textMuted} strokeWidth={2.2} />
               <span>Nuevo negocio</span>
@@ -545,12 +529,10 @@ function BusinessRow({
   active: boolean;
   onClick: () => void;
 }) {
-  const [hover, setHover] = useState(false);
   return (
     <button
       onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className="row-hover"
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -558,12 +540,9 @@ function BusinessRow({
         width: '100%',
         padding: `${space[2]} ${space[3]}`,
         borderRadius: radius.sm,
-        background: hover ? color.surfaceHover : 'transparent',
         color: color.text,
         fontSize: text.sm,
         textAlign: 'left',
-        cursor: 'pointer',
-        transition: `background ${duration.fast} ${ease}`,
       }}
     >
       <span style={{ fontSize: 16, width: 22, textAlign: 'center' }}>{emoji}</span>
@@ -679,7 +658,6 @@ function CreateBusinessModal({
 /* ===== Search global trigger (Cmd+K) ===== */
 
 function SearchTrigger({ onClick }: { onClick: () => void }) {
-  const [hover, setHover] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -697,8 +675,7 @@ function SearchTrigger({ onClick }: { onClick: () => void }) {
     <button
       ref={ref}
       onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className="btn-bordered"
       style={{
         flex: 1,
         maxWidth: 480,
@@ -708,12 +685,11 @@ function SearchTrigger({ onClick }: { onClick: () => void }) {
         gap: space[2],
         padding: `0 ${space[3]}`,
         background: color.surface2,
-        border: `1px solid ${hover ? color.borderStrong : color.border}`,
+        border: `1px solid ${color.border}`,
         borderRadius: radius.md,
         color: color.textDim,
         fontSize: text.sm,
         textAlign: 'left',
-        transition: `border-color ${duration.fast} ${ease}`,
       }}
     >
       <Search size={15} strokeWidth={2.2} />
@@ -751,23 +727,18 @@ function IconButton({
   onClick?: () => void;
   'aria-label': string;
 }) {
-  const [hover, setHover] = useState(false);
   return (
     <button
       onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className="btn-icon muted"
       style={{
         position: 'relative',
         width: 36,
         height: 36,
         borderRadius: radius.md,
-        background: hover ? color.surfaceHover : 'transparent',
-        color: hover ? color.text : color.textMuted,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        transition: `background ${duration.fast} ${ease}, color ${duration.fast} ${ease}`,
       }}
       {...rest}
     >

@@ -26,3 +26,394 @@ tr.hoverable:hover td {
   background: var(--surface-hover);
   cursor: pointer;
 }
+
+/* ─── Interactive utility classes ────────────────────────────────────
+ *
+ * Reemplazo de los pares onMouseEnter/onMouseLeave inline. Beneficios:
+ *  - Menos re-renders (no se setea style en el DOM con cada hover)
+ *  - Funciona con focus de teclado (:focus-visible) → mejor a11y
+ *  - Cambiar el efecto = tocar 1 archivo, no 50
+ *  - Respeta prefers-reduced-motion vía transition tokens
+ *
+ * Convención de uso:
+ *  - Botón con hover → className="btn-icon"
+ *  - Variantes        → className="btn-icon wa" (verde WhatsApp)
+ *  - Estado activo    → className="btn-icon active"  (queda highlighteado)
+ *  - Botón bordered   → className="btn-bordered"     (con border + bg)
+ *  - Menu/row hover   → className="row-hover"        (filas de menús/listas)
+ */
+
+.btn-icon {
+  background: transparent;
+  cursor: pointer;
+  transition: background 100ms, color 100ms;
+}
+.btn-icon:hover:not(:disabled),
+.btn-icon.active {
+  background: var(--surface-hover);
+}
+.btn-icon:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* Variante WhatsApp — verde */
+.btn-icon.wa {
+  color: var(--success);
+}
+.btn-icon.wa:hover:not(:disabled),
+.btn-icon.wa.active {
+  background: var(--success-bg);
+}
+
+/* Variante success-bg solo (para botones $ en filas) */
+.btn-icon.success-bg:hover:not(:disabled),
+.btn-icon.success-bg.active {
+  background: var(--success-bg);
+}
+
+/* Variante muted — color text-muted que pasa a text en hover (Topbar
+ * IconButton, sidebar items, etc.) */
+.btn-icon.muted {
+  color: var(--text-muted);
+}
+.btn-icon.muted:hover:not(:disabled),
+.btn-icon.muted.active {
+  color: var(--text);
+}
+
+/* Botón con borde + bg compuestos (full triggers, secondary buttons) */
+.btn-bordered {
+  cursor: pointer;
+  transition: background 100ms, border-color 100ms;
+}
+.btn-bordered:hover:not(:disabled),
+.btn-bordered.active {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+.btn-bordered:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* Row hover para items de menús, popovers, listas */
+.row-hover {
+  background: transparent;
+  cursor: pointer;
+  transition: background 100ms;
+}
+.row-hover:hover {
+  background: var(--surface-hover);
+}
+
+/* Focus visible — ring sutil para keyboard nav, sin afectar mouse-only */
+.btn-icon:focus-visible,
+.btn-bordered:focus-visible,
+.row-hover:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+/* ─── DataTable rows ─────────────────────────────────────────────────
+ * Combinación de tres estados independientes (hover / selected / active).
+ * Reglas (especificidad va de menor a mayor):
+ *  - .dt-row              fondo transparente, transición suave
+ *  - .dt-row:hover        surface-hover
+ *  - .dt-row.selected     tinte rojo claro (lifestyle de selección bulk)
+ *  - .dt-row.active       primary-bg (drawer abierto sobre esta fila)
+ * El .active gana siempre sobre selected y hover.
+ */
+.dt-row {
+  background: transparent;
+  transition: background 100ms;
+}
+.dt-row:hover {
+  background: var(--surface-hover);
+}
+.dt-row.selected,
+.dt-row.selected:hover {
+  background: rgba(225, 29, 72, 0.06);
+}
+.dt-row.active,
+.dt-row.active:hover,
+.dt-row.active.selected,
+.dt-row.active.selected:hover {
+  background: var(--primary-bg);
+}
+
+/* ─── Checkbox de DataTable ──────────────────────────────────────────
+ * Vacío: border sutil. Hover (sin estar marcado): border-strong.
+ * Lleno (checked/indeterminate): primary, sin cambio en hover.
+ */
+.dt-checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 100ms;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.dt-checkbox:hover:not(.filled) {
+  border-color: var(--border-strong);
+}
+.dt-checkbox.filled {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+/* ─── Select trigger (ui/Select.tsx) ─────────────────────────────────
+ * Border sutil → border-strong en hover. Si ya está abierto (clase .open),
+ * el border-strong se mantiene.
+ */
+.select-trigger {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: border-color 120ms;
+}
+.select-trigger:hover:not(:disabled),
+.select-trigger.open {
+  border-color: var(--border-strong);
+}
+.select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Select options dropdown */
+.select-option {
+  background: transparent;
+  cursor: pointer;
+  transition: background 100ms;
+}
+.select-option:hover:not(.active) {
+  background: var(--surface-2);
+}
+.select-option.active {
+  background: rgba(232, 0, 29, 0.08);
+}
+
+/* ─── Sidebar items (layout/Sidebar.tsx) ─────────────────────────────
+ * Default: color text-dim, sin bg. Hover: text + surfaceHover.
+ * Active (página actual): se mantiene resaltado por inline style.
+ * Variante .danger pinta el color en hover (botón salir / borrar).
+ */
+.sidebar-item {
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 100ms, color 100ms;
+}
+.sidebar-item:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.sidebar-item.danger:hover {
+  color: var(--danger);
+}
+
+/* NavButton (item de navegación principal del sidebar). Active = página
+ * actual. En active no hay efecto hover — queda pintado primary. */
+.sidebar-nav {
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 100ms, color 100ms;
+}
+.sidebar-nav:hover:not(.active) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.sidebar-nav.active {
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+
+/* ─── Modal close button ─────────────────────────────────────────────
+ * X 28×28 — bg surface-hover y color text-muted → text en hover.
+ */
+.modal-close {
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 100ms, color 100ms;
+}
+.modal-close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* ─── ContextMenu item (ContextMenu.tsx) ─────────────────────────────
+ * Variante 'default' (surface-hover) y 'danger' (danger-bg).
+ */
+.ctx-item {
+  background: transparent;
+  cursor: pointer;
+  transition: background 100ms;
+}
+.ctx-item:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.ctx-item.danger:hover:not(:disabled) {
+  background: var(--danger-bg);
+}
+.ctx-item:disabled {
+  cursor: not-allowed;
+}
+
+/* ─── Card hoverable (Card.tsx) ──────────────────────────────────────
+ * Border + bg shift cuando es interactiva.
+ */
+.card-hoverable {
+  transition: background 100ms, border-color 100ms;
+  cursor: pointer;
+}
+.card-hoverable:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+/* ─── TagChip close × ────────────────────────────────────────────────
+ * Sólo opacidad — el color del chip varía.
+ */
+.tag-chip-close {
+  opacity: 0.7;
+  cursor: pointer;
+  transition: opacity 100ms;
+  border: none;
+  background: transparent;
+}
+.tag-chip-close:hover {
+  opacity: 1;
+}
+
+/* ─── Button (Button.tsx) ────────────────────────────────────────────
+ * Variantes con su propio color de fondo. Hover, active (press) y
+ * focus-visible son CSS puros — antes vivían como useState(hover) +
+ * useState(press) + onFocus/onBlur con box-shadow inline.
+ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
+  outline: none;
+  transition: background 100ms, color 100ms, border-color 100ms, transform 100ms;
+}
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.btn:focus-visible {
+  box-shadow: var(--shadow-focus);
+}
+.btn:disabled {
+  cursor: not-allowed;
+  color: var(--text-dim);
+}
+
+.btn.primary {
+  background: var(--primary);
+  color: #fff;
+}
+.btn.primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn.primary:active:not(:disabled) { background: var(--primary-press); }
+.btn.primary:disabled { background: var(--surface-2); }
+
+.btn.danger {
+  background: var(--danger);
+  color: #fff;
+}
+.btn.danger:hover:not(:disabled) { background: #DC2626; }
+.btn.danger:disabled { background: var(--surface-2); }
+
+.btn.success {
+  background: var(--success);
+  color: #fff;
+}
+.btn.success:hover:not(:disabled) { background: #22C55E; }
+.btn.success:disabled { background: var(--surface-2); }
+
+.btn.secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn.secondary:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+.btn.secondary:disabled { background: var(--surface-2); border-color: transparent; }
+
+.btn.ghost {
+  background: transparent;
+  color: var(--text);
+}
+.btn.ghost:hover:not(:disabled) { background: var(--surface-hover); }
+.btn.ghost:disabled { background: transparent; }
+
+/* ─── Tabs (Tabs.tsx) ────────────────────────────────────────────────
+ * Underline variant: muted → text on hover, primary on active.
+ * Pills variant: surfaceHover bg on hover.
+ */
+.tab-underline {
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: color 100ms, border-color 100ms;
+}
+.tab-underline:hover:not(:disabled):not(.active) {
+  color: var(--text);
+}
+.tab-underline.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+.tab-underline:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tab-pill {
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  transition: color 100ms, background 100ms;
+}
+.tab-pill:hover:not(:disabled):not(.active) {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+.tab-pill.active {
+  color: #fff;
+  background: var(--primary);
+}
+.tab-pill:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ─── Sort button del header de DataTable ────────────────────────────
+ * Color del texto cambia en hover (muted → text). Si la columna ya está
+ * sorteada, queda en color text permanente — el :hover queda sin efecto
+ * porque el style inline ya pinta color.text.
+ */
+.dt-sort-btn {
+  color: var(--text-muted);
+  transition: color 100ms;
+}
+.dt-sort-btn:hover,
+.dt-sort-btn.sorted {
+  color: var(--text);
+}

@@ -1,5 +1,5 @@
-import { CSSProperties, ReactNode, useState } from 'react';
-import { color, duration, ease, space, text, weight } from '../tokens';
+import { ReactNode } from 'react';
+import { color, space, text, weight } from '../tokens';
 
 export interface TabItem {
   value: string;
@@ -31,14 +31,15 @@ export function Tabs({
   return <UnderlineTabs items={items} value={value} onChange={onChange} size={size} />;
 }
 
-/* ===== UNDERLINE — para navegación principal de pantalla ===== */
+/* ===== UNDERLINE — para navegación principal de pantalla =====
+ * Estilos de hover/active en globals.css (.tab-underline / .tab-underline.active).
+ */
 function UnderlineTabs({
   items,
   value,
   onChange,
   size,
 }: Required<Pick<TabsProps, 'items' | 'value' | 'onChange' | 'size'>>) {
-  const [hover, setHover] = useState<string | null>(null);
   const fontSize = size === 'sm' ? text.sm : text.base;
   const padY = size === 'sm' ? space[2] : space[3];
 
@@ -52,27 +53,20 @@ function UnderlineTabs({
     >
       {items.map((item) => {
         const active = item.value === value;
-        const isHover = hover === item.value && !active;
         return (
           <button
             key={item.value}
             disabled={item.disabled}
             onClick={() => onChange(item.value)}
-            onMouseEnter={() => setHover(item.value)}
-            onMouseLeave={() => setHover(null)}
+            className={`tab-underline${active ? ' active' : ''}`}
             style={{
               padding: `${padY} 0`,
               fontSize,
               fontWeight: active ? weight.semibold : weight.medium,
-              color: active ? color.primary : isHover ? color.text : color.textMuted,
-              borderBottom: `2px solid ${active ? color.primary : 'transparent'}`,
               marginBottom: -1,
-              transition: `color ${duration.fast} ${ease}, border-color ${duration.fast} ${ease}`,
               display: 'inline-flex',
               alignItems: 'center',
               gap: space[2],
-              cursor: item.disabled ? 'not-allowed' : 'pointer',
-              opacity: item.disabled ? 0.4 : 1,
             }}
           >
             {item.label}
@@ -99,14 +93,15 @@ function UnderlineTabs({
   );
 }
 
-/* ===== PILLS — para filtros secundarios ===== */
+/* ===== PILLS — para filtros secundarios =====
+ * Estilos de hover/active en globals.css (.tab-pill / .tab-pill.active).
+ */
 function PillTabs({
   items,
   value,
   onChange,
   size,
 }: Required<Pick<TabsProps, 'items' | 'value' | 'onChange' | 'size'>>) {
-  const [hover, setHover] = useState<string | null>(null);
   const fontSize = size === 'sm' ? text.sm : text.base;
   const height = size === 'sm' ? 28 : 32;
 
@@ -123,27 +118,19 @@ function PillTabs({
     >
       {items.map((item) => {
         const active = item.value === value;
-        const isHover = hover === item.value && !active;
-        const buttonStyle: CSSProperties = {
-          height,
-          padding: `0 ${space[3]}`,
-          fontSize,
-          fontWeight: active ? weight.semibold : weight.medium,
-          color: active ? '#FFFFFF' : isHover ? color.text : color.textMuted,
-          background: active ? color.primary : isHover ? color.surfaceHover : 'transparent',
-          borderRadius: 'var(--radius-sm)',
-          transition: `all ${duration.fast} ${ease}`,
-          cursor: item.disabled ? 'not-allowed' : 'pointer',
-          opacity: item.disabled ? 0.4 : 1,
-        };
         return (
           <button
             key={item.value}
             disabled={item.disabled}
             onClick={() => onChange(item.value)}
-            onMouseEnter={() => setHover(item.value)}
-            onMouseLeave={() => setHover(null)}
-            style={buttonStyle}
+            className={`tab-pill${active ? ' active' : ''}`}
+            style={{
+              height,
+              padding: `0 ${space[3]}`,
+              fontSize,
+              fontWeight: active ? weight.semibold : weight.medium,
+              borderRadius: 'var(--radius-sm)',
+            }}
           >
             {item.label}
           </button>

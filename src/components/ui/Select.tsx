@@ -36,30 +36,18 @@ export default function Select({ value, onChange, options, disabled, style, plac
         type="button"
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
+        className={`select-trigger${open ? " open" : ""}`}
         style={{
           width: "100%",
           padding: "8px 32px 8px 12px",
-          background: "var(--surface-2)",
-          border: `1px solid ${open ? "var(--border-strong)" : "var(--border)"}`,
           borderRadius: 8,
           color: selected ? "var(--text-primary)" : "var(--text-tertiary)",
           fontSize: 13,
           textAlign: "left",
-          cursor: disabled ? "not-allowed" : "pointer",
-          opacity: disabled ? 0.6 : 1,
-          transition: "border-color 0.12s",
           boxSizing: "border-box",
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
-        }}
-        onMouseEnter={(e) => {
-          if (!disabled && !open)
-            (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-strong)";
-        }}
-        onMouseLeave={(e) => {
-          if (!open)
-            (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)";
         }}
       >
         {selected?.label ?? placeholder ?? "Seleccionar..."}
@@ -108,26 +96,15 @@ export default function Select({ value, onChange, options, disabled, style, plac
                     onChange(opt.value);
                     setOpen(false);
                   }}
+                  className={`select-option${isActive ? " active" : ""}`}
                   style={{
                     width: "100%",
                     textAlign: "left",
                     padding: "9px 12px",
                     fontSize: 13,
                     color: isActive ? "var(--brand)" : "var(--text-primary)",
-                    background: isActive ? "rgba(232,0,29,0.08)" : "transparent",
                     fontWeight: isActive ? 600 : 400,
                     borderBottom: "1px solid var(--border)",
-                    transition: "background 0.1s",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive)
-                      (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-2)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = isActive
-                      ? "rgba(232,0,29,0.08)"
-                      : "transparent";
                   }}
                 >
                   {opt.label}

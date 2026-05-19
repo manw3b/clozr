@@ -1,17 +1,19 @@
 import { forwardRef, type ReactNode } from 'react';
 import { WhatsAppIcon } from '../icons/WhatsAppIcon';
-import { color, radius, space, text, weight, duration, ease } from '../../tokens';
+import { color, radius, space, text, weight } from '../../tokens';
 
 /**
  * Sub-componentes compartidos entre WaQuickPicker (pipeline) y
- * CustomerWaQuickPicker (clientes). Antes vivían duplicados ~250 líneas
- * en cada archivo.
+ * CustomerWaQuickPicker (clientes).
  *
  * Cuatro piezas:
  *   - <SmallTrigger>     botón chip 26×26 verde (filas de tabla / cards)
  *   - <FullTrigger>      botón full-width con label (drawers, footers)
  *   - <PickerHeader>     avatar + "Mensaje a {firstName}" en el tope del popover
  *   - <PickerRow>        un option row con ícono + título + preview
+ *
+ * Estilos de hover/focus están en globals.css (.btn-icon.wa, .btn-bordered,
+ * .row-hover) — antes vivían como onMouseEnter/onMouseLeave inline.
  *
  * Pequeño helper exportado: firstName() — extrae la primera palabra de un
  * nombre completo para usar en los headers.
@@ -33,6 +35,7 @@ export const SmallTrigger = forwardRef<HTMLButtonElement, SmallTriggerProps>(
         aria-label={ariaLabel}
         onClick={onClick}
         disabled={disabled}
+        className={`btn-icon wa${active ? ' active' : ''}`}
         style={{
           width: 26,
           height: 26,
@@ -40,17 +43,6 @@ export const SmallTrigger = forwardRef<HTMLButtonElement, SmallTriggerProps>(
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: radius.sm,
-          color: color.success,
-          background: active ? color.successBg : 'transparent',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          transition: `background ${duration.fast} ${ease}`,
-          opacity: disabled ? 0.4 : 1,
-        }}
-        onMouseEnter={(e) => {
-          if (!disabled && !active) e.currentTarget.style.background = color.successBg;
-        }}
-        onMouseLeave={(e) => {
-          if (!active) e.currentTarget.style.background = 'transparent';
         }}
       >
         {children}
@@ -73,6 +65,7 @@ export const FullTrigger = forwardRef<HTMLButtonElement, FullTriggerProps>(
         type="button"
         onClick={onClick}
         disabled={disabled}
+        className={`btn-bordered${active ? ' active' : ''}`}
         style={{
           height: 36,
           padding: `0 ${space[3]}`,
@@ -80,26 +73,11 @@ export const FullTrigger = forwardRef<HTMLButtonElement, FullTriggerProps>(
           alignItems: 'center',
           gap: space[2],
           borderRadius: radius.md,
-          background: active ? color.surfaceHover : color.surface2,
-          border: `1px solid ${active ? color.borderStrong : color.border}`,
+          background: color.surface2,
+          border: `1px solid ${color.border}`,
           color: color.text,
           fontSize: text.sm,
           fontWeight: weight.semibold,
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          transition: `background ${duration.fast} ${ease}, border-color ${duration.fast} ${ease}`,
-          opacity: disabled ? 0.4 : 1,
-        }}
-        onMouseEnter={(e) => {
-          if (!disabled) {
-            e.currentTarget.style.background = color.surfaceHover;
-            e.currentTarget.style.borderColor = color.borderStrong;
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!active) {
-            e.currentTarget.style.background = color.surface2;
-            e.currentTarget.style.borderColor = color.border;
-          }
         }}
       >
         {children}
@@ -164,19 +142,16 @@ export function PickerRow({
   return (
     <button
       onClick={onClick}
+      className="row-hover"
       style={{
         display: 'flex',
         alignItems: 'flex-start',
         gap: space[2],
         padding: `8px ${space[3]}`,
-        background: 'transparent',
         textAlign: 'left',
         borderRadius: radius.sm,
-        cursor: 'pointer',
-        transition: `background ${duration.fast} ${ease}`,
+        border: 'none',
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = color.surfaceHover)}
-      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
       <span
         style={{

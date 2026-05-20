@@ -109,8 +109,15 @@ export function PipelineColumn({
         display: 'flex',
         flexDirection: 'column',
         background: isOver && !isDragging ? accentBg : color.surface2,
-        border: `1px solid ${isOver && !isDragging ? accentBar : color.border}`,
+        // Borde por lados (NO usar `border` shorthand + `borderTop` juntos —
+        // React warning "Updating a style property during rerender" porque
+        // mezclar shorthand y propiedad específica puede dar inconsistencias
+        // visuales según el orden en que el browser aplica los writes al DOM).
+        // El top va de 3px (acento de la etapa); los otros 3 lados de 1px.
         borderTop: `3px solid ${accentBar}`,
+        borderRight: `1px solid ${isOver && !isDragging ? accentBar : color.border}`,
+        borderBottom: `1px solid ${isOver && !isDragging ? accentBar : color.border}`,
+        borderLeft: `1px solid ${isOver && !isDragging ? accentBar : color.border}`,
         borderRadius: radius.lg,
         width,
         minWidth: COL_MIN_WIDTH,

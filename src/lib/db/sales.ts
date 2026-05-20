@@ -284,6 +284,65 @@ export async function markAsPaid(saleId: string): Promise<void> {
   );
 }
 
+/**
+ * Registra UN cobro contra una venta — el camino "correcto" cuando el
+ * cliente paga, en vez de markAsPaid (que asume "pagado todo" sin
+ * registrar con qué). Usado por CollectPaymentModal desde Mi Día y
+ * SaleDrawer.
+ *
+ * Recalcula total_paid / balance / is_paid en base a TODOS los
+ * sale_payments (incluido el nuevo). is_paid=1 cuando balance llega a 0
+ * o menos (caso "el cliente pagó más del balance" → balance queda 0).
+ *
+ * Si amount > balance pendiente, lo clampeamos al balance para no
+ * acreditar de más por error de tipeo. El caller puede mostrar un
+ * warning si quiere.
+ */
+export async function addPayment(
+  saleId: string,
+  payment: { method: string; currency: "ARS" | "USD"; amount: number },
+): Promise<void> {
+  // 1) Leer total de la venta para calcular balance nuevo
+  const rows = await dbSelect<{ total: number; total_paid: number }>(
+    "SELECT total, total_paid FROM sales WHERE id = ?",
+    [saleId],
+  );
+  const sale = rows[0];
+  if (!sale) throw new Error(`Venta no encontrada: ${saleId}`);
+
+  const currentBalance = sale.total - sale.total_paid;
+  const applied = Math.min(payment.amount, currentBalance);
+
+  // 2) Insert del pago
+  await dbExecute(
+    `INSERT INTO sale_payments (id, sale_id, method, currency, amount, is_deposit)
+     VALUES (?, ?, ?, ?, ?, 0)`,
+    [
+      crypto.randomUUID(),
+      saleId,
+      payment.method,
+      payment.currency,
+      applied,
+    ],
+  );
+
+  // 3) Recalc del header de la venta. Hacemos SUM sobre sale_payments
+  //    para que sea idempotente — si por alguna razón el INSERT y el
+  //    UPDATE quedan fuera de fase, el próximo read converge.
+  const sumRows = await dbSelect<{ paid: number }>(
+    "SELECT COALESCE(SUM(amount), 0) AS paid FROM sale_payments WHERE sale_id = ?",
+    [saleId],
+  );
+  const totalPaid = sumRows[0]?.paid ?? 0;
+  const newBalance = Math.max(0, sale.total - totalPaid);
+  const isPaid = newBalance === 0 ? 1 : 0;
+
+  await dbExecute(
+    "UPDATE sales SET total_paid = ?, balance = ?, is_paid = ? WHERE id = ?",
+    [totalPaid, newBalance, isPaid, saleId],
+  );
+}
+
 export async function getRows(
   workspaceId: string,
   period: "today" | "week" | "month" | "all" = "all",
@@ -531,6 +590,7 @@ export const salesDb = {
   createManualDebt,
   updateSale,
   markAsPaid,
+  addPayment,
   getRows,
   getSalesMetrics,
   getTopCustomers,

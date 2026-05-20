@@ -160,6 +160,12 @@ export function dbSaleToDueCollection(s: DbSale): DueCollection {
     clientId: s.customer_id ?? "",
     clientName: s.customer_name ?? "Sin cliente",
     amount: s.balance,
+    total: s.total,
+    // Hoy todas las ventas se asumen ARS — el schema de sales no guarda
+    // currency a nivel header (la moneda vive en cada sale_payment).
+    // Para el cobro alcanza este default; el método de pago elegido
+    // define la moneda del nuevo pago.
+    currency: "ARS",
     dueAt: due,
     daysOverdue,
     product: s.notes ?? undefined,

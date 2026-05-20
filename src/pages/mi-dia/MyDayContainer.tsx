@@ -4,6 +4,8 @@ import { MyDay } from "./MyDay";
 import { NewSaleModal } from "../ventas/components/NewSaleModal";
 import { useCreateSale } from "../ventas/useSalesData";
 import { NewTaskModal } from "../tareas/components/NewTaskModal";
+import { CollectPaymentModal } from "../../components/CollectPaymentModal";
+import type { DueCollection } from "../../types/domain";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useBusinessStore } from "../../store/businessStore";
 import { useAuthStore } from "../../store/authStore";
@@ -38,6 +40,10 @@ export function MyDayContainer() {
   // si el usuario quiere la vista full de tareas (filtros, contextos,
   // bulk actions), ahí sí navega a la screen "Tareas" con el menú.
   const [newTaskOpen, setNewTaskOpen] = useState(false);
+  // Cobrar — abre modal con monto + método. Antes hacíamos markAsPaid
+  // bruto (asume "pagó todo, sin saber cómo") que rompía la trazabilidad
+  // a Caja. Ahora siempre pasa por el modal que insert sale_payments.
+  const [collectingFrom, setCollectingFrom] = useState<DueCollection | null>(null);
   const createSaleMut = useCreateSale();
 
   const wid = activeWorkspace?.id ?? "";
@@ -95,13 +101,6 @@ export function MyDayContainer() {
     },
   });
 
-  const markPaidMut = useMutation({
-    mutationFn: (saleId: string) => salesDb.markAsPaid(saleId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.miDia.all() });
-      qc.invalidateQueries({ queryKey: qk.ventas.all() });
-    },
-  });
 
   const recordContactMut = useRecordContact();
 
@@ -206,7 +205,12 @@ export function MyDayContainer() {
       onSetGoal={(amount) => setGoalMut.mutate({ amountUsd: amount })}
       onSetSalesGoal={(count) => setGoalMut.mutate({ salesCount: count })}
       onToggleTask={(id) => toggleTaskMut.mutate(id)}
-      onMarkPaid={(id) => markPaidMut.mutate(id)}
+      onMarkPaid={(id) => {
+        // Buscamos el DueCollection completo para pasarle al modal
+        // (necesita total + balance + currency, no solo id).
+        const collection = data.dueCollections.find((c) => c.saleId === id);
+        if (collection) setCollectingFrom(collection);
+      }}
       onCreateTask={() => setNewTaskOpen(true)}
       onWhatsApp={(clientId, opts) => {
         const customer = customersQ.data?.find((c) => c.id === clientId);
@@ -243,6 +247,21 @@ export function MyDayContainer() {
       }}
     />
     <NewTaskModal open={newTaskOpen} onClose={() => setNewTaskOpen(false)} />
+    <CollectPaymentModal
+      open={!!collectingFrom}
+      onClose={() => setCollectingFrom(null)}
+      sale={
+        collectingFrom
+          ? {
+              id: collectingFrom.saleId,
+              clientName: collectingFrom.clientName,
+              total: collectingFrom.total,
+              balance: collectingFrom.amount,
+              currency: collectingFrom.currency,
+            }
+          : null
+      }
+    />
     </>
   );
 }

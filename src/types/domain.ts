@@ -244,7 +244,13 @@ export interface DueCollection {
   saleId: string;
   clientId: string;
   clientName: string;
+  /** Lo que falta cobrar (= sale.balance). */
   amount: number;
+  /** Total facturado de la venta (para mostrar "X de Y" en el cobro). */
+  total: number;
+  /** Moneda de la venta. Hoy siempre ARS por el contexto AR; cuando
+   *  haya ventas USD nativas hay que derivarla del payment original. */
+  currency: 'ARS' | 'USD';
   dueAt: string;
   daysOverdue: number;
   product?: string;

@@ -164,6 +164,10 @@ describe("dbCustomerToClient", () => {
     created_by: null,
     created_at: "2026-01-01",
     updated_at: "2026-01-01",
+    instagram: null,
+    facebook: null,
+    tiktok: null,
+    twitter: null,
   };
 
   it("maps activo → active", () => {

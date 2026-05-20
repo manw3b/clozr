@@ -170,6 +170,11 @@ export interface Customer {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  /** Migration 029 — redes sociales opcionales. Handle (sin @) o URL completa. */
+  instagram: string | null;
+  facebook: string | null;
+  tiktok: string | null;
+  twitter: string | null;
 }
 
 export interface PipelineItem {
@@ -373,6 +378,11 @@ export interface CreateCustomerInput {
   pricing_policy_json?: string | null;
   avatar_path?: string | null;
   created_by?: string | null;
+  /** Migration 029 — redes opcionales. */
+  instagram?: string | null;
+  facebook?: string | null;
+  tiktok?: string | null;
+  twitter?: string | null;
 }
 
 export type UpdateCustomerInput = Partial<Omit<CreateCustomerInput, "created_by">>;

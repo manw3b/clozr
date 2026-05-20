@@ -204,6 +204,10 @@ export function dbCustomerToClient(c: DbCustomer): Client {
     totalPurchases: undefined,
     notes: c.notes ?? undefined,
     createdAt: c.created_at,
+    instagram: c.instagram ?? undefined,
+    facebook: c.facebook ?? undefined,
+    tiktok: c.tiktok ?? undefined,
+    twitter: c.twitter ?? undefined,
   };
 }
 

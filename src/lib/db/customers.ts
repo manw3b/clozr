@@ -51,8 +51,9 @@ export async function create(
   await dbExecute(
     `INSERT INTO customers (
       id, workspace_id, name, phone, email, type, status,
-      barrio, address, notes, pricing_policy_json, avatar_path, created_by, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      barrio, address, notes, pricing_policy_json, avatar_path, created_by, created_at, updated_at,
+      instagram, facebook, tiktok, twitter
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       workspaceId,
@@ -69,6 +70,10 @@ export async function create(
       data.created_by ?? null,
       now,
       now,
+      data.instagram ?? null,
+      data.facebook ?? null,
+      data.tiktok ?? null,
+      data.twitter ?? null,
     ],
   );
   return {
@@ -88,6 +93,10 @@ export async function create(
     created_by: data.created_by ?? null,
     created_at: now,
     updated_at: now,
+    instagram: data.instagram ?? null,
+    facebook: data.facebook ?? null,
+    tiktok: data.tiktok ?? null,
+    twitter: data.twitter ?? null,
   };
 }
 

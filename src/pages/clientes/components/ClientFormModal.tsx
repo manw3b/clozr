@@ -34,6 +34,13 @@ export function ClientFormModal({ open, onClose, client }: ClientFormModalProps)
   const [email, setEmail] = useState('');
   const [type, setType] = useState<ClientType>('final');
   const [notes, setNotes] = useState('');
+  // Redes sociales — opcionales. Aceptamos handle (sin @) o URL completa,
+  // la UI del drawer maneja ambos casos al renderizar el link.
+  const [instagram, setInstagram] = useState('');
+  const [facebook, setFacebook] = useState('');
+  const [tiktok, setTiktok] = useState('');
+  const [twitter, setTwitter] = useState('');
+  const [socialsOpen, setSocialsOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -42,28 +49,36 @@ export function ClientFormModal({ open, onClose, client }: ClientFormModalProps)
       setEmail(client?.email ?? '');
       setType(client?.type ?? 'final');
       setNotes(client?.notes ?? '');
+      setInstagram(client?.instagram ?? '');
+      setFacebook(client?.facebook ?? '');
+      setTiktok(client?.tiktok ?? '');
+      setTwitter(client?.twitter ?? '');
+      // Si el cliente YA tiene alguna red cargada, abrimos la sección de
+      // entrada para que se vea cargada y editable.
+      const hasAnySocial =
+        !!(client?.instagram || client?.facebook || client?.tiktok || client?.twitter);
+      setSocialsOpen(hasAnySocial);
     }
   }, [open, client]);
 
   const mutation = useMutation({
     mutationFn: async () => {
       if (!activeWorkspace) throw new Error('Sin workspace activo');
+      const payload = {
+        name: name.trim(),
+        phone: phone.trim() || null,
+        email: email.trim() || null,
+        type,
+        notes: notes.trim() || null,
+        instagram: instagram.trim() || null,
+        facebook: facebook.trim() || null,
+        tiktok: tiktok.trim() || null,
+        twitter: twitter.trim() || null,
+      };
       if (editing && client) {
-        await customersDb.update(activeWorkspace.id, client.id, {
-          name: name.trim(),
-          phone: phone.trim() || null,
-          email: email.trim() || null,
-          type,
-          notes: notes.trim() || null,
-        });
+        await customersDb.update(activeWorkspace.id, client.id, payload);
       } else {
-        await customersDb.create(activeWorkspace.id, {
-          name: name.trim(),
-          phone: phone.trim() || null,
-          email: email.trim() || null,
-          type,
-          notes: notes.trim() || null,
-        });
+        await customersDb.create(activeWorkspace.id, payload);
       }
     },
     onSuccess: () => {
@@ -82,6 +97,10 @@ export function ClientFormModal({ open, onClose, client }: ClientFormModalProps)
         phone.trim().length > 0 ||
         email.trim().length > 0 ||
         notes.trim().length > 0 ||
+        instagram.trim().length > 0 ||
+        facebook.trim().length > 0 ||
+        tiktok.trim().length > 0 ||
+        twitter.trim().length > 0 ||
         type !== "final"
       );
     }
@@ -90,7 +109,11 @@ export function ClientFormModal({ open, onClose, client }: ClientFormModalProps)
       phone !== (client.phone ?? "") ||
       email !== (client.email ?? "") ||
       type !== (client.type ?? "final") ||
-      notes !== (client.notes ?? "")
+      notes !== (client.notes ?? "") ||
+      instagram !== (client.instagram ?? "") ||
+      facebook !== (client.facebook ?? "") ||
+      tiktok !== (client.tiktok ?? "") ||
+      twitter !== (client.twitter ?? "")
     );
   };
 
@@ -155,13 +178,116 @@ export function ClientFormModal({ open, onClose, client }: ClientFormModalProps)
         </Select>
       </ModalField>
 
+      {/* Redes sociales — sección plegable para no ensuciar el form a los
+          usuarios que no las cargan. Si el cliente YA tenía alguna red
+          guardada, se abre por default (lógica en useEffect arriba). */}
+      <div style={{ marginBottom: 20 }}>
+        <button
+          type="button"
+          onClick={() => setSocialsOpen((v) => !v)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            width: '100%',
+            padding: '8px 0',
+            background: 'transparent',
+            color: 'var(--text-muted)',
+            fontSize: 12,
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.6px',
+            border: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          <span>{socialsOpen ? '▾' : '▸'}</span>
+          Redes sociales (opcional)
+        </button>
+        {socialsOpen && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+            <SocialInput label="Instagram" placeholder="@usuario o URL" value={instagram} onChange={setInstagram} />
+            <SocialInput label="Facebook" placeholder="usuario o URL completa" value={facebook} onChange={setFacebook} />
+            <SocialInput label="TikTok" placeholder="@usuario o URL" value={tiktok} onChange={setTiktok} />
+            <SocialInput label="X / Twitter" placeholder="@usuario o URL" value={twitter} onChange={setTwitter} />
+          </div>
+        )}
+      </div>
+
       <ModalField label="Notas">
-        <Input
+        {/* Textarea (no Input) — el campo de notas es libre, multi-línea,
+            y usualmente lleva varias frases. Antes era un Input de 1 línea
+            y no se podían entrar saltos de línea, aunque el drawer los
+            respetaba al renderizar. */}
+        <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Observaciones, preferencias…"
+          placeholder="Observaciones, preferencias, regateo histórico, lo que necesites recordar de este cliente…"
+          rows={4}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            background: "var(--surface-2)",
+            border: "1px solid var(--border-strong)",
+            borderRadius: 8,
+            color: "var(--text)",
+            fontSize: 13,
+            fontFamily: "inherit",
+            lineHeight: 1.5,
+            outline: "none",
+            boxSizing: "border-box",
+            resize: "vertical",
+            minHeight: 90,
+          }}
         />
       </ModalField>
     </Modal>
+  );
+}
+
+/** Input compacto para una red social. Label inline a la izquierda, input
+ *  a la derecha. Pensado para la sección "Redes sociales" del form donde
+ *  hay 4 redes apiladas y queremos ocupar poco vertical. */
+function SocialInput({
+  label,
+  placeholder,
+  value,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span
+        style={{
+          fontSize: 12,
+          fontWeight: 500,
+          color: 'var(--text-muted)',
+          width: 95,
+          flexShrink: 0,
+        }}
+      >
+        {label}
+      </span>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          flex: 1,
+          padding: '8px 10px',
+          background: 'var(--surface-2)',
+          border: '1px solid var(--border-strong)',
+          borderRadius: 6,
+          color: 'var(--text)',
+          fontSize: 13,
+          outline: 'none',
+          boxSizing: 'border-box',
+        }}
+      />
+    </div>
   );
 }

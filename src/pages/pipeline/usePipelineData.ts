@@ -3,10 +3,11 @@ import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useBusinessStore } from "../../store/businessStore";
 import { pipelineDb } from "../../lib/db/pipeline";
 import { followupsDb } from "../../lib/db/followups";
+import { settingsDb } from "../../lib/db/settings";
 import { dbItemToLead } from "../../lib/mappers";
 import { qk, invalidate } from "../../lib/queryKeys";
 import { followupForStage } from "../../lib/stageFollowups";
-import { getCachedStages } from "./usePipelineStages";
+import { useUIStore } from "../../store/uiStore";
 import type { Lead, LeadStage } from "../../types/domain";
 
 export function usePipelineLeads() {
@@ -26,17 +27,34 @@ export function useMoveLead() {
   const qc = useQueryClient();
   const { activeWorkspace } = useWorkspaceStore();
   const { activeBusiness } = useBusinessStore();
+  const { showToast } = useUIStore();
   const wid = activeWorkspace?.id ?? "";
   const bid = activeBusiness?.id ?? "";
 
   return useMutation({
     mutationFn: async ({ leadId, newStage }: { leadId: string; newStage: LeadStage }) => {
-      // Usamos la lista dinámica del workspace (cacheada en React Query).
-      const stages = getCachedStages(qc, wid);
+      // Leemos las stages DIRECTO de la DB en vez de getCachedStages.
+      //
+      // Por qué: getCachedStages caía al FALLBACK_STAGES si la query de
+      // pipeline_stages todavía no había mountado. El fallback tenía IDs
+      // distintos a los seedeados en DB (ej: "negociando" vs "aprobado"),
+      // entonces stageConfig venía undefined y la mutation hacía un return
+      // silencioso. El kanban mostraba el move (optimistic) y al invalidar
+      // la query, el lead volvía a la stage original (típicamente
+      // "prospecto", parecía un revert).
+      //
+      // settingsDb.getPipelineStages además seed-on-demand si no hay nada
+      // en la tabla, así que siempre devuelve algo válido.
+      const stages = await settingsDb.getPipelineStages(wid);
       const stageConfig = stages.find((s) => s.id === newStage);
       const stageOrder = stages.findIndex((s) => s.id === newStage);
-      if (!stageConfig) return;
-      await pipelineDb.updateStage(leadId, newStage, stageConfig.label, stageOrder);
+      if (!stageConfig) {
+        throw new Error(
+          `La etapa "${newStage}" no existe en este workspace. ` +
+            `Revisá Ajustes → Etapas del pipeline.`,
+        );
+      }
+      await pipelineDb.updateStage(leadId, newStage, stageConfig.name, stageOrder);
 
       // Auto-followup según la nueva etapa. Best-effort: si falla no
       // queremos romper el move (la persistencia del stage ya está hecha).
@@ -60,8 +78,12 @@ export function useMoveLead() {
       );
       return { prev };
     },
-    onError: (_err, _vars, ctx) => {
+    onError: (err, _vars, ctx) => {
+      // Rollback de la optimistic update + toast visible — antes el error
+      // se tragaba en silencio y el lead "rebotaba" al stage original sin
+      // que el usuario supiera por qué.
       if (ctx?.prev) qc.setQueryData(qk.pipeline.leads(wid), ctx.prev);
+      showToast(err instanceof Error ? err.message : "No se pudo mover el lead", "error");
     },
     onSettled: () => invalidate.afterLeadChange(qc),
   });
@@ -123,12 +145,15 @@ export function useScheduleVisit() {
       product?: string | null;
       isMayorista: boolean;
     }) => {
-      // Buscamos la etapa "visita agendada" del workspace: primero por id
-      // canonical, después por nombre (tolerante a guion/espacio/case).
-      const stages = getCachedStages(qc, wid);
+      // Buscamos la etapa "visita agendada" del workspace. Tolerante a
+      // variantes de id ("visita_agendada" / "visita-agendada" / nombre).
+      // Leemos directo de DB para evitar la race con el cache (mismo motivo
+      // que useMoveLead).
+      const stages = await settingsDb.getPipelineStages(wid);
       const stageCfg =
+        stages.find((s) => s.id === "visita_agendada") ??
         stages.find((s) => s.id === "visita-agendada") ??
-        stages.find((s) => /visita/i.test(s.label));
+        stages.find((s) => /visita/i.test(s.name));
       const stageOrder = stageCfg ? stages.findIndex((s) => s.id === stageCfg.id) : -1;
       if (!stageCfg) throw new Error("No hay etapa de visita configurada en este workspace");
 
@@ -154,7 +179,7 @@ export function useScheduleVisit() {
         product: product ?? null,
         wholesaleCode,
         stageId: stageCfg.id,
-        stageName: stageCfg.label,
+        stageName: stageCfg.name,
         stageOrder,
       });
 

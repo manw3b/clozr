@@ -31,6 +31,11 @@ export interface Client {
   createdAt?: string;
   /** Etiquetas asignadas. Configurables desde Settings → Etiquetas. */
   tags?: ClientTag[];
+  /** Redes sociales opcionales (handle sin @ o URL completa). Migration 029. */
+  instagram?: string;
+  facebook?: string;
+  tiktok?: string;
+  twitter?: string;
 }
 
 /* ============================================================
@@ -362,17 +367,20 @@ export interface StageConfig {
   order?: number;
 }
 
+// FALLBACK del kanban cuando la query de pipeline_stages todavía no cargó.
+// IDs alineados con DEFAULT_PIPELINE_STAGES en lib/db/settings.ts — si los
+// desalineás, se rompe el drag-to-stage: useMoveLead no encuentra el
+// stageConfig para el id de destino y el persist se aborta en silencio.
+// Si cambiás esta lista, cambiá la otra. Mejor todavía: en algún momento
+// unificarlas en una sola constante exportada desde acá.
 export const STAGES: StageConfig[] = [
-  // Colores ahora vienen de la paleta unificada (lib/colorPalette.ts).
-  // Cada etapa con un color distinto para que el kanban dé información de
-  // un vistazo. Los semantic ids viejos (info/warning/primary/etc.) siguen
-  // funcionando gracias al LEGACY_ALIAS — no rompemos workspaces existentes.
   { id: 'prospecto', label: 'Prospecto', color: 'slate', probability: 0.1 },
   { id: 'contactado', label: 'Contactado', color: 'blue', probability: 0.2 },
-  { id: 'visita-agendada', label: 'Visita agendada', color: 'cyan', probability: 0.4 },
-  { id: 'presupuestado', label: 'Presupuestado', color: 'yellow', probability: 0.6 },
-  { id: 'negociando', label: 'Negociando', color: 'orange', probability: 0.8 },
-  { id: 'cerrado', label: 'Cerrado', color: 'green', probability: 1, terminal: true },
+  { id: 'visita_agendada', label: 'Visita agendada', color: 'cyan', probability: 0.4 },
+  { id: 'presupuestado', label: 'Presupuestado', color: 'yellow', probability: 0.5 },
+  { id: 'aprobado', label: 'Aprobado', color: 'amber', probability: 0.7 },
+  { id: 'instalado', label: 'Instalado', color: 'green', probability: 0.9 },
+  { id: 'cobrado', label: 'Cobrado', color: 'green', probability: 1, terminal: true },
   { id: 'perdido', label: 'Perdido', color: 'red', probability: 0, terminal: true },
 ];
 

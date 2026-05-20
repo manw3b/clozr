@@ -674,6 +674,18 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
   // Hora puntual de la visita (separada de next_action_at, que puede ser
   // cualquier follow-up). Si está, gana sobre next_action_at para WA.
   await safe(() => dbExecute(`ALTER TABLE pipeline_items ADD COLUMN visit_at TEXT`));
+
+  // ════════════════════════════════════════════════════════════
+  //  029 — Redes sociales en cliente (opcionales)
+  // ════════════════════════════════════════════════════════════
+  // Guardamos el handle o URL completa — la UI maneja ambos casos. Para
+  // WhatsApp seguimos usando `phone` (con el deep link clozr arma wa.me).
+  // Si en el futuro sumamos más redes (snapchat, threads, etc.) extender
+  // acá. NO obligatorias, NO indexadas — son metadata de contacto.
+  await safe(() => dbExecute(`ALTER TABLE customers ADD COLUMN instagram TEXT`));
+  await safe(() => dbExecute(`ALTER TABLE customers ADD COLUMN facebook TEXT`));
+  await safe(() => dbExecute(`ALTER TABLE customers ADD COLUMN tiktok TEXT`));
+  await safe(() => dbExecute(`ALTER TABLE customers ADD COLUMN twitter TEXT`));
 }
 
 /**

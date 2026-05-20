@@ -21,6 +21,7 @@ import { Avatar } from '../../../components/Avatar';
 import { Tabs } from '../../../components/Tabs';
 import { TagChip } from '../../../components/TagChip';
 import { EmptyState } from '../../../components/EmptyState';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { useCustomerTags, useSetCustomerTags } from '../useClientsData';
 import { ManualDebtModal } from './ManualDebtModal';
 import type { ClientTag } from '../../../types/domain';
@@ -411,6 +412,8 @@ function Stat({
  * ============================================================ */
 
 function InfoTab({ client }: { client: ClientDetail }) {
+  const hasSocials =
+    !!(client.instagram || client.facebook || client.tiktok || client.twitter);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: space[5] }}>
       <InfoSection title="Datos de contacto">
@@ -421,6 +424,12 @@ function InfoTab({ client }: { client: ClientDetail }) {
           <InfoRow label="Cliente desde" value={formatDateLong(client.createdAt)} />
         )}
       </InfoSection>
+
+      {hasSocials && (
+        <InfoSection title="Redes sociales">
+          <SocialLinks client={client} />
+        </InfoSection>
+      )}
 
       <InfoSection title="Notas">
         {client.notes ? (
@@ -441,6 +450,61 @@ function InfoTab({ client }: { client: ClientDetail }) {
           </span>
         )}
       </InfoSection>
+    </div>
+  );
+}
+
+/**
+ * Renderiza los chips de redes sociales del cliente. Cada uno abre la URL
+ * externa via openUrl (Tauri plugin). Aceptamos handle (sin @) o URL
+ * completa — si no empieza con http(s), prependeamos el dominio base de
+ * cada red.
+ */
+function SocialLinks({
+  client,
+}: {
+  client: Pick<ClientDetail, 'instagram' | 'facebook' | 'tiktok' | 'twitter'>;
+}) {
+  const items: Array<{ key: string; label: string; value: string | undefined; baseUrl: string; color: string }> = [
+    { key: 'instagram', label: 'Instagram', value: client.instagram, baseUrl: 'https://instagram.com/', color: '#E1306C' },
+    { key: 'facebook', label: 'Facebook', value: client.facebook, baseUrl: 'https://facebook.com/', color: '#1877F2' },
+    { key: 'tiktok', label: 'TikTok', value: client.tiktok, baseUrl: 'https://tiktok.com/@', color: '#FF0050' },
+    { key: 'twitter', label: 'X / Twitter', value: client.twitter, baseUrl: 'https://x.com/', color: '#000000' },
+  ];
+
+  function resolveUrl(value: string, baseUrl: string): string {
+    const v = value.trim().replace(/^@/, '');
+    if (/^https?:\/\//i.test(v)) return v;
+    return baseUrl + v;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      {items
+        .filter((i) => i.value && i.value.trim().length > 0)
+        .map((i) => (
+          <button
+            key={i.key}
+            onClick={() => openUrl(resolveUrl(i.value as string, i.baseUrl)).catch(() => {})}
+            title={i.value}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '6px 10px',
+              background: 'var(--surface-2)',
+              border: `1px solid var(--border)`,
+              borderRadius: 6,
+              fontSize: text.xs,
+              fontWeight: weight.medium,
+              color: color.text,
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: i.color, flexShrink: 0 }} />
+            {i.label}
+          </button>
+        ))}
     </div>
   );
 }

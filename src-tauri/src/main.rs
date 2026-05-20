@@ -2,6 +2,8 @@
 
 use tauri_plugin_sql::Builder;
 
+mod turso_spike;
+
 fn main() {
     // Migrations nativas DESACTIVADAS — el schema se maneja desde JS en
     // src/lib/db/ensureSchema.ts (replayer idempotente). Esto evita el error
@@ -22,6 +24,13 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(Builder::new().build())
+        // Spike Fase 0 — comandos para validar libsql + Turso. Solo
+        // expuestos en build de desarrollo. Si la validación es exitosa
+        // los borramos y replicamos el patrón en un módulo definitivo.
+        .invoke_handler(tauri::generate_handler![
+            turso_spike::turso_ping,
+            turso_spike::turso_roundtrip,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

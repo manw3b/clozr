@@ -7,6 +7,13 @@ import { useUIStore } from "./store/uiStore";
 import { errorMessage, log } from "./lib/logger";
 import "./styles/globals.css";
 
+// Spike Fase 0 — expone window.__tursoSpike en dev mode para validar
+// que libsql + Turso funcionan runtime. Se monta condicionalmente
+// adentro del módulo. Ver src/dev/tursoSpike.ts para uso.
+if (import.meta.env.DEV) {
+  import("./dev/tursoSpike");
+}
+
 // Deshabilitar el context menu nativo del WebView (Atrás / Actualizar /
 // Imprimir / Inspeccionar / etc) que aparece por default. En una app
 // desktop esos items son ruido. En DEV lo dejamos activo para que se

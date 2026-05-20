@@ -182,6 +182,10 @@ export function dbCustomerToClient(c: DbCustomer): Client {
     phone: c.phone ?? undefined,
     email: c.email ?? undefined,
     type: CUSTOMER_TYPE_MAP[c.type] ?? "final",
+    // El status base viene del DB column (manual). Se OVERRIDE en
+    // useClientsList con deriveActivityStatus(lastContactAt, createdAt)
+    // para reflejar actividad real sin pedirle al usuario que lo marque
+    // cliente por cliente.
     status:
       c.status === "activo"
         ? "active"
@@ -195,6 +199,42 @@ export function dbCustomerToClient(c: DbCustomer): Client {
     notes: c.notes ?? undefined,
     createdAt: c.created_at,
   };
+}
+
+/**
+ * Deriva el "status de actividad" de un cliente según cuándo fue su último
+ * contacto. Reemplaza el flag manual `customers.status` del schema (que
+ * casi nadie actualizaba) por una clasificación automática que se calcula
+ * en cada read.
+ *
+ * Umbrales:
+ *  - sin contacto y creado hace ≤30d → "new"      (cliente reciente)
+ *  - último contacto ≤30d            → "active"   (todo bien)
+ *  - último contacto 31-90d          → "inactive" (dormido, hay que despertar)
+ *  - último contacto >90d            → "risk"     (perdiéndose)
+ *  - sin contacto y creado hace >30d → "inactive" (nunca lo trabajamos)
+ *
+ * Si en el futuro querés umbrales configurables por workspace, mover acá
+ * a un parámetro. Por ahora estos números son razonables para iPhone Club.
+ */
+export function deriveActivityStatus(
+  lastContactAt: string | null | undefined,
+  createdAt: string,
+): import("../types/domain").ClientStatus {
+  const DAY = 86_400_000;
+  const now = Date.now();
+
+  if (!lastContactAt) {
+    const ageMs = now - new Date(createdAt).getTime();
+    return ageMs <= 30 * DAY ? "new" : "inactive";
+  }
+
+  const sinceMs = now - new Date(lastContactAt).getTime();
+  const days = sinceMs / DAY;
+
+  if (days <= 30) return "active";
+  if (days <= 90) return "inactive";
+  return "risk";
 }
 
 export function dbCustomerToInactive(c: DbCustomer, daysSinceContact: number): InactiveClient {

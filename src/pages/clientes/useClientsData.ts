@@ -5,7 +5,7 @@ import { customersDb } from "../../lib/db/customers";
 import { salesDb } from "../../lib/db/sales";
 import { customerContactsDb, type ContactKind } from "../../lib/db/customerContacts";
 import { customerTagsDb, type CustomerTag } from "../../lib/db/customerTags";
-import { dbCustomerToClient, dbSaleToDomain } from "../../lib/mappers";
+import { dbCustomerToClient, dbSaleToDomain, deriveActivityStatus } from "../../lib/mappers";
 import { qk, invalidate } from "../../lib/queryKeys";
 import type { Client, ClientDetail, ActivityItem } from "../../types/domain";
 
@@ -23,9 +23,17 @@ export function useClientsList() {
       const tagsMap = await customerTagsDb.getForCustomerIds(ids);
       return dbCustomers.map((c): Client => {
         const base = dbCustomerToClient(c);
+        // lastContactAt: el último registro en customer_contacts si existe,
+        // sino caemos a updated_at (que se mueve cuando editás el cliente
+        // pero NO cuando le mandás WA — por eso priorizamos contacts).
+        const lastContactAt = lastContactMap.get(c.id) ?? null;
         return {
           ...base,
-          lastContactAt: lastContactMap.get(c.id) ?? c.updated_at,
+          // Override del status manual: calculamos actividad real desde
+          // last contact + created_at. Ver deriveActivityStatus para la
+          // matriz de umbrales.
+          status: deriveActivityStatus(lastContactAt, c.created_at),
+          lastContactAt: lastContactAt ?? c.updated_at,
           lastPurchaseAt: c.updated_at,
           balanceDue: 0, // computed only in detail
           tags: tagsMap.get(c.id) ?? [],

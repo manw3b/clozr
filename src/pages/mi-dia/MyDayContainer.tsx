@@ -10,7 +10,6 @@ import { useUIStore, type ScreenId } from "../../store/uiStore";
 import { tasksDb } from "../../lib/db/tasks";
 import { followupsDb } from "../../lib/db/followups";
 import { salesDb } from "../../lib/db/sales";
-import { customersDb } from "../../lib/db/customers";
 import { scoreDb } from "../../lib/db/score";
 import { workspaceDb } from "../../lib/db/workspace";
 import { openWhatsApp, openTel } from "../../lib/openExternal";
@@ -21,13 +20,10 @@ import {
   dbFollowupToDomain,
   dbSaleRowToDomain,
   dbSaleToDueCollection,
-  dbCustomerToInactive,
 } from "../../lib/mappers";
 import { qk } from "../../lib/queryKeys";
-import { useRecordContact } from "../clientes/useClientsData";
-import type { MyDayData } from "../../types/domain";
-
-const INACTIVE_DAYS_THRESHOLD = 30;
+import { useClientsList, useRecordContact } from "../clientes/useClientsData";
+import type { MyDayData, InactiveClient } from "../../types/domain";
 
 export function MyDayContainer() {
   const { activeWorkspace } = useWorkspaceStore();
@@ -66,11 +62,13 @@ export function MyDayContainer() {
     enabled: !!wid,
   });
 
-  const customersQ = useQuery({
-    queryKey: qk.clientes.list(wid),
-    queryFn: () => customersDb.getAll(wid),
-    enabled: !!wid,
-  });
+  // Usamos el mismo hook que la pantalla Clientes — devuelve Client[] con
+  // status ya derivado de actividad (active/new/inactive/risk según días
+  // sin contacto). Antes hacíamos otro useQuery con la MISMA queryKey pero
+  // queryFn distinta (raw vs enriched), lo que era un bug latente: el que
+  // mountaba primero ganaba y el otro componente recibía data del shape
+  // equivocado.
+  const customersQ = useClientsList();
 
   const scoreQ = useQuery({
     queryKey: qk.miDia.score(wid),
@@ -141,13 +139,24 @@ export function MyDayContainer() {
     const dueCollections = (pendingCobrosQ.data ?? []).map(dbSaleToDueCollection);
 
     const now = Date.now();
-    const inactiveClients = (customersQ.data ?? [])
-      .filter((c) => c.status === "dormido" || c.status === "perdido")
-      .slice(0, 5)
-      .map((c) => {
-        const days = Math.floor((now - new Date(c.updated_at).getTime()) / 86400000);
-        return dbCustomerToInactive(c, Math.max(INACTIVE_DAYS_THRESHOLD, days));
-      });
+    // Filtramos los Client enriquecidos por status DERIVADO (no por la
+    // columna manual del DB que casi nadie actualizaba). Tomamos hasta 5,
+    // priorizando los más viejos sin contacto.
+    const inactiveClients: InactiveClient[] = (customersQ.data ?? [])
+      .filter((c) => c.status === "inactive" || c.status === "risk")
+      .map((c): InactiveClient => {
+        // Fallback chain: contacto > creación > "ahora" (defensivo —
+        // createdAt es opcional en el tipo aunque siempre viene del DB).
+        const refDate = c.lastContactAt ?? c.createdAt ?? new Date().toISOString();
+        const days = Math.floor((now - new Date(refDate).getTime()) / 86_400_000);
+        return {
+          client: c,
+          daysSinceContact: Math.max(0, days),
+          totalPurchases: c.totalPurchases ?? 0,
+        };
+      })
+      .sort((a, b) => b.daysSinceContact - a.daysSinceContact)
+      .slice(0, 5);
 
     const goalAmount = activeWorkspace?.daily_goal ?? 0;
     const goalSalesCount = activeWorkspace?.daily_goal_count ?? 0;

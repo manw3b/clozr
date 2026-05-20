@@ -21,11 +21,24 @@ tauri-plugin-window-state = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# Spike Fase 0 — validar libsql embedded replica + sync con Turso cloud.
-# Si esto buildea limpio en Windows y un test command funciona, seguimos
-# con el reemplazo completo de tauri-plugin-sql. Si falla, pivoteamos.
-# remote = HTTP client, replication = embedded replica con sync.
-libsql = { version = "0.6", default-features = false, features = ["core", "remote", "replication"] }
+# Spike Fase 0 — PIVOT 2: HTTP directo via reqwest.
+#
+# Histórico de intentos:
+#  1. libsql 0.6 full (core + remote + replication) → libsql-ffi falla
+#     en Windows con "program not found" incluso con MSVC + LLVM.
+#  2. libsql 0.6 remote-only → libsql-sys usa API Unix-only
+#     (OsStr::as_bytes) que en Windows ni compila.
+#  3. (acá) reqwest contra el endpoint Turso `/v2/pipeline` → puro Rust
+#     sin native deps, garantizado Windows. Misma capacidad funcional
+#     (auth + query + multi-PC) pero perdemos la API "se siente SQLite"
+#     que da el SDK libsql.
+#
+# Trade-offs aceptados:
+#  - SIN réplica embedded local — cada query es 1 HTTP a Turso. Latencia
+#    ~400ms desde AR. Cuando esto sea problema, evaluar (a) bundlear
+#    sqlite local y sync nosotros, (b) revisar versiones nuevas libsql,
+#    (c) seguir con HTTP puro si la latencia es aceptable.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
 
 [profile.release]

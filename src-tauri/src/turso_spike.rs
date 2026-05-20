@@ -1,22 +1,27 @@
-//! Spike Fase 0 — validar libsql + Turso en Tauri 2 (Windows / WebView2).
+//! Spike Fase 0 — PIVOT 2: HTTP directo a Turso vía reqwest.
 //!
-//! Dos comandos Tauri expuestos:
+//! Por qué no libsql SDK: ver comentario en Cargo.toml. Resumen: el SDK
+//! de libsql tiene problemas de build en Windows (libsql-ffi requiere
+//! prereqs no documentados, libsql-sys usa API Unix-only). Fuimos
+//! pragmáticos y validamos el transport HTTP puro contra Turso.
 //!
-//!   - `turso_ping(url, token)` → conecta remoto puro vía libsql HTTP y
-//!     ejecuta `SELECT 1+1 as result`. Si responde "2" sabemos que la
-//!     transport layer básica anda. Esto NO valida la réplica local.
+//! Endpoint usado: `POST {dbUrl}/v2/pipeline`
+//! Auth: `Authorization: Bearer <token>`
+//! Body: `{ "requests": [{ "type": "execute", "stmt": {"sql": "..."}}, {"type":"close"}] }`
 //!
-//!   - `turso_roundtrip(url, token, local_path)` → crea una réplica
-//!     embedded en `local_path`, hace un CREATE TABLE + INSERT + SELECT,
-//!     fuerza sync, devuelve cuántas filas leyó. Esto SÍ valida el modelo
-//!     que usaremos en producción (lee local, escribe local + sync a
-//!     cloud).
+//! Dos comandos Tauri:
+//!   - `turso_ping(url, token)` → SELECT 1+1 y extrae el `2` de la
+//!     primera fila.
+//!   - `turso_roundtrip(url, token, local_path)` → CREATE TABLE + INSERT
+//!     + COUNT en una sola request multi-statement. Valida que el flow
+//!     completo de schema + writes + reads funciona end-to-end.
 //!
-//! Llamados desde JS con `invoke('turso_ping', { url, token })`. La UI
-//! del spike está en src/dev/TursoSpike.tsx (montado condicionalmente
-//! en dev mode).
+//! El parámetro `local_path` se mantiene en la firma de roundtrip para
+//! que cuando volvamos a embedded replica (Fase 2) no tengamos que
+//! cambiar el contrato del comando — se ignora por ahora.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 #[derive(Serialize)]
 pub struct PingResult {
@@ -34,122 +39,138 @@ pub struct RoundtripResult {
     pub elapsed_ms: u128,
 }
 
-/// Conexión remota pura — no usa storage local. Sirve para validar que
-/// el binario buildea con libsql y que las creds funcionan en runtime.
+/// Convierte una URL `libsql://host` → `https://host` para hablarle al
+/// endpoint HTTP. Si ya viene https/http la deja igual.
+fn to_http_url(url: &str) -> String {
+    if let Some(rest) = url.strip_prefix("libsql://") {
+        format!("https://{rest}")
+    } else {
+        url.to_string()
+    }
+}
+
+/// Manda una pipeline a Turso y devuelve el JSON `results` como Value.
+/// Cada statement va dentro de un objeto execute; opcionalmente se
+/// agrega un close al final para liberar el baton (no estamos
+/// reutilizando la conexión, así que cerramos siempre).
+async fn execute_pipeline(
+    base_url: &str,
+    token: &str,
+    statements: Vec<&str>,
+) -> Result<Value, String> {
+    let http = to_http_url(base_url);
+    let url = format!("{http}/v2/pipeline");
+
+    let mut requests: Vec<Value> = statements
+        .iter()
+        .map(|sql| json!({ "type": "execute", "stmt": { "sql": sql } }))
+        .collect();
+    requests.push(json!({ "type": "close" }));
+
+    let client = reqwest::Client::new();
+    let res = client
+        .post(&url)
+        .bearer_auth(token)
+        .json(&json!({ "requests": requests }))
+        .send()
+        .await
+        .map_err(|e| format!("send: {e}"))?;
+
+    let status = res.status();
+    let body: Value = res
+        .json()
+        .await
+        .map_err(|e| format!("decode: {e}"))?;
+
+    if !status.is_success() {
+        return Err(format!("HTTP {status}: {body}"));
+    }
+
+    Ok(body)
+}
+
+#[derive(Deserialize)]
+struct CellValue {
+    #[serde(rename = "type")]
+    kind: String,
+    value: Value,
+}
+
+/// Extrae un i64 de `body.results[stmt_idx].response.result.rows[0][0]`.
+/// Si Turso devuelve los enteros como string ("2"), lo parseamos.
+fn extract_first_int(body: &Value, stmt_idx: usize) -> Result<i64, String> {
+    let cell = body
+        .pointer(&format!("/results/{stmt_idx}/response/result/rows/0/0"))
+        .ok_or_else(|| format!("no cell at stmt {stmt_idx}: {body}"))?;
+    let cell: CellValue =
+        serde_json::from_value(cell.clone()).map_err(|e| format!("cell shape: {e}"))?;
+    if cell.kind != "integer" {
+        return Err(format!("expected integer, got {}: {:?}", cell.kind, cell.value));
+    }
+    match cell.value {
+        Value::String(s) => s.parse::<i64>().map_err(|e| format!("parse: {e}")),
+        Value::Number(n) => n.as_i64().ok_or_else(|| "not i64".to_string()),
+        _ => Err(format!("unexpected value: {:?}", cell.value)),
+    }
+}
+
 #[tauri::command]
 pub async fn turso_ping(url: String, token: String) -> Result<PingResult, String> {
     let start = std::time::Instant::now();
-
-    let result = (|| async {
-        let db = libsql::Builder::new_remote(url, token)
-            .build()
-            .await
-            .map_err(|e| format!("build: {e}"))?;
-        let conn = db.connect().map_err(|e| format!("connect: {e}"))?;
-        let mut rows = conn
-            .query("SELECT 1+1 as result", ())
-            .await
-            .map_err(|e| format!("query: {e}"))?;
-        let row = rows
-            .next()
-            .await
-            .map_err(|e| format!("next: {e}"))?
-            .ok_or_else(|| "no row returned".to_string())?;
-        let value: i64 = row.get(0).map_err(|e| format!("get: {e}"))?;
-        Ok::<i64, String>(value)
-    })()
-    .await;
-
+    let result = execute_pipeline(&url, &token, vec!["SELECT 1+1 as result"])
+        .await
+        .and_then(|body| extract_first_int(&body, 0));
     let elapsed_ms = start.elapsed().as_millis();
-    match result {
-        Ok(value) => Ok(PingResult {
+    Ok(match result {
+        Ok(value) => PingResult {
             ok: true,
             value: Some(value),
             error: None,
             elapsed_ms,
-        }),
-        Err(e) => Ok(PingResult {
+        },
+        Err(error) => PingResult {
             ok: false,
             value: None,
-            error: Some(e),
+            error: Some(error),
             elapsed_ms,
-        }),
-    }
+        },
+    })
 }
 
-/// Réplica embedded — el modelo real que usaríamos en producción.
-///
-/// Crea un archivo SQLite local en `local_path`, le configura sync con
-/// el Turso remoto, hace un CREATE TABLE + INSERT + sync push, lee la
-/// cantidad de filas locales.
-///
-/// Si esto anda: reads son 0ms (local), writes son 0ms local + N ms
-/// asíncrono al sync. La UX es como tener SQLite puro pero todo se
-/// replica al cloud.
 #[tauri::command]
 pub async fn turso_roundtrip(
     url: String,
     token: String,
     local_path: String,
 ) -> Result<RoundtripResult, String> {
+    let _ = local_path; // ignorado en remote-only
     let start = std::time::Instant::now();
 
-    let result = (|| async {
-        let db = libsql::Builder::new_remote_replica(local_path, url, token)
-            .build()
-            .await
-            .map_err(|e| format!("build: {e}"))?;
-
-        // Pull cualquier cosa que esté en remoto antes de empezar.
-        db.sync().await.map_err(|e| format!("sync pre: {e}"))?;
-
-        let conn = db.connect().map_err(|e| format!("connect: {e}"))?;
-
-        conn.execute(
+    let result = execute_pipeline(
+        &url,
+        &token,
+        vec![
             "CREATE TABLE IF NOT EXISTS spike_test (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, at TEXT DEFAULT (datetime('now')))",
-            (),
-        )
-        .await
-        .map_err(|e| format!("create: {e}"))?;
-
-        conn.execute(
-            "INSERT INTO spike_test (msg) VALUES (?)",
-            libsql::params!["roundtrip from clozr tauri"],
-        )
-        .await
-        .map_err(|e| format!("insert: {e}"))?;
-
-        // Push del INSERT al remoto.
-        db.sync().await.map_err(|e| format!("sync post: {e}"))?;
-
-        let mut rows = conn
-            .query("SELECT COUNT(*) FROM spike_test", ())
-            .await
-            .map_err(|e| format!("count: {e}"))?;
-        let row = rows
-            .next()
-            .await
-            .map_err(|e| format!("count next: {e}"))?
-            .ok_or_else(|| "no count row".to_string())?;
-        let count: i64 = row.get(0).map_err(|e| format!("count get: {e}"))?;
-
-        Ok::<i64, String>(count)
-    })()
-    .await;
+            "INSERT INTO spike_test (msg) VALUES ('roundtrip from clozr tauri (HTTP)')",
+            "SELECT COUNT(*) FROM spike_test",
+        ],
+    )
+    .await
+    .and_then(|body| extract_first_int(&body, 2));
 
     let elapsed_ms = start.elapsed().as_millis();
-    match result {
-        Ok(count) => Ok(RoundtripResult {
+    Ok(match result {
+        Ok(count) => RoundtripResult {
             ok: true,
             rows_after_insert: Some(count),
             error: None,
             elapsed_ms,
-        }),
-        Err(e) => Ok(RoundtripResult {
+        },
+        Err(error) => RoundtripResult {
             ok: false,
             rows_after_insert: None,
-            error: Some(e),
+            error: Some(error),
             elapsed_ms,
-        }),
-    }
+        },
+    })
 }

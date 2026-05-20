@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MyDay } from "./MyDay";
 import { NewSaleModal } from "../ventas/components/NewSaleModal";
 import { useCreateSale } from "../ventas/useSalesData";
+import { NewTaskModal } from "../tareas/components/NewTaskModal";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useBusinessStore } from "../../store/businessStore";
 import { useAuthStore } from "../../store/authStore";
@@ -32,6 +33,11 @@ export function MyDayContainer() {
   const { setActiveScreen, showToast } = useUIStore();
   const qc = useQueryClient();
   const [newSaleOpen, setNewSaleOpen] = useState(false);
+  // "Crear tarea" desde Mi Día abre este modal INLINE. La intención de
+  // Mi Día son atajos rápidos del día a día sin salir del dashboard —
+  // si el usuario quiere la vista full de tareas (filtros, contextos,
+  // bulk actions), ahí sí navega a la screen "Tareas" con el menú.
+  const [newTaskOpen, setNewTaskOpen] = useState(false);
   const createSaleMut = useCreateSale();
 
   const wid = activeWorkspace?.id ?? "";
@@ -201,14 +207,7 @@ export function MyDayContainer() {
       onSetSalesGoal={(count) => setGoalMut.mutate({ salesCount: count })}
       onToggleTask={(id) => toggleTaskMut.mutate(id)}
       onMarkPaid={(id) => markPaidMut.mutate(id)}
-      onCreateTask={() => {
-        // Mi Día y Tareas son pantallas distintas: navegamos primero a
-        // tareas y luego pedimos abrir el form. El listener vive en
-        // Tareas.tsx. Sin la navegación previa el form se montaría
-        // pero no se vería porque seguís en Mi Día.
-        setActiveScreen("tasks");
-        window.dispatchEvent(new CustomEvent("clozr:open-new-task"));
-      }}
+      onCreateTask={() => setNewTaskOpen(true)}
       onWhatsApp={(clientId, opts) => {
         const customer = customersQ.data?.find((c) => c.id === clientId);
         if (customer?.phone) {
@@ -243,6 +242,7 @@ export function MyDayContainer() {
         showToast(data.outOfStock ? "Venta fuera de stock registrada" : "Venta registrada", "success");
       }}
     />
+    <NewTaskModal open={newTaskOpen} onClose={() => setNewTaskOpen(false)} />
     </>
   );
 }

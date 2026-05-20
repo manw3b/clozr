@@ -342,6 +342,14 @@ export function Pipeline() {
       if (migratedRef.has(l.id)) continue;
       const target = resolveLeadStage(l.stage, STAGES);
       if (target === l.stage) continue;
+      // eslint-disable-next-line no-console
+      console.warn("[Pipeline] orphan-stage rescue dispatching move", {
+        leadId: l.id,
+        clientName: l.clientName,
+        rawStage: l.stage,
+        target,
+        stagesInUI: STAGES.map((s) => s.id),
+      });
       migratedRef.add(l.id);
       moveLeadMut.mutate({ leadId: l.id, newStage: target });
     }
@@ -579,6 +587,14 @@ export function Pipeline() {
         targetStage = leads.find((l) => l.id === overId)?.stage ?? null;
       }
     }
+    // eslint-disable-next-line no-console
+    console.log("[Pipeline.handleDragEnd] resolved targetStage", {
+      activeId,
+      overId,
+      targetStage,
+      overDataType: overData?.type,
+      stagesInUI: STAGES.map((s) => s.id),
+    });
     if (!targetStage) return;
 
     setLeads((prev) => {

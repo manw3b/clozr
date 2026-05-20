@@ -138,25 +138,16 @@ export function SectionCard({
         {onViewAll && (
           <button
             onClick={onViewAll}
+            className="btn-icon muted"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: space[1],
               padding: `${space[1]} ${space[2]}`,
               fontSize: text.sm,
-              color: color.textMuted,
               fontWeight: weight.medium,
               borderRadius: radius.md,
-              transition: 'color 100ms, background 100ms',
               flexShrink: 0,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = color.text;
-              e.currentTarget.style.background = color.surfaceHover;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = color.textMuted;
-              e.currentTarget.style.background = 'transparent';
             }}
           >
             {viewAllLabel}
@@ -185,6 +176,7 @@ export function SectionRow({ children, onClick, isLast }: SectionRowProps) {
   return (
     <div
       onClick={onClick}
+      className={onClick ? 'row-hover' : undefined}
       style={{
         padding: `${space[3]} ${space[5]}`,
         borderBottom: isLast ? 'none' : `1px solid ${color.border}`,
@@ -192,13 +184,6 @@ export function SectionRow({ children, onClick, isLast }: SectionRowProps) {
         alignItems: 'center',
         gap: space[3],
         cursor: onClick ? 'pointer' : 'default',
-        transition: 'background 100ms',
-      }}
-      onMouseEnter={(e) => {
-        if (onClick) e.currentTarget.style.background = color.surfaceHover;
-      }}
-      onMouseLeave={(e) => {
-        if (onClick) e.currentTarget.style.background = 'transparent';
       }}
     >
       {children}

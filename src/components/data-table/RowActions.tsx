@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode } from 'react';
 import { color, radius } from '../../tokens';
 
 interface RowAction {
@@ -39,8 +39,9 @@ export function RowActions({ actions, alwaysVisible }: RowActionsProps) {
 }
 
 function ActionButton({ action }: { action: RowAction }) {
-  const [hover, setHover] = useState(false);
-
+  // Color base por tone (success=verde, danger=rojo, neutral=muted). El hover
+  // (cambio de bg + color) lo maneja .btn-icon en globals.css con la variante
+  // que corresponde.
   const baseColor =
     action.tone === 'success'
       ? color.success
@@ -48,19 +49,12 @@ function ActionButton({ action }: { action: RowAction }) {
       ? color.danger
       : color.textMuted;
 
-  const hoverBg =
+  const variantClass =
     action.tone === 'success'
-      ? color.successBg
+      ? 'wa'
       : action.tone === 'danger'
-      ? color.dangerBg
-      : color.surfaceHover;
-
-  const hoverColor =
-    action.tone === 'success'
-      ? color.success
-      : action.tone === 'danger'
-      ? color.danger
-      : color.text;
+      ? 'danger'
+      : 'muted';
 
   return (
     <button
@@ -70,18 +64,15 @@ function ActionButton({ action }: { action: RowAction }) {
         e.stopPropagation();
         action.onClick(e);
       }}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className={`btn-icon ${variantClass}`}
       style={{
         width: 30,
         height: 30,
         borderRadius: radius.md,
-        background: hover ? hoverBg : 'transparent',
-        color: hover ? hoverColor : baseColor,
+        color: baseColor,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        transition: 'all 100ms',
       }}
     >
       {action.icon}

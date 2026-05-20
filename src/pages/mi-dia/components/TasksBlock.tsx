@@ -84,20 +84,12 @@ function TaskRow({
           width: 22,
           height: 22,
           borderRadius: radius.sm,
-          border: `2px solid ${isDone ? color.success : color.border}`,
-          background: isDone ? color.success : 'transparent',
           color: '#FFFFFF',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          transition: 'all 150ms',
         }}
-        onMouseEnter={(e) => {
-          if (!isDone) e.currentTarget.style.borderColor = color.primary;
-        }}
-        onMouseLeave={(e) => {
-          if (!isDone) e.currentTarget.style.borderColor = color.border;
-        }}
+        className={`task-checkbox${isDone ? ' done' : ''}`}
       >
         {isDone && <Check size={14} strokeWidth={3} />}
       </button>

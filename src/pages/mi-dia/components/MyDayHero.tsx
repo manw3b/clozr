@@ -323,31 +323,17 @@ function SalesGoalChip({
       type="button"
       onClick={isClickable ? () => setEditing(true) : undefined}
       disabled={!isClickable}
+      className={isClickable ? 'btn-icon muted' : undefined}
       style={{
         fontSize: text.xs,
         fontWeight: weight.semibold,
-        color: color.textDim,
-        background: 'transparent',
-        cursor: isClickable ? 'pointer' : 'default',
+        color: isClickable ? undefined : color.textDim,
         padding: '2px 6px',
         borderRadius: radius.sm,
         border: `1px dashed ${salesGoal ? 'transparent' : color.border}`,
-        transition: 'background 100ms, color 100ms, border-color 100ms',
         display: 'inline-flex',
         alignItems: 'center',
         gap: 3,
-      }}
-      onMouseEnter={(e) => {
-        if (isClickable) {
-          e.currentTarget.style.color = color.text;
-          e.currentTarget.style.background = color.surfaceHover;
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (isClickable) {
-          e.currentTarget.style.color = color.textDim;
-          e.currentTarget.style.background = 'transparent';
-        }
       }}
       title={isClickable ? 'Editar objetivo de ventas' : undefined}
     >
@@ -558,26 +544,15 @@ function GoalEditButton({
         onClick={() => setEditing(true)}
         title="Editar objetivo"
         aria-label="Editar objetivo"
+        className="btn-icon muted"
         style={{
           marginLeft: space[1],
           width: 24,
           height: 24,
           borderRadius: radius.sm,
-          color: color.textDim,
-          background: 'transparent',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          cursor: 'pointer',
-          transition: 'color 100ms, background 100ms',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.color = color.text;
-          e.currentTarget.style.background = color.surfaceHover;
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.color = color.textDim;
-          e.currentTarget.style.background = 'transparent';
         }}
       >
         <Pencil size={12} />

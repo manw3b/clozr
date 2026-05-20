@@ -458,23 +458,16 @@ function DolaresPopoverChip({
                       setActiveKind(r.kind);
                       setOpen(false);
                     }}
+                    className={isActive ? undefined : "row-hover"}
                     style={{
                       display: "flex",
                       alignItems: "center",
                       gap: space[2],
                       padding: `${space[2]} ${space[3]}`,
-                      background: isActive ? color.primaryBg : "transparent",
+                      background: isActive ? color.primaryBg : undefined,
                       border: "none",
-                      cursor: "pointer",
                       width: "100%",
                       textAlign: "left",
-                      transition: "background 100ms",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isActive) e.currentTarget.style.background = color.surfaceHover;
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) e.currentTarget.style.background = "transparent";
                     }}
                   >
                     <span

@@ -82,6 +82,63 @@ tr.hoverable:hover td {
   color: var(--text);
 }
 
+/* Variante danger — tinta de rojo en hover (delete buttons en filas) */
+.btn-icon.danger:hover:not(:disabled),
+.btn-icon.danger.active {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* Variante primary — tinta de primary (rojo Clozr) en hover (CardActionBtn
+ * "Cerrar venta", botones de acción primaria en cards). */
+.btn-icon.primary {
+  color: var(--primary);
+}
+.btn-icon.primary:hover:not(:disabled),
+.btn-icon.primary.active {
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+
+/* ─── Task checkbox (mi-dia/TasksBlock) ──────────────────────────────
+ * Vacío: border sutil. Hover: border primary (rojo). Marcado: bg success.
+ * El marcado se setea inline porque rompe el patrón normal.
+ */
+.task-checkbox {
+  border: 2px solid var(--border);
+  background: transparent;
+  transition: all 150ms;
+}
+.task-checkbox:hover:not(.done) {
+  border-color: var(--primary);
+}
+.task-checkbox.done {
+  border-color: var(--success);
+  background: var(--success);
+}
+
+/* ─── ImageUpload trigger (ui/ImageUpload.tsx) ───────────────────────
+ * Overlay con ícono de cámara visible solo en hover del trigger.
+ * El overlay siempre está en el DOM (cuando hay imagen) y se muestra
+ * vía opacity, así sacamos el useState(hovered) de React.
+ */
+.image-upload-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 100ms;
+}
+.image-upload-trigger {
+  cursor: pointer;
+}
+.image-upload-trigger:hover .image-upload-overlay {
+  opacity: 1;
+}
+
 /* Botón con borde + bg compuestos (full triggers, secondary buttons) */
 .btn-bordered {
   cursor: pointer;

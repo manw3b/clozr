@@ -294,6 +294,7 @@ function ContactButton({
   return (
     <button
       onClick={onClick}
+      className="btn-bordered"
       style={{
         flex: minimal ? 'none' : 1,
         height: 32,
@@ -307,19 +308,10 @@ function ContactButton({
         color: color.text,
         fontSize: text.sm,
         fontWeight: weight.medium,
-        transition: 'all 100ms',
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         minWidth: 0,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = color.surfaceHover;
-        e.currentTarget.style.borderColor = color.borderStrong;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = color.surface2;
-        e.currentTarget.style.borderColor = color.border;
       }}
     >
       <span style={{ color: color.textMuted, display: 'inline-flex', flexShrink: 0 }}>{icon}</span>
@@ -342,23 +334,14 @@ function IconButton({
       onClick={onClick}
       title={title}
       aria-label={title}
+      className="btn-icon muted"
       style={{
         width: 28,
         height: 28,
         borderRadius: radius.sm,
-        color: color.textMuted,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        transition: 'all 100ms',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = color.surfaceHover;
-        e.currentTarget.style.color = color.text;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.color = color.textMuted;
       }}
     >
       {children}
@@ -950,23 +933,12 @@ function ClientTagsEditor({
           alignItems: 'center',
           gap: 3,
           padding: '2px 8px',
-          background: 'transparent',
           border: `1px dashed ${color.border}`,
           borderRadius: radius.sm,
-          color: color.textMuted,
           fontSize: 11,
           fontWeight: weight.semibold,
-          cursor: 'pointer',
-          transition: 'all 100ms',
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = color.borderStrong;
-          e.currentTarget.style.color = color.text;
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = color.border;
-          e.currentTarget.style.color = color.textMuted;
-        }}
+        className="btn-bordered"
       >
         {tags.length === 0 ? (
           <>
@@ -1014,22 +986,18 @@ function ClientTagsEditor({
                   key={t.id}
                   type="button"
                   onClick={() => toggle(t.id)}
+                  className="row-hover"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: space[2],
                     padding: `6px ${space[3]}`,
-                    background: 'transparent',
                     color: color.text,
                     fontSize: text.sm,
                     fontWeight: weight.medium,
                     textAlign: 'left',
                     borderRadius: radius.sm,
-                    cursor: 'pointer',
-                    transition: 'background 100ms',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = color.surfaceHover)}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <TagChip tag={t} size="sm" />

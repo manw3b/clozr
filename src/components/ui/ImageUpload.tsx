@@ -27,7 +27,6 @@ export default function ImageUpload({
 }: ImageUploadProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [hovered, setHovered] = useState(false);
 
   const px = SIZE_MAP[size];
   const borderRadius = shape === "circle" ? "50%" : 8;
@@ -67,8 +66,7 @@ export default function ImageUpload({
       <button
         type="button"
         onClick={handleClick}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        className="image-upload-trigger"
         style={{
           width: "100%",
           height: "100%",
@@ -77,7 +75,6 @@ export default function ImageUpload({
           border: "1px solid var(--border-strong)",
           overflow: "hidden",
           position: "relative",
-          cursor: "pointer",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -94,16 +91,11 @@ export default function ImageUpload({
         ) : imageUrl ? (
           <>
             <img src={imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            {hovered && (
-              <div style={{
-                position: "absolute", inset: 0,
-                background: "rgba(0,0,0,0.45)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                borderRadius,
-              }}>
-                <Camera size={iconSize} color="#fff" />
-              </div>
-            )}
+            {/* Overlay siempre en DOM cuando hay imagen — visibilidad por
+                CSS :hover en .image-upload-trigger. Antes era state-driven. */}
+            <div className="image-upload-overlay" style={{ borderRadius }}>
+              <Camera size={iconSize} color="#fff" />
+            </div>
           </>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>

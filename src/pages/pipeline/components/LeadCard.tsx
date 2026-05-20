@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { WaQuickPicker } from '../../../components/WaQuickPicker';
 import { Avatar } from '../../../components/Avatar';
-import { color, radius, space, text, weight, duration, ease } from '../../../tokens';
+import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney, formatRelative } from '../../../lib/format';
 import type { Lead, LeadStage } from '../../../types/domain';
 import { usePipelineStages } from '../usePipelineStages';
@@ -634,22 +634,18 @@ function MenuItem({
   return (
     <button
       onClick={onClick}
+      className="row-hover"
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: space[2],
         padding: `7px ${space[3]}`,
-        background: 'transparent',
         color: c,
         fontSize: text.sm,
         fontWeight: weight.medium,
         textAlign: 'left',
         borderRadius: radius.sm,
-        cursor: 'pointer',
-        transition: `background ${duration.fast} ${ease}`,
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = color.surfaceHover)}
-      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
       {children}
     </button>
@@ -671,43 +667,23 @@ function CardActionBtn({
   onClick: (e: React.MouseEvent) => void;
   tone?: 'success' | 'primary';
 }) {
-  const baseColor =
-    tone === 'success' ? color.success
-    : tone === 'primary' ? color.primary
-    : color.textMuted;
-  const hoverBg =
-    tone === 'success' ? color.successBg
-    : tone === 'primary' ? color.primaryBg
-    : color.surfaceHover;
-  const hoverColor =
-    tone === 'success' ? color.success
-    : tone === 'primary' ? color.primary
-    : color.text;
+  // Mapeo de tone a la variante .btn-icon que define el hover bg + color.
+  const variantClass =
+    tone === 'success' ? 'wa' : tone === 'primary' ? 'primary' : 'muted';
   return (
     <button
       aria-label={ariaLabel}
       title={ariaLabel}
       onClick={onClick}
       onMouseDown={(e) => e.stopPropagation()} // evita que dispare drag
+      className={`btn-icon ${variantClass}`}
       style={{
         width: 26,
         height: 26,
         borderRadius: radius.sm,
-        background: 'transparent',
-        color: baseColor,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        transition: 'all 100ms',
-        cursor: 'pointer',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = hoverBg;
-        e.currentTarget.style.color = hoverColor;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.color = baseColor;
       }}
     >
       {children}

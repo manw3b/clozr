@@ -181,25 +181,14 @@ function QuickActionButton({
         e.stopPropagation();
         onClick();
       }}
+      className={`btn-icon ${tone === 'success' ? 'wa' : 'muted'}`}
       style={{
         width: 32,
         height: 32,
         borderRadius: radius.md,
-        background: 'transparent',
-        color: tone === 'success' ? color.success : color.textMuted,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        transition: 'all 100ms',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background =
-          tone === 'success' ? color.successBg : color.surfaceHover;
-        e.currentTarget.style.color = tone === 'success' ? color.success : color.text;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.color = tone === 'success' ? color.success : color.textMuted;
       }}
     >
       {children}

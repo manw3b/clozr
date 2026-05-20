@@ -45,7 +45,12 @@ export function followupForStage(
 ): StageFollowupConfig | null {
   const cfg = STAGE_FOLLOWUPS[stage];
   if (!cfg) return null;
-  const firstName = customerName.trim().split(/\s+/)[0] ?? customerName;
+  // Defensa: si por algún motivo llega null/undefined/non-string (cache
+  // viejo, edge case del mapper), evitamos tirar TypeError aquí porque
+  // useMoveLead llama a esto en su mutationFn — una excepción rebota el
+  // move (rollback + toast confuso). Default a "" → firstName queda "".
+  const safeName = typeof customerName === "string" ? customerName : "";
+  const firstName = safeName.trim().split(/\s+/)[0] ?? safeName;
   return {
     days: cfg.days,
     text: cfg.text.replace(/\{nombre\}/g, firstName),

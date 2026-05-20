@@ -56,16 +56,40 @@ export function useMoveLead() {
       }
       await pipelineDb.updateStage(leadId, newStage, stageConfig.name, stageOrder);
 
-      // Auto-followup según la nueva etapa. Best-effort: si falla no
-      // queremos romper el move (la persistencia del stage ya está hecha).
-      const lead = qc.getQueryData<Lead[]>(qk.pipeline.leads(wid))?.find((l) => l.id === leadId);
-      if (lead && lead.clientId && bid) {
-        const cfg = followupForStage(newStage, lead.clientName);
-        if (cfg) {
-          await followupsDb
-            .createStageFollowup(wid, bid, lead.clientId, lead.clientName, cfg.text, cfg.days)
-            .catch(() => {});
+      // Auto-followup según la nueva etapa. ESTRICTAMENTE best-effort:
+      // el move ya está persistido, así que CUALQUIER falla acá no debe
+      // propagar y volver el lead atrás. Antes había un .catch(() => {})
+      // en la cadena promesa, pero si la lógica SYNCHRONOUS de armar el
+      // cfg (followupForStage) tiraba —ej: porque lead.clientName venía
+      // null en una versión vieja del cache—, la excepción saltaba el
+      // catch y burbujeaba al onError de useMutation, que rollbackeaba
+      // la optimistic update y mostraba toast. El usuario veía: "drag a
+      // Contactado → vuelve a Prospecto + toast misterioso", aunque la
+      // tabla en DB SÍ tenía contactado ya escrito.
+      //
+      // Fix: envolver toda la sección en try/catch + console.warn para
+      // que veamos en consola qué pasó realmente. La UX queda intacta.
+      try {
+        const lead = qc
+          .getQueryData<Lead[]>(qk.pipeline.leads(wid))
+          ?.find((l) => l.id === leadId);
+        if (lead && lead.clientId && bid && typeof lead.clientName === "string") {
+          const cfg = followupForStage(newStage, lead.clientName);
+          if (cfg) {
+            await followupsDb.createStageFollowup(
+              wid,
+              bid,
+              lead.clientId,
+              lead.clientName,
+              cfg.text,
+              cfg.days,
+            );
+          }
         }
+      } catch (followupErr) {
+        // Visible en DevTools console pero NO interrumpe el move.
+        // eslint-disable-next-line no-console
+        console.warn("[useMoveLead] followup auto-stage falló (no rompe el move):", followupErr);
       }
     },
     onMutate: async ({ leadId, newStage }) => {

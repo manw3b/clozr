@@ -56,6 +56,9 @@ describe("dbTaskToDomain", () => {
     due_at: null,
     created_by: null,
     created_at: "2026-01-01T00:00:00Z",
+    template_id: null,
+    target_count: null,
+    progress: null,
   };
 
   it("maps completed=1 to status=done", () => {

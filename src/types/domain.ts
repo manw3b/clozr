@@ -119,6 +119,12 @@ export interface Task {
   dueAt?: string;
   clientId?: string;
   clientName?: string;
+  /** Migration 030 — si fue materializada desde un template obligatorio. */
+  templateId?: string;
+  /** Migration 030 — meta numérica (ej: 30 personas). */
+  targetCount?: number;
+  /** Migration 030 — contador progresivo +1. */
+  progress?: number;
 }
 
 export type FollowUpReason =

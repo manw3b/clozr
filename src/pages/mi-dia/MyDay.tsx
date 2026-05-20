@@ -22,6 +22,7 @@ interface MyDayProps {
   onSetGoal?: (amountUsd: number) => void;
   onSetSalesGoal?: (count: number) => void;
   onCreateTask?: () => void;
+  onTaskProgressDelta?: (taskId: string, delta: 1 | -1) => void;
   onNavigate?: (page: string) => void;
 }
 
@@ -47,6 +48,7 @@ export function MyDay({
   onSetGoal,
   onSetSalesGoal,
   onCreateTask = () => {},
+  onTaskProgressDelta,
   onNavigate = () => {},
 }: MyDayProps) {
   // Antes había un `useState(data.tasks)` local para hacer toggle instantáneo,
@@ -94,6 +96,7 @@ export function MyDay({
             onTaskClick={onTaskClick}
             onViewAll={() => onNavigate('tareas')}
             onCreateTask={onCreateTask}
+            onProgressDelta={onTaskProgressDelta}
           />
 
           <FollowUpsBlock

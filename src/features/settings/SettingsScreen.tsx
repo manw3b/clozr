@@ -15,6 +15,7 @@ import { CustomerTagsSection } from "./CustomerTagsSection";
 import { WhatsAppTemplatesSection } from "./WhatsAppTemplatesSection";
 import { DolaresArSection } from "./DolaresArSection";
 import { AboutSection } from "./AboutSection";
+import { AssignedTasksSection } from "./AssignedTasksSection";
 import { qk } from "../../lib/queryKeys";
 import type { PipelineStage, CustomerTypeRow } from "../../lib/db/types";
 // Paleta unificada — la misma que usa el kanban del pipeline para el
@@ -23,7 +24,7 @@ import { PALETTE_LIST as COLORS, colorCss } from "../../lib/colorPalette";
 
 // ── Shared ────────────────────────────────────────────────────────
 
-type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "wa-templates" | "dolares" | "data" | "about";
+type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "wa-templates" | "dolares" | "assigned-tasks" | "data" | "about";
 
 const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "general", label: "General" },
@@ -36,6 +37,7 @@ const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "catalog-featured", label: "Productos destacados" },
   { id: "wa-templates", label: "Plantillas WhatsApp" },
   { id: "dolares", label: "Cotizaciones del dólar" },
+  { id: "assigned-tasks", label: "Tareas obligatorias" },
   { id: "data", label: "Datos y backup" },
   { id: "about", label: "Acerca de Clozr" },
 ];
@@ -1069,6 +1071,7 @@ export default function SettingsScreen() {
       case "catalog-featured": return <FeaturedModelsSection wid={wid} />;
       case "wa-templates": return <WhatsAppTemplatesSection wid={wid} />;
       case "dolares": return <DolaresArSection />;
+      case "assigned-tasks": return <AssignedTasksSection wid={wid} />;
       case "data": return <DataSection wid={wid} />;
       case "about": return <AboutSection />;
     }

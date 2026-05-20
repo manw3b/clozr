@@ -686,6 +686,56 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
   await safe(() => dbExecute(`ALTER TABLE customers ADD COLUMN facebook TEXT`));
   await safe(() => dbExecute(`ALTER TABLE customers ADD COLUMN tiktok TEXT`));
   await safe(() => dbExecute(`ALTER TABLE customers ADD COLUMN twitter TEXT`));
+
+  // ════════════════════════════════════════════════════════════
+  //  030 — Tareas obligatorias (templates asignados por dueño)
+  // ════════════════════════════════════════════════════════════
+  // El dueño/encargado define templates de rutinas que el sistema
+  // materializa en `tasks` cada día para los vendedores asignados.
+  //
+  // Ejemplos del usuario: "subir historia a las 10:00", "seguir 30
+  // personas", "hablar con 30 personas". El target_count permite el
+  // contador progresivo +1; target_time es un horario sugerido.
+  //
+  // Modelo de cumplimiento: cada día arranca limpio. Las tareas del día
+  // anterior NO se acumulan ni se reabren — quedan en el histórico de
+  // `tasks` con su completed/uncompleted para reportes de compliance.
+  await safe(() => dbExecute(`
+    CREATE TABLE IF NOT EXISTS assigned_task_templates (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      frequency TEXT NOT NULL DEFAULT 'daily',
+      target_time TEXT,
+      target_count INTEGER,
+      assigned_to_user_id TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )`));
+  await safe(() =>
+    dbExecute(
+      `CREATE INDEX IF NOT EXISTS idx_assigned_templates_workspace ON assigned_task_templates (workspace_id, is_active)`,
+    ),
+  );
+
+  // Columnas en `tasks` para soportar templates + contador progresivo.
+  // template_id: link soft al template que las materializó (NULL si la
+  //   tarea es manual creada por el vendedor).
+  // target_count: copia del target del template al momento de materializar
+  //   (para que cambiar el template no afecte tareas históricas).
+  // progress: cuántas veces el vendedor incrementó +1 hoy. Cuando llega
+  //   a target_count, completed=1 automático.
+  await safe(() => dbExecute(`ALTER TABLE tasks ADD COLUMN template_id TEXT`));
+  await safe(() => dbExecute(`ALTER TABLE tasks ADD COLUMN target_count INTEGER`));
+  await safe(() => dbExecute(`ALTER TABLE tasks ADD COLUMN progress INTEGER DEFAULT 0`));
+  await safe(() =>
+    dbExecute(
+      `CREATE INDEX IF NOT EXISTS idx_tasks_template_date ON tasks (template_id, assigned_to, created_at)`,
+    ),
+  );
 }
 
 /**

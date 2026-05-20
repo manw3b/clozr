@@ -65,6 +65,8 @@ export const PERMISSIONS: Readonly<Record<string, readonly UserRole[]>> = {
   manageWorkspaceSettings: ["owner", "admin"],
   manageTeam: ["owner"],
   manageExchangeRate: ["owner", "admin"],
+  /** Crear/editar/borrar templates de tareas obligatorias del equipo. */
+  manageAssignedTasks: ["owner", "admin"],
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;

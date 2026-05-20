@@ -78,6 +78,9 @@ export function dbTaskToDomain(t: DbTask): Task {
     status: t.completed === 1 ? "done" : "pending",
     priority: undefined,
     dueAt: t.due_at ?? undefined,
+    templateId: t.template_id ?? undefined,
+    targetCount: t.target_count ?? undefined,
+    progress: t.progress ?? undefined,
   };
 }
 

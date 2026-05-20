@@ -22,6 +22,8 @@ import { qk, invalidate } from "../../lib/queryKeys";
 import { usePersistedState } from "../../lib/usePersistedState";
 import { color, space, text, weight } from "../../tokens";
 import { NewTaskModal } from "./components/NewTaskModal";
+import { assignedTasksDb } from "../../lib/db/assignedTasks";
+import { useAuthStore } from "../../store/authStore";
 import type { Task as DbTask, TaskType } from "../../lib/db/types";
 
 type FilterStatus = "todas" | "pendientes" | "completadas";
@@ -45,6 +47,22 @@ export function Tareas() {
     return () => window.removeEventListener("clozr:open-new-task", handler);
   }, []);
 
+  // Materializa templates obligatorios al abrir la pantalla. Es idempotente,
+  // así que si el user ya entró hoy no duplica. Después de materializar,
+  // invalida la query de tareas para que el render incluya las nuevas.
+  const userId = useAuthStore((s) => s.userId);
+  useEffect(() => {
+    if (!wid || !userId) return;
+    assignedTasksDb
+      .materializeForToday(wid, userId)
+      .then((n) => {
+        if (n > 0) qc.invalidateQueries({ queryKey: qk.tasks.all() });
+      })
+      .catch(() => {
+        /* best-effort: no rompemos la pantalla por esto */
+      });
+  }, [wid, userId, qc]);
+
   const { data: tasks = [] } = useQuery({
     queryKey: qk.tasks.list(wid),
     queryFn: () => tasksDb.getAll(wid),
@@ -66,6 +84,15 @@ export function Tareas() {
 
   // Helper para los dos call sites (row delete + context menu delete).
   function undoableDeleteTask(t: DbTask) {
+    // Guard: tareas obligatorias (materializadas de un template del
+    // dueño) no se pueden borrar. El vendedor solo las puede completar.
+    if (t.template_id) {
+      showToast(
+        "Esta tarea es obligatoria — solo el dueño puede sacarla desde Ajustes → Tareas obligatorias.",
+        "error",
+      );
+      return;
+    }
     const queryKey = qk.tasks.list(wid);
     const snapshot = qc.getQueryData<DbTask[]>(queryKey);
     qc.setQueryData<DbTask[]>(queryKey, (prev) =>

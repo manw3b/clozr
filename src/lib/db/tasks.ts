@@ -43,6 +43,11 @@ export async function create(
     due_at: data.due_at ?? null,
     created_by: data.created_by ?? null,
     created_at: now,
+    // Migration 030 — tareas creadas manualmente (sin template) no son
+    // obligatorias y no tienen contador.
+    template_id: null,
+    target_count: null,
+    progress: null,
   };
 }
 

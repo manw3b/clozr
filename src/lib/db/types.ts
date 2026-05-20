@@ -242,6 +242,34 @@ export interface Task {
   due_at: string | null;
   created_by: string | null;
   created_at: string;
+  /** Migration 030 — si la tarea fue materializada desde un template
+   *  obligatorio del owner. Si está, la tarea NO se puede borrar y muestra
+   *  badge "Obligatoria" en la UI. */
+  template_id: string | null;
+  /** Migration 030 — objetivo numérico copiado del template (ej: 30).
+   *  Cuando progress >= target_count → completed=1 automático. */
+  target_count: number | null;
+  /** Migration 030 — contador progresivo del +1. */
+  progress: number | null;
+}
+
+/** Migration 030 — Template de tarea obligatoria asignada por el dueño. */
+export interface AssignedTaskTemplate {
+  id: string;
+  workspace_id: string;
+  title: string;
+  description: string | null;
+  frequency: "daily" | "weekly" | "monthly";
+  /** Horario sugerido HH:MM o NULL (ej: "10:00"). Solo display. */
+  target_time: string | null;
+  /** Objetivo numérico o NULL. Si está, materializa con contador +1. */
+  target_count: number | null;
+  /** User al que se le asigna. NULL = a todos los vendedores. */
+  assigned_to_user_id: string | null;
+  is_active: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Sale {

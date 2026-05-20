@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MyDay } from "./MyDay";
 import { NewSaleModal } from "../ventas/components/NewSaleModal";
 import { useCreateSale } from "../ventas/useSalesData";
 import { NewTaskModal } from "../tareas/components/NewTaskModal";
 import { CollectPaymentModal } from "../../components/CollectPaymentModal";
+import { assignedTasksDb } from "../../lib/db/assignedTasks";
 import type { DueCollection } from "../../types/domain";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useBusinessStore } from "../../store/businessStore";
@@ -31,7 +32,7 @@ import type { MyDayData, InactiveClient } from "../../types/domain";
 export function MyDayContainer() {
   const { activeWorkspace } = useWorkspaceStore();
   const { activeBusiness } = useBusinessStore();
-  const { userName } = useAuthStore();
+  const { userName, userId } = useAuthStore();
   const { setActiveScreen, showToast } = useUIStore();
   const qc = useQueryClient();
   const [newSaleOpen, setNewSaleOpen] = useState(false);
@@ -49,6 +50,20 @@ export function MyDayContainer() {
   const wid = activeWorkspace?.id ?? "";
   const bid = activeBusiness?.id ?? "";
   const today = getTodayISO();
+
+  // Materializa templates obligatorios al abrir Mi Día. Idempotente —
+  // si el vendedor ya entró hoy, no duplica. Después invalida tasks.
+  useEffect(() => {
+    if (!wid || !userId) return;
+    assignedTasksDb
+      .materializeForToday(wid, userId)
+      .then((n) => {
+        if (n > 0) qc.invalidateQueries({ queryKey: qk.tasks.all() });
+      })
+      .catch(() => {
+        /* best-effort */
+      });
+  }, [wid, userId, qc]);
 
   const tasksQ = useQuery({
     queryKey: qk.tasks.list(wid),
@@ -212,6 +227,19 @@ export function MyDayContainer() {
         if (collection) setCollectingFrom(collection);
       }}
       onCreateTask={() => setNewTaskOpen(true)}
+      onTaskProgressDelta={(taskId, delta) => {
+        // +1 / -1 contra el contador de tareas obligatorias. Después de
+        // mutar, invalida la query de tareas para refrescar el render.
+        assignedTasksDb
+          .incrementProgress(taskId, delta)
+          .then(() => {
+            qc.invalidateQueries({ queryKey: qk.tasks.list(wid) });
+            qc.invalidateQueries({ queryKey: qk.miDia.score(wid) });
+          })
+          .catch((err) => {
+            showToast(err instanceof Error ? err.message : "Error al actualizar", "error");
+          });
+      }}
       onWhatsApp={(clientId, opts) => {
         const customer = customersQ.data?.find((c) => c.id === clientId);
         if (customer?.phone) {

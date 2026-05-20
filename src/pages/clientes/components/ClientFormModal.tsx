@@ -7,6 +7,12 @@ import { customersDb } from '../../../lib/db/customers';
 import { invalidate } from '../../../lib/queryKeys';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
 import { useUIStore } from '../../../store/uiStore';
+import {
+  InstagramIcon,
+  FacebookIcon,
+  TikTokIcon,
+  XIcon,
+} from '../../../components/icons/SocialIcons';
 import type { Client, ClientType } from '../../../types/domain';
 
 const TYPE_LABELS: Record<ClientType, string> = {
@@ -206,10 +212,34 @@ export function ClientFormModal({ open, onClose, client }: ClientFormModalProps)
         </button>
         {socialsOpen && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
-            <SocialInput label="Instagram" placeholder="@usuario o URL" value={instagram} onChange={setInstagram} />
-            <SocialInput label="Facebook" placeholder="usuario o URL completa" value={facebook} onChange={setFacebook} />
-            <SocialInput label="TikTok" placeholder="@usuario o URL" value={tiktok} onChange={setTiktok} />
-            <SocialInput label="X / Twitter" placeholder="@usuario o URL" value={twitter} onChange={setTwitter} />
+            <SocialInput
+              icon={<InstagramIcon size={14} color="#E1306C" />}
+              label="Instagram"
+              placeholder="@usuario o URL"
+              value={instagram}
+              onChange={setInstagram}
+            />
+            <SocialInput
+              icon={<FacebookIcon size={14} color="#1877F2" />}
+              label="Facebook"
+              placeholder="usuario o URL completa"
+              value={facebook}
+              onChange={setFacebook}
+            />
+            <SocialInput
+              icon={<TikTokIcon size={13} color="var(--text)" />}
+              label="TikTok"
+              placeholder="@usuario o URL"
+              value={tiktok}
+              onChange={setTiktok}
+            />
+            <SocialInput
+              icon={<XIcon size={13} color="var(--text)" />}
+              label="X / Twitter"
+              placeholder="@usuario o URL"
+              value={twitter}
+              onChange={setTwitter}
+            />
           </div>
         )}
       </div>
@@ -245,15 +275,18 @@ export function ClientFormModal({ open, onClose, client }: ClientFormModalProps)
   );
 }
 
-/** Input compacto para una red social. Label inline a la izquierda, input
- *  a la derecha. Pensado para la sección "Redes sociales" del form donde
- *  hay 4 redes apiladas y queremos ocupar poco vertical. */
+/** Input compacto para una red social. Ícono + label inline a la
+ *  izquierda, input a la derecha. Pensado para la sección "Redes
+ *  sociales" del form donde hay 4 redes apiladas y queremos ocupar
+ *  poco vertical. */
 function SocialInput({
+  icon,
   label,
   placeholder,
   value,
   onChange,
 }: {
+  icon: React.ReactNode;
   label: string;
   placeholder: string;
   value: string;
@@ -263,13 +296,19 @@ function SocialInput({
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <span
         style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
           fontSize: 12,
           fontWeight: 500,
           color: 'var(--text-muted)',
-          width: 95,
+          width: 105,
           flexShrink: 0,
         }}
       >
+        <span style={{ display: 'inline-flex', width: 14, justifyContent: 'center', flexShrink: 0 }}>
+          {icon}
+        </span>
         {label}
       </span>
       <input

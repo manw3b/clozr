@@ -22,6 +22,12 @@ import { Tabs } from '../../../components/Tabs';
 import { TagChip } from '../../../components/TagChip';
 import { EmptyState } from '../../../components/EmptyState';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import {
+  InstagramIcon,
+  FacebookIcon,
+  TikTokIcon,
+  XIcon,
+} from '../../../components/icons/SocialIcons';
 import { useCustomerTags, useSetCustomerTags } from '../useClientsData';
 import { ManualDebtModal } from './ManualDebtModal';
 import type { ClientTag } from '../../../types/domain';
@@ -465,11 +471,39 @@ function SocialLinks({
 }: {
   client: Pick<ClientDetail, 'instagram' | 'facebook' | 'tiktok' | 'twitter'>;
 }) {
-  const items: Array<{ key: string; label: string; value: string | undefined; baseUrl: string; color: string }> = [
-    { key: 'instagram', label: 'Instagram', value: client.instagram, baseUrl: 'https://instagram.com/', color: '#E1306C' },
-    { key: 'facebook', label: 'Facebook', value: client.facebook, baseUrl: 'https://facebook.com/', color: '#1877F2' },
-    { key: 'tiktok', label: 'TikTok', value: client.tiktok, baseUrl: 'https://tiktok.com/@', color: '#FF0050' },
-    { key: 'twitter', label: 'X / Twitter', value: client.twitter, baseUrl: 'https://x.com/', color: '#000000' },
+  // Cada item incluye el ícono brand + la URL base. El ícono Instagram
+  // y Facebook van coloreados con el brand; TikTok y X quedan en color
+  // del tema (negro/blanco según light/dark) porque sus logos oficiales
+  // son monocromáticos.
+  const items: Array<{ key: string; label: string; value: string | undefined; baseUrl: string; icon: React.ReactNode }> = [
+    {
+      key: 'instagram',
+      label: 'Instagram',
+      value: client.instagram,
+      baseUrl: 'https://instagram.com/',
+      icon: <InstagramIcon size={13} color="#E1306C" />,
+    },
+    {
+      key: 'facebook',
+      label: 'Facebook',
+      value: client.facebook,
+      baseUrl: 'https://facebook.com/',
+      icon: <FacebookIcon size={13} color="#1877F2" />,
+    },
+    {
+      key: 'tiktok',
+      label: 'TikTok',
+      value: client.tiktok,
+      baseUrl: 'https://tiktok.com/@',
+      icon: <TikTokIcon size={13} color="var(--text)" />,
+    },
+    {
+      key: 'twitter',
+      label: 'X / Twitter',
+      value: client.twitter,
+      baseUrl: 'https://x.com/',
+      icon: <XIcon size={12} color="var(--text)" />,
+    },
   ];
 
   function resolveUrl(value: string, baseUrl: string): string {
@@ -487,6 +521,7 @@ function SocialLinks({
             key={i.key}
             onClick={() => openUrl(resolveUrl(i.value as string, i.baseUrl)).catch(() => {})}
             title={i.value}
+            className="btn-bordered"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -498,10 +533,11 @@ function SocialLinks({
               fontSize: text.xs,
               fontWeight: weight.medium,
               color: color.text,
-              cursor: 'pointer',
             }}
           >
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: i.color, flexShrink: 0 }} />
+            <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+              {i.icon}
+            </span>
             {i.label}
           </button>
         ))}

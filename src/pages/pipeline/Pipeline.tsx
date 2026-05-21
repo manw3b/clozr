@@ -342,14 +342,6 @@ export function Pipeline() {
       if (migratedRef.has(l.id)) continue;
       const target = resolveLeadStage(l.stage, STAGES);
       if (target === l.stage) continue;
-      // eslint-disable-next-line no-console
-      console.warn("[Pipeline] orphan-stage rescue dispatching move", {
-        leadId: l.id,
-        clientName: l.clientName,
-        rawStage: l.stage,
-        target,
-        stagesInUI: STAGES.map((s) => s.id),
-      });
       migratedRef.add(l.id);
       moveLeadMut.mutate({ leadId: l.id, newStage: target });
     }
@@ -587,14 +579,6 @@ export function Pipeline() {
         targetStage = leads.find((l) => l.id === overId)?.stage ?? null;
       }
     }
-    // eslint-disable-next-line no-console
-    console.log("[Pipeline.handleDragEnd] resolved targetStage", {
-      activeId,
-      overId,
-      targetStage,
-      overDataType: overData?.type,
-      stagesInUI: STAGES.map((s) => s.id),
-    });
     if (!targetStage) return;
 
     setLeads((prev) => {
@@ -620,19 +604,18 @@ export function Pipeline() {
       return prev;
     });
 
-    // Persist stage change a SQLite. Confirm si va a "perdido" — fácil de
-    // pegar por accidente con el drag.
+    // Persist stage change a SQLite. Antes había un window.confirm si iba
+    // a "perdido", pero window.confirm está bloqueado en Tauri 2 ("dialog.
+    // confirm not allowed. Command not found") y tiraba un Uncaught (in
+    // promise) cada vez que el usuario arrastraba a Perdido. El drag igual
+    // persistía (rowsAffected: 1) pero el error de consola hacía dudar.
+    // Solución pragmática: sin confirm — si el user se equivoca, arrastra
+    // de vuelta. Toast deja claro que se marcó como perdido.
+    moveLeadMut.mutate({ leadId: activeId, newStage: targetStage });
     if (lostStage && targetStage === lostStage.id) {
       const movedLead = leads.find((l) => l.id === activeId);
-      const ok = window.confirm(
-        `¿Marcar el lead de ${movedLead?.clientName ?? 'este cliente'} como perdido?`,
-      );
-      if (!ok) {
-        setLocalLeads(null);
-        return;
-      }
+      showToast(`${movedLead?.clientName ?? 'Lead'} marcado como perdido`);
     }
-    moveLeadMut.mutate({ leadId: activeId, newStage: targetStage });
   }
 
   /* ---------- Drawer del cliente (real DB) ---------- */
@@ -921,10 +904,8 @@ export function Pipeline() {
         const close = () => ctxMenu.close();
         const moveTo = (stage: typeof lead.stage) => {
           const target = STAGES.find((s) => s.id === stage);
-          if (target?.isLost && !window.confirm(`¿Marcar el lead de ${lead.clientName} como perdido?`)) {
-            close();
-            return;
-          }
+          // Antes había window.confirm para target.isLost — bloqueado en
+          // Tauri 2 (mismo issue que handleDragEnd). Sacamos el confirm.
           moveLeadMut.mutate({ leadId: lead.id, newStage: stage });
           if (target?.isWon) showToast(`${lead.clientName} marcado como ganado 🎯`, 'success');
           else if (target?.isLost) showToast(`${lead.clientName} marcado como perdido`);

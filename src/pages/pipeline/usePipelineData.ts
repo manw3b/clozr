@@ -46,13 +46,6 @@ export function useMoveLead() {
       // settingsDb.getPipelineStages además seed-on-demand si no hay nada
       // en la tabla, así que siempre devuelve algo válido.
       const stages = await settingsDb.getPipelineStages(wid);
-      // eslint-disable-next-line no-console
-      console.log("[useMoveLead] mutationFn", {
-        leadId,
-        newStage,
-        stagesFromDb: stages.map((s) => s.id),
-        hasTargetStage: stages.some((s) => s.id === newStage),
-      });
       const stageConfig = stages.find((s) => s.id === newStage);
       const stageOrder = stages.findIndex((s) => s.id === newStage);
       if (!stageConfig) {
@@ -62,8 +55,6 @@ export function useMoveLead() {
         );
       }
       await pipelineDb.updateStage(leadId, newStage, stageConfig.name, stageOrder);
-      // eslint-disable-next-line no-console
-      console.log("[useMoveLead] updateStage OK", { leadId, newStage, stageOrder });
 
       // Auto-followup según la nueva etapa. ESTRICTAMENTE best-effort:
       // el move ya está persistido, así que CUALQUIER falla acá no debe
@@ -111,20 +102,14 @@ export function useMoveLead() {
       );
       return { prev };
     },
-    onError: (err, vars, ctx) => {
-      // eslint-disable-next-line no-console
-      console.error("[useMoveLead] onError — rollback", { vars, err });
+    onError: (err, _vars, ctx) => {
       // Rollback de la optimistic update + toast visible — antes el error
       // se tragaba en silencio y el lead "rebotaba" al stage original sin
       // que el usuario supiera por qué.
       if (ctx?.prev) qc.setQueryData(qk.pipeline.leads(wid), ctx.prev);
       showToast(err instanceof Error ? err.message : "No se pudo mover el lead", "error");
     },
-    onSettled: (_data, err, vars) => {
-      // eslint-disable-next-line no-console
-      console.log("[useMoveLead] onSettled", { vars, errored: !!err });
-      invalidate.afterLeadChange(qc);
-    },
+    onSettled: () => invalidate.afterLeadChange(qc),
   });
 }
 

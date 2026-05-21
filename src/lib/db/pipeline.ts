@@ -113,33 +113,10 @@ export async function updateStage(
   stageOrder: number,
 ): Promise<void> {
   const now = new Date().toISOString();
-  const res = await dbExecute(
+  await dbExecute(
     "UPDATE pipeline_items SET stage_id = ?, stage_name = ?, stage_order = ?, updated_at = ? WHERE id = ?",
     [stageId, stageName, stageOrder, now, id],
   );
-  // eslint-disable-next-line no-console
-  console.log("[pipelineDb.updateStage] result", {
-    id,
-    stageId,
-    stageName,
-    stageOrder,
-    rowsAffected: res.rowsAffected,
-  });
-  if (res.rowsAffected === 0) {
-    // Diagnóstico: si rowsAffected = 0, el id NO matcheó ninguna fila —
-    // ahí está el bug del "vuelve a la columna vieja". Buscamos el id
-    // para reportar contexto útil en consola.
-    const rows = await dbSelect<{ id: string; stage_id: string; status: string; workspace_id: string }>(
-      "SELECT id, stage_id, status, workspace_id FROM pipeline_items WHERE id = ?",
-      [id],
-    );
-    // eslint-disable-next-line no-console
-    console.error("[pipelineDb.updateStage] rowsAffected=0 — el WHERE id=? no matcheó", {
-      id,
-      stageId,
-      foundRows: rows,
-    });
-  }
 }
 
 export async function closeItem(id: string, status: "won" | "lost"): Promise<void> {

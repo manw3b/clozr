@@ -91,3 +91,81 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+
+/* ── Invitación a un workspace ───────────────────────────────────────── */
+
+export interface SendInviteOpts {
+  to: string;
+  workspaceName: string;
+  inviterEmail: string;
+  role: string;
+  apiKey: string;
+  from: string;
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  owner: "Dueño",
+  admin: "Encargado",
+  vendedor: "Vendedor",
+  viewer: "Solo lectura",
+};
+
+export async function sendInviteEmail(opts: SendInviteOpts): Promise<void> {
+  const roleLabel = ROLE_LABELS[opts.role] ?? opts.role;
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${opts.apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      from: opts.from,
+      to: opts.to,
+      subject: `${opts.inviterEmail} te invitó a ${opts.workspaceName} en Clozr`,
+      html: renderInviteHtml({ workspaceName: opts.workspaceName, inviterEmail: opts.inviterEmail, roleLabel }),
+      text: renderInviteText({ workspaceName: opts.workspaceName, inviterEmail: opts.inviterEmail, roleLabel }),
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`[resend invite] HTTP ${res.status}: ${body.slice(0, 300)}`);
+  }
+}
+
+function renderInviteHtml(o: { workspaceName: string; inviterEmail: string; roleLabel: string }): string {
+  return `<!doctype html>
+<html>
+<body style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; color: #1f2937;">
+  <h1 style="font-size: 22px; margin: 0 0 12px;">Te invitaron a ${escapeHtml(o.workspaceName)}</h1>
+  <p style="font-size: 15px; line-height: 1.5; color: #374151;">
+    <strong>${escapeHtml(o.inviterEmail)}</strong> te incluyó como
+    <strong>${escapeHtml(o.roleLabel)}</strong> en <strong>${escapeHtml(o.workspaceName)}</strong>.
+  </p>
+  <p style="font-size: 15px; line-height: 1.5; color: #374151; margin-top: 24px;">
+    Para entrar, abrí Clozr en tu PC, andá a <strong>Ajustes → Cuenta en la nube</strong>
+    y pedí un magic link con este email. Cuando entres vas a ver el workspace ya disponible.
+  </p>
+  <p style="font-size: 13px; color: #6b7280; line-height: 1.5; margin-top: 28px;">
+    Si no tenés Clozr todavía, descargalo desde
+    <a href="https://github.com/manw3b/clozr/releases/latest" style="color: #ef4444;">github.com/manw3b/clozr/releases/latest</a>.
+  </p>
+  <p style="font-size: 12px; color: #9ca3af; margin-top: 32px;">
+    Si no esperabas esta invitación, ignorá este email — no se hace nada sin login.
+  </p>
+</body>
+</html>`;
+}
+
+function renderInviteText(o: { workspaceName: string; inviterEmail: string; roleLabel: string }): string {
+  return `${o.inviterEmail} te invitó a ${o.workspaceName} en Clozr como ${o.roleLabel}.
+
+Para entrar:
+1. Abrí Clozr en tu PC
+2. Ajustes → Cuenta en la nube
+3. Pedí un magic link con este email
+4. Vas a ver el workspace ya disponible
+
+Si no tenés Clozr: https://github.com/manw3b/clozr/releases/latest
+
+Si no esperabas esta invitación, ignorá este email.`;
+}

@@ -32,6 +32,14 @@ export interface Env {
 import { handleAuthRequest } from "./routes/request";
 import { handleAuthVerify } from "./routes/verify";
 import { handleAuthVerifyCode } from "./routes/verify-code";
+import { handleMe } from "./routes/me";
+import {
+  handleCreateWorkspace,
+  handleListMembers,
+  handleInviteMember,
+  handlePatchMember,
+  handleRevokeMember,
+} from "./routes/workspaces";
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -44,6 +52,31 @@ export default {
 
     try {
       const route = `${req.method} ${url.pathname}`;
+
+      // ── Rutas con path dinámico (/workspaces/:id/...) ─────────────
+      const wsMembersMatch = url.pathname.match(
+        /^\/workspaces\/([^/]+)\/members(?:\/([^/]+))?\/?$/,
+      );
+      const wsInviteMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/invite\/?$/);
+
+      if (wsMembersMatch) {
+        const wsId = wsMembersMatch[1]!;
+        const mId = wsMembersMatch[2];
+        if (!mId && req.method === "GET") {
+          return cors(req, env, await handleListMembers(wsId, req, env));
+        }
+        if (mId && req.method === "PATCH") {
+          return cors(req, env, await handlePatchMember(wsId, mId, req, env));
+        }
+        if (mId && req.method === "DELETE") {
+          return cors(req, env, await handleRevokeMember(wsId, mId, req, env));
+        }
+      }
+      if (wsInviteMatch && req.method === "POST") {
+        const wsId = wsInviteMatch[1]!;
+        return cors(req, env, await handleInviteMember(wsId, req, env));
+      }
+
       switch (route) {
         case "GET /":
           return cors(req, env, json({ ok: true, service: "clozr-auth", version: "0.1.0" }));
@@ -58,6 +91,12 @@ export default {
           // No CORS: este endpoint lo abre el USUARIO desde su email,
           // navega directo, no es una request cross-origin del app.
           return handleAuthVerify(req, env);
+
+        case "GET /me":
+          return cors(req, env, await handleMe(req, env));
+
+        case "POST /workspaces":
+          return cors(req, env, await handleCreateWorkspace(req, env));
 
         default:
           return cors(req, env, json({ error: "not_found", route }, 404));

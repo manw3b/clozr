@@ -1,0 +1,21 @@
+{
+  "name": "clozr-auth-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare Worker que maneja magic-link auth para Clozr. Frontea Turso (users/sessions) y manda emails via Resend.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "typecheck": "tsc --noEmit",
+    "secret:turso-url": "wrangler secret put TURSO_DATABASE_URL",
+    "secret:turso-token": "wrangler secret put TURSO_AUTH_TOKEN",
+    "secret:resend": "wrangler secret put RESEND_API_KEY",
+    "secret:jwt": "wrangler secret put JWT_SECRET"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "typescript": "^5.5.0",
+    "wrangler": "^3.90.0"
+  }
+}

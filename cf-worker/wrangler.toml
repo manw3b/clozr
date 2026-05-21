@@ -1,0 +1,31 @@
+# ════════════════════════════════════════════════════════════════════════
+#  Clozr — Cloudflare Worker config (auth backend)
+# ════════════════════════════════════════════════════════════════════════
+#
+# Este worker fronteа los flujos de auth (magic link request + verify).
+# Los secrets NO van acá — se setean con `wrangler secret put NOMBRE`.
+# Ver scripts en package.json (npm run secret:turso-url, etc).
+#
+# Bindings de prod:
+#   TURSO_DATABASE_URL  → libsql://clozr-prod-<org>.turso.io
+#   TURSO_AUTH_TOKEN    → JWT con permisos read+write
+#   RESEND_API_KEY      → re_xxx (sender configurado por separado)
+#   JWT_SECRET          → string aleatorio fuerte para firmar sessions
+#
+# `vars` (no-secrets) sí pueden vivir acá.
+
+name = "clozr-auth"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Sender + asunto del email magic-link. No son secretos.
+[vars]
+RESEND_FROM = "Clozr <login@clozr.app>"
+MAGIC_LINK_TTL_MIN = "15"
+SESSION_TTL_DAYS = "30"
+DEEP_LINK_SCHEME = "clozr"
+# CORS — la app Tauri en dev corre en tauri://localhost (Mac) o
+# https://tauri.localhost (Windows WebView2). En prod el origin es similar.
+# Para pegarle desde el navegador en testing local sumamos http://localhost:1420.
+ALLOWED_ORIGINS = "tauri://localhost,https://tauri.localhost,http://localhost:1420"

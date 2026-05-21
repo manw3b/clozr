@@ -16,6 +16,7 @@ import { ensurePricingSchema } from "./lib/db/ensureSchema";
 import { autoBackupIfDue } from "./lib/backup";
 import { log } from "./lib/logger";
 import { useCloudAuthListener } from "./lib/useCloudAuthListener";
+import { useSyncCloudRole } from "./lib/useSyncCloudRole";
 
 // AppShell stays eager — render shell immediately
 import { AppShell } from "./layout/AppShell";
@@ -150,6 +151,11 @@ export default function App() {
   // Escucha el deep link clozr://auth-complete?jwt=... que dispara Rust
   // cuando el SO le pasa un magic link a la app. Llena cloudAuthStore.
   useCloudAuthListener();
+
+  // Cuando hay sesión cloud activa, mantiene authStore.userRole en sync
+  // con el rol del workspace cloud activo. Así can() — que lee userRole —
+  // aplica los permisos correctos sin tocar callsites.
+  useSyncCloudRole();
 
   useGlobalShortcuts();
 

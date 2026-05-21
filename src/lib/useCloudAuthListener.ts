@@ -23,7 +23,7 @@ import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useCloudAuthStore } from "../store/cloudAuthStore";
 import { useUIStore } from "../store/uiStore";
-import { parseAuthDeepLink, parseJwtPayload } from "./cloudAuth";
+import { parseAuthDeepLink, parseJwtPayload, fetchMe } from "./cloudAuth";
 
 const REASON_LABELS: Record<string, string> = {
   invalid_token: "El link de acceso no es válido. Pedí uno nuevo.",
@@ -34,6 +34,7 @@ const REASON_LABELS: Record<string, string> = {
 
 export function useCloudAuthListener(): void {
   const setSession = useCloudAuthStore((s) => s.setSession);
+  const setWorkspaces = useCloudAuthStore((s) => s.setWorkspaces);
   const showToast = useUIStore((s) => s.showToast);
 
   useEffect(() => {
@@ -88,6 +89,14 @@ export function useCloudAuthListener(): void {
             expiresAt: payload.exp,
           });
           showToast(`Conectado a la nube${pendingEmail ? " como " + pendingEmail : ""}`, "success");
+
+          // Hidratar workspaces — fire-and-forget. Si falla, la UI
+          // muestra "Sin workspaces" y el user puede reintentar desde
+          // Ajustes. No mostramos toast de error acá para no asustar
+          // (la sesión ya está OK, los workspaces se cargan después).
+          void fetchMe(jwt).then((res) => {
+            if (res.ok) setWorkspaces(res.data.workspaces);
+          });
         });
         unlistenFn = unl;
       } catch (e) {

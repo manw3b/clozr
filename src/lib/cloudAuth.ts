@@ -131,6 +131,128 @@ function b64urlDecode(s: string): string {
   return atob(padded);
 }
 
+/* ── API authenticated calls ─────────────────────────────────────────── */
+
+/**
+ * Hace un fetch al worker con el JWT del cloudAuthStore en el header.
+ * Devuelve { ok, data } o { ok: false, error }. No throwa.
+ *
+ * El JWT lo lee dinámicamente del store en cada call para que un logout
+ * en otra tab/instancia se respete inmediatamente.
+ */
+async function authFetch<T>(
+  jwt: string | null,
+  path: string,
+  init?: RequestInit,
+): Promise<{ ok: true; data: T } | { ok: false; error: string; status?: number }> {
+  if (!jwt) return { ok: false, error: "no_jwt" };
+  try {
+    const res = await fetch(`${AUTH_BASE}${path}`, {
+      ...init,
+      headers: {
+        ...(init?.headers ?? {}),
+        authorization: `Bearer ${jwt}`,
+        "content-type": "application/json",
+      },
+    });
+    const text = await res.text();
+    const data = text ? (JSON.parse(text) as unknown) : null;
+    if (!res.ok) {
+      const err = (data && typeof data === "object" && "error" in data) ? String((data as { error: unknown }).error) : `http_${res.status}`;
+      return { ok: false, error: err, status: res.status };
+    }
+    return { ok: true, data: data as T };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "network_error" };
+  }
+}
+
+/* ── /me ─────────────────────────────────────────────────────────────── */
+
+export interface MeUser {
+  id: string;
+  email: string;
+  name: string | null;
+}
+
+export interface MeWorkspace {
+  id: string;
+  name: string;
+  role: "owner" | "admin" | "vendedor" | "viewer";
+  status: "active" | "invited" | "revoked";
+}
+
+export interface MeResponse {
+  user: MeUser;
+  workspaces: MeWorkspace[];
+}
+
+export function fetchMe(jwt: string | null) {
+  return authFetch<MeResponse>(jwt, "/me");
+}
+
+/* ── /workspaces ─────────────────────────────────────────────────────── */
+
+export interface CreatedWorkspace {
+  id: string;
+  name: string;
+  role: "owner";
+  status: "active";
+}
+
+export function createWorkspace(jwt: string | null, name: string) {
+  return authFetch<CreatedWorkspace>(jwt, "/workspaces", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+/* ── /workspaces/:id/members ─────────────────────────────────────────── */
+
+export interface MemberRow {
+  id: string;
+  email: string;
+  role: "owner" | "admin" | "vendedor" | "viewer";
+  status: "active" | "invited" | "revoked";
+  invited_at: string;
+  accepted_at: string | null;
+  user_name: string | null;
+}
+
+export function listMembers(jwt: string | null, workspaceId: string) {
+  return authFetch<{ members: MemberRow[] }>(jwt, `/workspaces/${workspaceId}/members`);
+}
+
+export function inviteMember(
+  jwt: string | null,
+  workspaceId: string,
+  email: string,
+  role: "admin" | "vendedor" | "viewer",
+) {
+  return authFetch<MemberRow>(jwt, `/workspaces/${workspaceId}/invite`, {
+    method: "POST",
+    body: JSON.stringify({ email, role }),
+  });
+}
+
+export function patchMemberRole(
+  jwt: string | null,
+  workspaceId: string,
+  membershipId: string,
+  role: "owner" | "admin" | "vendedor" | "viewer",
+) {
+  return authFetch<{ ok: true; id: string; role: string }>(jwt, `/workspaces/${workspaceId}/members/${membershipId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export function revokeMember(jwt: string | null, workspaceId: string, membershipId: string) {
+  return authFetch<{ ok: true; id: string }>(jwt, `/workspaces/${workspaceId}/members/${membershipId}`, {
+    method: "DELETE",
+  });
+}
+
 /* ── Deep link URL parsing ───────────────────────────────────────────── */
 
 export interface DeepLinkResult {

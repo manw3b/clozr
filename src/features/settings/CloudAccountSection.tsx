@@ -15,14 +15,26 @@
  */
 
 import { useState } from "react";
-import { Mail, LogOut, CheckCircle2, RefreshCw } from "lucide-react";
+import { Mail, LogOut, CheckCircle2, RefreshCw, Plus, Building2, Check } from "lucide-react";
 import { useCloudAuthStore } from "../../store/cloudAuthStore";
 import { useUIStore } from "../../store/uiStore";
-import { requestMagicLink, verifyCode } from "../../lib/cloudAuth";
+import { requestMagicLink, verifyCode, fetchMe, createWorkspace } from "../../lib/cloudAuth";
 import { color, radius, space, text, weight } from "../../tokens";
 
+const ROLE_LABELS: Record<string, string> = {
+  owner: "Dueño",
+  admin: "Encargado",
+  vendedor: "Vendedor",
+  viewer: "Solo lectura",
+};
+
 export function CloudAccountSection() {
-  const { jwt, email, expiresAt, setSession, clearSession, isLoggedIn } = useCloudAuthStore();
+  const {
+    jwt, email, expiresAt,
+    workspaces, activeWorkspaceId,
+    setSession, setWorkspaces, setActiveWorkspace, upsertWorkspace,
+    clearSession, isLoggedIn,
+  } = useCloudAuthStore();
   const { showToast } = useUIStore();
 
   const loggedIn = isLoggedIn();
@@ -33,6 +45,10 @@ export function CloudAccountSection() {
   // Estado del input de código (alternativa al deep link).
   const [codeInput, setCodeInput] = useState("");
   const [verifyingCode, setVerifyingCode] = useState(false);
+  // Estado del flow "crear negocio" (modal inline).
+  const [creatingWs, setCreatingWs] = useState(false);
+  const [wsName, setWsName] = useState("");
+  const [creatingSubmit, setCreatingSubmit] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -103,6 +119,37 @@ export function CloudAccountSection() {
     setCodeInput("");
     setEmailInput("");
     showToast(`Conectado a la nube como ${res.email ?? sentTo}`, "success");
+
+    // Fire-and-forget: hidratar workspaces.
+    void fetchMe(res.jwt).then((meRes) => {
+      if (meRes.ok) setWorkspaces(meRes.data.workspaces);
+    });
+  }
+
+  /**
+   * Crea un workspace nuevo en la nube. El user que lo crea queda como
+   * owner automáticamente (auto-membership server-side).
+   */
+  async function handleCreateWs(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = wsName.trim();
+    if (!trimmed) { showToast("Escribí un nombre", "error"); return; }
+    setCreatingSubmit(true);
+    const res = await createWorkspace(jwt, trimmed);
+    setCreatingSubmit(false);
+    if (!res.ok) {
+      showToast(`No se pudo crear: ${res.error}`, "error");
+      return;
+    }
+    upsertWorkspace({
+      id: res.data.id,
+      name: res.data.name,
+      role: res.data.role,
+      status: res.data.status,
+    });
+    setCreatingWs(false);
+    setWsName("");
+    showToast(`Negocio "${res.data.name}" creado en la nube`, "success");
   }
 
   /* ────────────────────────────────────────────────────────────────── */
@@ -114,11 +161,13 @@ export function CloudAccountSection() {
       <div>
         <h2 style={titleStyle}>Cuenta en la nube</h2>
         <p style={descStyle}>
-          Estás logueado. Cuando F2 migre datos a Turso, tu equipo va a ver
-          los mismos clientes/ventas desde otras PCs.
+          Estás logueado. Tus negocios en la nube viven acá.
+          Cuando F2 termine de migrar los datos del cliente/ventas, tu equipo
+          va a ver los mismos números desde otras PCs en tiempo real.
         </p>
 
-        <div style={cardStyle}>
+        {/* Identidad */}
+        <div style={{ ...cardStyle, marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: space[3] }}>
             <div style={{
               width: 36, height: 36, borderRadius: "50%",
@@ -143,6 +192,102 @@ export function CloudAccountSection() {
             </button>
           </div>
         </div>
+
+        {/* Workspaces */}
+        <h3 style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 12px" }}>
+          Negocios
+        </h3>
+
+        {workspaces.length === 0 && !creatingWs && (
+          <div style={{ ...cardStyle, textAlign: "center" }}>
+            <Building2 size={32} color={color.textDim} style={{ margin: "0 auto 12px" }} />
+            <div style={{ fontSize: text.sm, color: color.textMuted, marginBottom: 8 }}>
+              Todavía no creaste tu negocio en la nube.
+            </div>
+            <div style={{ fontSize: text.xs, color: color.textDim, marginBottom: 16, lineHeight: 1.5 }}>
+              Vas a poder invitar a tu encargado y vendedores. Cada uno entra desde su PC con su email.
+            </div>
+            <button onClick={() => setCreatingWs(true)} style={btnPrimary}>
+              <Plus size={14} style={{ verticalAlign: "middle", marginRight: 6 }} />
+              Crear mi negocio
+            </button>
+          </div>
+        )}
+
+        {workspaces.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+            {workspaces.map((ws) => {
+              const isActive = ws.id === activeWorkspaceId;
+              const roleLabel = ROLE_LABELS[ws.role] ?? ws.role;
+              return (
+                <button
+                  key={ws.id}
+                  type="button"
+                  onClick={() => setActiveWorkspace(ws.id)}
+                  style={{
+                    ...cardStyle,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: space[3],
+                    cursor: "pointer",
+                    border: `1px solid ${isActive ? color.primary : color.border}`,
+                    boxShadow: isActive ? `0 0 0 2px ${color.primary}22` : "none",
+                    textAlign: "left",
+                  }}
+                >
+                  <Building2 size={18} color={isActive ? color.primary : color.textMuted} style={{ flexShrink: 0 }} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text }}>
+                      {ws.name}
+                    </div>
+                    <div style={{ fontSize: text.xs, color: color.textDim, marginTop: 2 }}>
+                      Tu rol: <strong style={{ color: color.textMuted }}>{roleLabel}</strong>
+                    </div>
+                  </div>
+                  {isActive && <Check size={16} color={color.primary} />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Botón "crear otro" cuando ya hay >=1 */}
+        {workspaces.length > 0 && !creatingWs && (
+          <button onClick={() => setCreatingWs(true)} style={btnGhost}>
+            <Plus size={13} />
+            Crear otro negocio
+          </button>
+        )}
+
+        {/* Form inline de crear negocio */}
+        {creatingWs && (
+          <form onSubmit={handleCreateWs} style={{ ...cardStyle, marginTop: 12 }}>
+            <label style={labelStyle}>Nombre del negocio</label>
+            <input
+              type="text"
+              autoFocus
+              value={wsName}
+              onChange={(e) => setWsName(e.target.value)}
+              placeholder="Ej: iPhone Club"
+              maxLength={80}
+              disabled={creatingSubmit}
+              style={inputStyle}
+            />
+            <div style={{ display: "flex", gap: space[2] }}>
+              <button type="submit" disabled={creatingSubmit} style={{ ...btnPrimary, flex: 1 }}>
+                {creatingSubmit ? "Creando..." : "Crear"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setCreatingWs(false); setWsName(""); }}
+                disabled={creatingSubmit}
+                style={btnGhost}
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     );
   }

@@ -17,6 +17,7 @@ import { DolaresArSection } from "./DolaresArSection";
 import { AboutSection } from "./AboutSection";
 import { AssignedTasksSection } from "./AssignedTasksSection";
 import { CloudAccountSection } from "./CloudAccountSection";
+import { CloudTeamSection } from "./CloudTeamSection";
 import { qk } from "../../lib/queryKeys";
 import type { PipelineStage, CustomerTypeRow } from "../../lib/db/types";
 // Paleta unificada — la misma que usa el kanban del pipeline para el
@@ -25,7 +26,7 @@ import { PALETTE_LIST as COLORS, colorCss } from "../../lib/colorPalette";
 
 // ── Shared ────────────────────────────────────────────────────────
 
-type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "wa-templates" | "dolares" | "assigned-tasks" | "cloud-account" | "data" | "about";
+type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "wa-templates" | "dolares" | "assigned-tasks" | "cloud-account" | "cloud-team" | "data" | "about";
 
 const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "general", label: "General" },
@@ -40,6 +41,7 @@ const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "dolares", label: "Cotizaciones del dólar" },
   { id: "assigned-tasks", label: "Tareas obligatorias" },
   { id: "cloud-account", label: "Cuenta en la nube" },
+  { id: "cloud-team", label: "Equipo en la nube" },
   { id: "data", label: "Datos y backup" },
   { id: "about", label: "Acerca de Clozr" },
 ];
@@ -1075,6 +1077,7 @@ export default function SettingsScreen() {
       case "dolares": return <DolaresArSection />;
       case "assigned-tasks": return <AssignedTasksSection wid={wid} />;
       case "cloud-account": return <CloudAccountSection />;
+      case "cloud-team": return <CloudTeamSection />;
       case "data": return <DataSection wid={wid} />;
       case "about": return <AboutSection />;
     }

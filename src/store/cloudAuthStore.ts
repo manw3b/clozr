@@ -15,6 +15,15 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+export type CloudRole = "owner" | "admin" | "vendedor" | "viewer";
+
+export interface CloudWorkspace {
+  id: string;
+  name: string;
+  role: CloudRole;
+  status: "active" | "invited" | "revoked";
+}
+
 interface CloudAuthState {
   /** JWT firmado por el worker. Null = no logueado. */
   jwt: string | null;
@@ -27,10 +36,23 @@ interface CloudAuthState {
   /** Unix seconds — cuándo expira. */
   expiresAt: number | null;
 
+  /** Workspaces a los que el user pertenece (hidratado por GET /me). */
+  workspaces: CloudWorkspace[];
+  /** ID del workspace cloud activo (persisted). */
+  activeWorkspaceId: string | null;
+
   setSession: (args: { jwt: string; email: string; userId: string; sessionId: string; expiresAt: number }) => void;
+  setWorkspaces: (ws: CloudWorkspace[]) => void;
+  setActiveWorkspace: (id: string | null) => void;
+  /** Agrega o reemplaza un workspace en la lista. Útil después de crear. */
+  upsertWorkspace: (ws: CloudWorkspace) => void;
   clearSession: () => void;
   /** True si tenemos JWT y NO está expirado. */
   isLoggedIn: () => boolean;
+  /** Workspace cloud activo (o null si no hay). */
+  activeWorkspace: () => CloudWorkspace | null;
+  /** Rol del user en el workspace activo (o null). */
+  currentRole: () => CloudRole | null;
 }
 
 export const useCloudAuthStore = create<CloudAuthState>()(
@@ -41,17 +63,55 @@ export const useCloudAuthStore = create<CloudAuthState>()(
       userId: null,
       sessionId: null,
       expiresAt: null,
+      workspaces: [],
+      activeWorkspaceId: null,
 
       setSession: ({ jwt, email, userId, sessionId, expiresAt }) =>
         set({ jwt, email, userId, sessionId, expiresAt }),
 
+      setWorkspaces: (ws) =>
+        set((state) => {
+          // Si tenemos activeWorkspaceId pero ya no existe en la lista
+          // (ej: te expulsaron), lo limpiamos. Si no hay activo y hay ≥1,
+          // tomamos el primero como default.
+          let activeId = state.activeWorkspaceId;
+          if (activeId && !ws.some((w) => w.id === activeId)) activeId = null;
+          if (!activeId && ws.length > 0) activeId = ws[0]?.id ?? null;
+          return { workspaces: ws, activeWorkspaceId: activeId };
+        }),
+
+      setActiveWorkspace: (id) => set({ activeWorkspaceId: id }),
+
+      upsertWorkspace: (ws) =>
+        set((state) => {
+          const others = state.workspaces.filter((w) => w.id !== ws.id);
+          const next = [...others, ws];
+          // Si era el primer workspace, lo marcamos activo.
+          const activeId = state.activeWorkspaceId ?? ws.id;
+          return { workspaces: next, activeWorkspaceId: activeId };
+        }),
+
       clearSession: () =>
-        set({ jwt: null, email: null, userId: null, sessionId: null, expiresAt: null }),
+        set({
+          jwt: null, email: null, userId: null, sessionId: null, expiresAt: null,
+          workspaces: [], activeWorkspaceId: null,
+        }),
 
       isLoggedIn: () => {
         const { jwt, expiresAt } = get();
         if (!jwt || !expiresAt) return false;
         return expiresAt * 1000 > Date.now();
+      },
+
+      activeWorkspace: () => {
+        const { workspaces, activeWorkspaceId } = get();
+        if (!activeWorkspaceId) return null;
+        return workspaces.find((w) => w.id === activeWorkspaceId) ?? null;
+      },
+
+      currentRole: () => {
+        const ws = get().activeWorkspace();
+        return ws ? ws.role : null;
       },
     }),
     { name: "clozr-cloud-auth" },

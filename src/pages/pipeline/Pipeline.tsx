@@ -426,9 +426,19 @@ export function Pipeline() {
     const targetColumnId = String(columnHits[0]?.id ?? '');
     const targetStageId = targetColumnId.slice(4); // quita "col:"
 
-    // PASO 2 — buscar card hover dentro de esa columna (para reorder interno)
+    // PASO 2 — buscar card hover dentro de esa columna (para reorder interno).
+    //
+    // CRITICAL: excluir la card activa del set candidato. Si no la
+    // excluimos, rectIntersection compara el rect del activo contra
+    // sí mismo y siempre gana con overlap 100%. Eso devuelve over === active,
+    // handleDragEnd hace `if (activeId === overId) return` (early return
+    // para no auto-mover), y la mutation NUNCA se dispara. El optimistic
+    // está → parece que funcionó. Al refetch (navegar y volver) la DB
+    // todavía tiene la stage vieja → el lead "vuelve" a Prospecto.
+    // Confirmado en logs: cardWinner === activeId en cada frame del drag.
     const cardsInTarget = args.droppableContainers.filter((c) => {
       if (typeof c.id !== 'string' || c.id.startsWith('col:')) return false;
+      if (c.id === activeId) return false;
       const data = c.data.current as
         | { type?: string; lead?: { stage?: string } }
         | undefined;
@@ -440,22 +450,9 @@ export function Pipeline() {
         ...args,
         droppableContainers: cardsInTarget,
       });
-      if (cardHits.length > 0) {
-        // eslint-disable-next-line no-console
-        console.log("[collision] CARD hit", {
-          activeId,
-          targetColumn: targetColumnId,
-          cardWinner: cardHits[0]?.id,
-        });
-        return cardHits;
-      }
+      if (cardHits.length > 0) return cardHits;
     }
 
-    // eslint-disable-next-line no-console
-    console.log("[collision] COLUMN hit", {
-      activeId,
-      targetColumn: targetColumnId,
-    });
     return columnHits;
   };
 
@@ -544,11 +541,7 @@ export function Pipeline() {
 
   function handleDragOver(e: DragOverEvent) {
     const { active, over } = e;
-    if (!over) {
-      // eslint-disable-next-line no-console
-      console.log("[handleDragOver] over=null");
-      return;
-    }
+    if (!over) return;
 
     const activeId = active.id as string;
     const overId = over.id as string;
@@ -560,16 +553,6 @@ export function Pipeline() {
 
     const overLead = leads.find((l) => l.id === overId);
     const overStage = (overLead?.stage || stageIdFromDragId(overId)) as LeadStage;
-
-    // eslint-disable-next-line no-console
-    console.log("[handleDragOver]", {
-      activeId,
-      overId,
-      overIsLead: !!overLead,
-      activeStage: activeLead.stage,
-      overStage,
-      willUpdate: activeLead.stage !== overStage,
-    });
 
     if (activeLead.stage === overStage) return;
 

@@ -18,8 +18,22 @@ tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 tauri-plugin-window-state = "2"
+# Deep linking — registra el scheme clozr:// para que el SO mande los
+# magic links del email a la app ya corriendo (ver tauri.conf.json
+# plugins.deep-link). En desktop además necesitamos single-instance
+# (más abajo) para que abrir el link no spawnee otra ventana.
+tauri-plugin-deep-link = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# single-instance solo aplica en desktop. Cuando el SO intenta lanzar una
+# segunda instancia de Clozr (lo que pasa al hacer click en un clozr://
+# si ya está corriendo), single-instance la intercepta y le forwardea el
+# URL a la instancia existente. La feature "deep-link" hace que el plugin
+# de deep-link reciba ese URL como evento normal (el handler único cubre
+# ambos casos: app cerrada y app corriendo).
+[target.'cfg(any(windows, target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 
 [profile.release]
 panic = "abort"

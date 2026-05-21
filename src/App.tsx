@@ -15,6 +15,7 @@ import { followupsDb } from "./lib/db/followups";
 import { ensurePricingSchema } from "./lib/db/ensureSchema";
 import { autoBackupIfDue } from "./lib/backup";
 import { log } from "./lib/logger";
+import { useCloudAuthListener } from "./lib/useCloudAuthListener";
 
 // AppShell stays eager — render shell immediately
 import { AppShell } from "./layout/AppShell";
@@ -145,6 +146,10 @@ export default function App() {
   // de cotización — toda la app que lee `usdToArs` recibe el valor
   // del API automáticamente sin tener que tocar cada caller.
   useSyncActiveDolarToExchangeRate();
+
+  // Escucha el deep link clozr://auth-complete?jwt=... que dispara Rust
+  // cuando el SO le pasa un magic link a la app. Llena cloudAuthStore.
+  useCloudAuthListener();
 
   useGlobalShortcuts();
 

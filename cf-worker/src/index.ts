@@ -80,20 +80,36 @@ function json(body: unknown, status = 200): Response {
 }
 
 /**
- * Aplica CORS headers según ALLOWED_ORIGINS de wrangler.toml.
- * Para evitar reflejar cualquier origin, validamos contra la lista.
+ * CORS abierto para los endpoints de auth.
+ *
+ * Razonamiento: estos endpoints son intencionalmente públicos
+ *   - POST /auth/request: pide un email; manda magic link. Si un sitio
+ *     malicioso lo invoca, lo único que logra es mandarle un email al
+ *     dueño legítimo de ese email — no se filtra info, no hay efecto
+ *     sobre el receptor a menos que CLICKEE el link.
+ *   - POST /auth/verify-code: pide email + código. El código está SOLO
+ *     en el email del user — un attacker tendría que tener acceso al
+ *     email para guessearlo. Si lo tiene, ya ganó.
+ *   - GET /: health.
+ *
+ * No usamos `*` con credentials (browser lo rechaza), pero como NO
+ * mandamos cookies, no necesitamos credentials. Reflejamos el origin
+ * que venga (incluyendo "null" cuando algunos Tauri/WebView mandan eso).
+ *
+ * Antes lista de origins explícita (tauri://localhost, https://tauri.localhost,
+ * http://localhost:1420) pero Tauri 2 Windows usa "http://tauri.localhost"
+ * con el slash final y a veces "null" — la lista era frágil y rompía
+ * con "Failed to fetch" desde el WebView2.
  */
 function cors(req: Request, env: Env, res: Response): Response {
-  const origin = req.headers.get("origin") ?? "";
-  const allowed = env.ALLOWED_ORIGINS.split(",").map((s) => s.trim());
+  // env.ALLOWED_ORIGINS queda para diagnostico; ya no lo usamos en runtime.
+  void env;
+  const origin = req.headers.get("origin");
   const headers = new Headers(res.headers);
-  if (allowed.includes(origin)) {
-    headers.set("access-control-allow-origin", origin);
-    headers.set("access-control-allow-credentials", "true");
-    headers.set("access-control-allow-methods", "GET, POST, OPTIONS");
-    headers.set("access-control-allow-headers", "content-type, authorization");
-    headers.set("access-control-max-age", "86400");
-    headers.set("vary", "origin");
-  }
+  headers.set("access-control-allow-origin", origin ?? "*");
+  headers.set("access-control-allow-methods", "GET, POST, OPTIONS");
+  headers.set("access-control-allow-headers", "content-type, authorization");
+  headers.set("access-control-max-age", "86400");
+  headers.set("vary", "origin");
   return new Response(res.body, { status: res.status, headers });
 }

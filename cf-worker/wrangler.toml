@@ -21,7 +21,10 @@ compatibility_flags = ["nodejs_compat"]
 
 # Sender + asunto del email magic-link. No son secretos.
 [vars]
-RESEND_FROM = "Clozr <login@clozr.app>"
+# Sandbox: Resend solo deja mandar emails al owner de la cuenta
+# (pyter.import@gmail.com) hasta que verifiquemos un dominio propio.
+# Cuando F1.7 conecte un dominio, swappear por "Clozr <login@tudominio>".
+RESEND_FROM = "Clozr <onboarding@resend.dev>"
 MAGIC_LINK_TTL_MIN = "15"
 SESSION_TTL_DAYS = "30"
 DEEP_LINK_SCHEME = "clozr"

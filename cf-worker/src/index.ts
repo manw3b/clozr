@@ -29,6 +29,9 @@ export interface Env {
   ALLOWED_ORIGINS: string;
 }
 
+import { handleAuthRequest } from "./routes/request";
+import { handleAuthVerify } from "./routes/verify";
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
@@ -44,8 +47,13 @@ export default {
         case "GET /":
           return cors(req, env, json({ ok: true, service: "clozr-auth", version: "0.1.0" }));
 
-        // case "POST /auth/request":  → F1.3 (próximo commit)
-        // case "GET /auth/verify":    → F1.4
+        case "POST /auth/request":
+          return cors(req, env, await handleAuthRequest(req, env));
+
+        case "GET /auth/verify":
+          // No CORS: este endpoint lo abre el USUARIO desde su email,
+          // navega directo, no es una request cross-origin del app.
+          return handleAuthVerify(req, env);
 
         default:
           return cors(req, env, json({ error: "not_found", route }, 404));

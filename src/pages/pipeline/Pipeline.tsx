@@ -365,36 +365,85 @@ export function Pipeline() {
   );
 
   /**
-   * Estrategia de detección de colisión específica para kanban:
+   * Estrategia de detección de colisión específica para kanban.
    *
-   * Orden:
-   *   1. rectIntersection → qué droppables se superponen con el rect de
-   *      la card arrastrada. Es lo más cercano a "donde está visualmente
-   *      la card" que es lo que el usuario espera.
-   *   2. pointerWithin → fallback si la card no intersecta nada (ej:
-   *      empezás a arrastrar y todavía no movió lo suficiente).
-   *   3. closestCenter restringido a columnas → último recurso.
+   * Para drag de CARDS hay 2 pasos:
    *
-   * Antes pointerWithin iba PRIMERO. El bug: al arrastrar una card de
-   * 110px+ ancho, el cursor puede quedar varios px a la izquierda mientras
-   * la card visualmente está adentro de la columna 2. pointerWithin
-   * devolvía la columna 1 (la del cursor), rectIntersection devolvía la
-   * columna 2 (la de la card) — y como pointer ganaba, el drop iba a la
-   * columna 1. El usuario veía "drop visual en col 2, vuelve a col 1".
-   * Priorizando rectIntersection, lo que se ve es lo que pasa.
+   *   PASO 1 — Encontrar la columna destino mirando SOLO columnas.
+   *     Antes mirábamos todos los droppables (columnas + cards) y eso
+   *     causaba el bug "drop al top de columna no persiste":
+   *
+   *       Al arrastrar al top de la columna B, el rect de la card se
+   *       superpone con (a) un sliver superior chico de la columna B y
+   *       (b) las cards adyacentes de la columna A fuente. rectIntersection
+   *       devolvía la card de A como winner por mayor área de overlap.
+   *       handleDragOver veía overStage === activeStage y hacía return
+   *       sin updatear el optimistic. handleDragEnd mutaba con la stage
+   *       fuente. El usuario veía "soltó en B, volvió a A".
+   *
+   *     Filtrando a sólo columnas, gana la que más overlap visual tiene
+   *     con la card, sin interferencia de cards adyacentes.
+   *
+   *   PASO 2 — Dentro de la columna destino, encontrar la card hover
+   *     (para preservar reorder vertical dentro de una columna). Si no
+   *     hay match, devolvemos la columna sola — el drop persiste igual.
+   *
+   * Para drag de COLUMNAS (reorder horizontal) usamos cascada estándar
+   * sin tocar nada.
    */
   const collisionDetection: CollisionDetection = (args) => {
-    const rect = rectIntersection(args);
-    if (rect.length > 0) return rect;
+    const activeId = String(args.active.id);
+    const isColumnReorder = activeId.startsWith('col:');
 
-    const pointer = pointerWithin(args);
-    if (pointer.length > 0) return pointer;
+    if (isColumnReorder) {
+      const rect = rectIntersection(args);
+      if (rect.length > 0) return rect;
+      const pointer = pointerWithin(args);
+      if (pointer.length > 0) return pointer;
+      return closestCenter(args);
+    }
 
-    // Fallback restringido a columnas (ids con prefijo "col:").
-    const columnContainers = args.droppableContainers.filter((c) =>
-      typeof c.id === 'string' && c.id.startsWith('col:'),
+    // PASO 1 — resolver columna destino
+    const columnContainers = args.droppableContainers.filter(
+      (c) => typeof c.id === 'string' && c.id.startsWith('col:'),
     );
-    return closestCenter({ ...args, droppableContainers: columnContainers });
+    if (columnContainers.length === 0) return [];
+
+    let columnHits = rectIntersection({
+      ...args,
+      droppableContainers: columnContainers,
+    });
+    if (columnHits.length === 0) {
+      // Fallback si la card todavía no intersecta visualmente ninguna
+      // (ej: arranque del drag, transición entre columnas).
+      columnHits = closestCenter({
+        ...args,
+        droppableContainers: columnContainers,
+      });
+    }
+    if (columnHits.length === 0) return [];
+
+    const targetColumnId = String(columnHits[0]?.id ?? '');
+    const targetStageId = targetColumnId.slice(4); // quita "col:"
+
+    // PASO 2 — buscar card hover dentro de esa columna (para reorder interno)
+    const cardsInTarget = args.droppableContainers.filter((c) => {
+      if (typeof c.id !== 'string' || c.id.startsWith('col:')) return false;
+      const data = c.data.current as
+        | { type?: string; lead?: { stage?: string } }
+        | undefined;
+      return data?.type === 'lead' && data.lead?.stage === targetStageId;
+    });
+
+    if (cardsInTarget.length > 0) {
+      const cardHits = rectIntersection({
+        ...args,
+        droppableContainers: cardsInTarget,
+      });
+      if (cardHits.length > 0) return cardHits;
+    }
+
+    return columnHits;
   };
 
   /* ---------- Filtrado ---------- */

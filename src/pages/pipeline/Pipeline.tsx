@@ -440,9 +440,22 @@ export function Pipeline() {
         ...args,
         droppableContainers: cardsInTarget,
       });
-      if (cardHits.length > 0) return cardHits;
+      if (cardHits.length > 0) {
+        // eslint-disable-next-line no-console
+        console.log("[collision] CARD hit", {
+          activeId,
+          targetColumn: targetColumnId,
+          cardWinner: cardHits[0]?.id,
+        });
+        return cardHits;
+      }
     }
 
+    // eslint-disable-next-line no-console
+    console.log("[collision] COLUMN hit", {
+      activeId,
+      targetColumn: targetColumnId,
+    });
     return columnHits;
   };
 
@@ -531,27 +544,35 @@ export function Pipeline() {
 
   function handleDragOver(e: DragOverEvent) {
     const { active, over } = e;
-    if (!over) return;
+    if (!over) {
+      // eslint-disable-next-line no-console
+      console.log("[handleDragOver] over=null");
+      return;
+    }
 
     const activeId = active.id as string;
     const overId = over.id as string;
 
-    // Drag de columna → no muta leads, deja que DragEnd reordene.
     if (isColumnDrag(activeId)) return;
 
-    // Encontramos el lead que estamos arrastrando
     const activeLead = leads.find((l) => l.id === activeId);
     if (!activeLead) return;
 
-    // El "over" puede ser otra card, una columna vacía (col:<id>) o el id
-    // de stage directo (compat). Resolvemos a un stageId limpio.
     const overLead = leads.find((l) => l.id === overId);
     const overStage = (overLead?.stage || stageIdFromDragId(overId)) as LeadStage;
 
-    // Si está sobre la misma stage, no hacemos nada acá (lo maneja DragEnd para reordenar)
+    // eslint-disable-next-line no-console
+    console.log("[handleDragOver]", {
+      activeId,
+      overId,
+      overIsLead: !!overLead,
+      activeStage: activeLead.stage,
+      overStage,
+      willUpdate: activeLead.stage !== overStage,
+    });
+
     if (activeLead.stage === overStage) return;
 
-    // Mover entre columnas: actualizamos el stage y le ponemos position al final
     setLeads((prev) => {
       const next = prev.map((l) => (l.id === activeId ? { ...l, stage: overStage } : l));
       return next;

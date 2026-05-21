@@ -31,6 +31,7 @@ export interface Env {
 
 import { handleAuthRequest } from "./routes/request";
 import { handleAuthVerify } from "./routes/verify";
+import { handleAuthVerifyCode } from "./routes/verify-code";
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -49,6 +50,9 @@ export default {
 
         case "POST /auth/request":
           return cors(req, env, await handleAuthRequest(req, env));
+
+        case "POST /auth/verify-code":
+          return cors(req, env, await handleAuthVerifyCode(req, env));
 
         case "GET /auth/verify":
           // No CORS: este endpoint lo abre el USUARIO desde su email,

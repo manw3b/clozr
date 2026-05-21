@@ -40,16 +40,21 @@ export async function handleAuthRequest(req: Request, env: Env): Promise<Respons
 
   await ensureSchema(env);
 
-  // Token: 32 bytes random → hex (64 chars). Lo suficientemente largo
-  // para ser unguessable en la ventana de 15 min.
+  // Token: 32 bytes random → hex (64 chars). Va en el link del email,
+  // unguessable en la ventana de 15 min.
+  // Code: 6 dígitos. Para el caso "abrí el email en el celular, quiero
+  // loguearme en la PC". El user lee el código y lo escribe en la app.
+  // 6 dígitos = 1M combinaciones, suficiente con TTL 15 min y rate
+  // limit (futuro). Brute force = 95 años a 1 req/seg.
   const token = randomHex(32);
+  const code = randomDigits(6);
   const ttlMin = Number(env.MAGIC_LINK_TTL_MIN) || 15;
   const expiresAt = new Date(Date.now() + ttlMin * 60_000).toISOString();
 
   await tursoExec(
     env,
-    `INSERT INTO magic_links (token, email, expires_at) VALUES (?, ?, ?)`,
-    [token, email, expiresAt],
+    `INSERT INTO magic_links (token, email, expires_at, code) VALUES (?, ?, ?, ?)`,
+    [token, email, expiresAt, code],
   );
 
   // Workers expone la URL del request. La verify route va al mismo origen.
@@ -64,6 +69,7 @@ export async function handleAuthRequest(req: Request, env: Env): Promise<Respons
   await sendMagicLinkEmail({
     to: email,
     link,
+    code,
     apiKey: env.RESEND_API_KEY,
     from: env.RESEND_FROM,
   });
@@ -77,6 +83,26 @@ function randomHex(bytes: number): string {
   const buf = new Uint8Array(bytes);
   crypto.getRandomValues(buf);
   return Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Devuelve N dígitos uniformemente random.
+ * Usa rejection sampling para evitar bias en módulo (los últimos
+ * múltiplos de 256 no son 10-divisibles → un % 10 sesga a los chicos).
+ */
+function randomDigits(n: number): string {
+  let out = "";
+  while (out.length < n) {
+    const buf = new Uint8Array(n);
+    crypto.getRandomValues(buf);
+    for (const b of buf) {
+      // Aceptamos solo bytes en [0, 249] para que el módulo 10 sea uniforme.
+      if (b >= 250) continue;
+      out += String(b % 10);
+      if (out.length === n) break;
+    }
+  }
+  return out;
 }
 
 function isValidEmail(s: string): boolean {

@@ -18,11 +18,11 @@ import { useState } from "react";
 import { Mail, LogOut, CheckCircle2, RefreshCw } from "lucide-react";
 import { useCloudAuthStore } from "../../store/cloudAuthStore";
 import { useUIStore } from "../../store/uiStore";
-import { requestMagicLink } from "../../lib/cloudAuth";
+import { requestMagicLink, verifyCode } from "../../lib/cloudAuth";
 import { color, radius, space, text, weight } from "../../tokens";
 
 export function CloudAccountSection() {
-  const { jwt, email, expiresAt, clearSession, isLoggedIn } = useCloudAuthStore();
+  const { jwt, email, expiresAt, setSession, clearSession, isLoggedIn } = useCloudAuthStore();
   const { showToast } = useUIStore();
 
   const loggedIn = isLoggedIn();
@@ -30,6 +30,9 @@ export function CloudAccountSection() {
   const [emailInput, setEmailInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  // Estado del input de código (alternativa al deep link).
+  const [codeInput, setCodeInput] = useState("");
+  const [verifyingCode, setVerifyingCode] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -58,7 +61,48 @@ export function CloudAccountSection() {
     clearSession();
     setEmailInput("");
     setSentTo(null);
+    setCodeInput("");
     showToast("Sesión cerrada");
+  }
+
+  /**
+   * Valida el código manual contra el worker. Usa el email guardado en
+   * sentTo — el user no tiene que re-escribirlo. Si OK, llena la sesión
+   * y vuelve al estado "logueado". Si error, mostramos toast.
+   */
+  async function handleSubmitCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!sentTo) return;
+    const cleaned = codeInput.replace(/\D/g, "");
+    if (cleaned.length !== 6) {
+      showToast("El código tiene que ser de 6 dígitos", "error");
+      return;
+    }
+    setVerifyingCode(true);
+    const res = await verifyCode(sentTo, cleaned);
+    setVerifyingCode(false);
+    if (!res.ok || !res.jwt) {
+      const ERR_LABELS: Record<string, string> = {
+        invalid_code: "Código incorrecto. Revisalo o pedí uno nuevo.",
+        already_used: "Este código ya se usó. Pedí uno nuevo.",
+        expired: "El código expiró. Pedí uno nuevo.",
+        invalid_code_format: "El código tiene que ser de 6 dígitos.",
+      };
+      showToast(ERR_LABELS[res.error ?? ""] ?? `Error: ${res.error ?? "desconocido"}`, "error");
+      return;
+    }
+    setSession({
+      jwt: res.jwt,
+      email: res.email ?? sentTo,
+      userId: res.userId ?? "",
+      sessionId: res.sessionId ?? "",
+      expiresAt: res.expiresAt ?? 0,
+    });
+    sessionStorage.removeItem("clozr:pending-login-email");
+    setSentTo(null);
+    setCodeInput("");
+    setEmailInput("");
+    showToast(`Conectado a la nube como ${res.email ?? sentTo}`, "success");
   }
 
   /* ────────────────────────────────────────────────────────────────── */
@@ -104,33 +148,76 @@ export function CloudAccountSection() {
   }
 
   /* ────────────────────────────────────────────────────────────────── */
-  /* Estado: EMAIL ENVIADO (pendiente que clickee el link)              */
+  /* Estado: EMAIL ENVIADO (pendiente que clickee el link O ingrese el code) */
   /* ────────────────────────────────────────────────────────────────── */
   if (sentTo) {
     return (
       <div>
         <h2 style={titleStyle}>Revisá tu email</h2>
         <p style={descStyle}>
-          Te mandamos un link a <strong style={{ color: color.text }}>{sentTo}</strong>.
-          Hacé click ahí (puede tardar 1 minuto en llegar — chequeá spam) y la
-          app se abre logueada.
+          Te mandamos un email a <strong style={{ color: color.text }}>{sentTo}</strong>
+          {" "}con dos opciones (puede tardar 1 min — chequeá spam):
         </p>
 
-        <div style={cardStyle}>
+        {/* Opción 1: link */}
+        <div style={{ ...cardStyle, marginBottom: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: space[3] }}>
             <Mail size={20} color={color.textMuted} style={{ flexShrink: 0 }} />
-            <div style={{ fontSize: text.sm, color: color.textMuted, flex: 1 }}>
-              El link expira en 15 minutos.
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text, marginBottom: 2 }}>
+                Opción 1 — Click el botón "Abrir Clozr"
+              </div>
+              <div style={{ fontSize: text.xs, color: color.textDim }}>
+                Si estás leyendo el email en esta PC. Te loguea automático.
+              </div>
             </div>
+          </div>
+        </div>
+
+        {/* Opción 2: código manual */}
+        <form onSubmit={handleSubmitCode} style={cardStyle}>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text, marginBottom: 2 }}>
+              Opción 2 — Pegá el código de 6 dígitos
+            </div>
+            <div style={{ fontSize: text.xs, color: color.textDim }}>
+              Si abriste el email en el celular u otro dispositivo.
+            </div>
+          </div>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={codeInput}
+            onChange={(e) => setCodeInput(e.target.value)}
+            placeholder="123 456"
+            disabled={verifyingCode}
+            maxLength={9}
+            style={{
+              ...inputStyle,
+              fontFamily: "ui-monospace, 'SF Mono', Consolas, monospace",
+              fontSize: 22,
+              letterSpacing: 3,
+              textAlign: "center",
+            }}
+          />
+          <div style={{ display: "flex", gap: space[2] }}>
+            <button type="submit" disabled={verifyingCode} style={{ ...btnPrimary, flex: 1 }}>
+              {verifyingCode ? "Verificando..." : "Confirmar código"}
+            </button>
             <button
-              onClick={() => { setSentTo(null); setEmailInput(""); }}
+              type="button"
+              onClick={() => { setSentTo(null); setEmailInput(""); setCodeInput(""); }}
               style={btnGhost}
             >
               <RefreshCw size={13} />
               Otro email
             </button>
           </div>
-        </div>
+          <div style={{ fontSize: text.xs, color: color.textDim, marginTop: 10 }}>
+            El link y el código expiran en 15 minutos.
+          </div>
+        </form>
       </div>
     );
   }

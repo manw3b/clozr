@@ -56,6 +56,40 @@ export async function requestMagicLink(email: string): Promise<RequestMagicLinkR
   }
 }
 
+export interface VerifyCodeResult {
+  ok: boolean;
+  jwt?: string;
+  email?: string;
+  userId?: string;
+  sessionId?: string;
+  /** unix seconds */
+  expiresAt?: number;
+  error?: string;
+}
+
+/**
+ * Valida el código de 6 dígitos contra el worker. Alternativa al deep
+ * link — útil cuando el user lee el email en otro dispositivo y escribe
+ * el código en la PC donde corre Clozr.
+ *
+ * Errores típicos del worker: invalid_code, already_used, expired,
+ * invalid_code_format.
+ */
+export async function verifyCode(email: string, code: string): Promise<VerifyCodeResult> {
+  try {
+    const res = await fetch(`${AUTH_BASE}/auth/verify-code`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, code }),
+    });
+    const data = (await res.json()) as VerifyCodeResult;
+    if (!res.ok) return { ok: false, error: data.error ?? `http_${res.status}` };
+    return data;
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "network_error" };
+  }
+}
+
 /* ── JWT helpers ─────────────────────────────────────────────────────── */
 
 export interface JwtPayload {

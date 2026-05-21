@@ -367,23 +367,28 @@ export function Pipeline() {
   /**
    * Estrategia de detección de colisión específica para kanban:
    *
-   * 1. pointerWithin → si el cursor está literalmente dentro de algún
-   *    droppable, ése gana. Lo más preciso posible.
-   * 2. rectIntersection → si no hay match con el pointer (ej: el cursor
-   *    está en el gap entre columnas), buscamos qué droppables se
-   *    superponen con el rect del item arrastrado.
-   * 3. closestCenter sólo entre columnas → fallback final cuando no hay
-   *    intersección clara. Restringimos a columnas (no cards) para que
-   *    al estar en zona ambigua se elija "la columna más cerca", no
-   *    "la card cuyo centro queda más cerca" (que puede saltar erráticamente
-   *    entre columnas distintas).
+   * Orden:
+   *   1. rectIntersection → qué droppables se superponen con el rect de
+   *      la card arrastrada. Es lo más cercano a "donde está visualmente
+   *      la card" que es lo que el usuario espera.
+   *   2. pointerWithin → fallback si la card no intersecta nada (ej:
+   *      empezás a arrastrar y todavía no movió lo suficiente).
+   *   3. closestCenter restringido a columnas → último recurso.
+   *
+   * Antes pointerWithin iba PRIMERO. El bug: al arrastrar una card de
+   * 110px+ ancho, el cursor puede quedar varios px a la izquierda mientras
+   * la card visualmente está adentro de la columna 2. pointerWithin
+   * devolvía la columna 1 (la del cursor), rectIntersection devolvía la
+   * columna 2 (la de la card) — y como pointer ganaba, el drop iba a la
+   * columna 1. El usuario veía "drop visual en col 2, vuelve a col 1".
+   * Priorizando rectIntersection, lo que se ve es lo que pasa.
    */
   const collisionDetection: CollisionDetection = (args) => {
-    const pointer = pointerWithin(args);
-    if (pointer.length > 0) return pointer;
-
     const rect = rectIntersection(args);
     if (rect.length > 0) return rect;
+
+    const pointer = pointerWithin(args);
+    if (pointer.length > 0) return pointer;
 
     // Fallback restringido a columnas (ids con prefijo "col:").
     const columnContainers = args.droppableContainers.filter((c) =>

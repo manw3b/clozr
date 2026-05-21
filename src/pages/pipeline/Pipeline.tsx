@@ -5,8 +5,6 @@ import {
   DndContext,
   DragEndEvent,
   DragOverEvent,
-  DragOverlay,
-  DragStartEvent,
   PointerSensor,
   useSensor,
   useSensors,
@@ -15,6 +13,11 @@ import {
   closestCenter,
   type CollisionDetection,
 } from '@dnd-kit/core';
+// Nota: antes usábamos DragOverlay (fantasma flotante que sigue al cursor)
+// y DragStartEvent para trackear activeId. Migramos al modelo "inline sort"
+// estilo Trello: la card real se mueve dentro del kanban via CSS transform
+// del SortableContext, y las otras se corren para mostrar el destino. Sin
+// overlay, sin estado activeId. Más sólido visualmente y menos código.
 import { SortableContext, verticalListSortingStrategy, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { Search, Plus, Filter } from 'lucide-react';
 import { PageHeader } from '../../components/PageHeader';
@@ -22,7 +25,6 @@ import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Tabs } from '../../components/Tabs';
 import { ClientDrawer } from '../clientes/components/ClientDrawer';
-import { LeadCard } from './components/LeadCard';
 import { SortableLeadCard } from './components/SortableLeadCard';
 import { PipelineColumn, ColumnEmpty, COLUMN_DEFAULT_WIDTH } from './components/PipelineColumn';
 import { PipelineMetrics } from './components/PipelineMetrics';
@@ -282,7 +284,6 @@ export function Pipeline() {
   const [advFiltersOpen, setAdvFiltersOpen] = useState(false);
   const activeFilterCount = countActiveFilters(advFilters);
 
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [openClientId, setOpenClientId] = useState<string | null>(null);
 
   // Selección múltiple para bulk actions
@@ -466,18 +467,12 @@ export function Pipeline() {
   }, [leads, search, priorityFilter, userId, advFilters, clientById]);
 
   const grouped = useMemo(() => groupLeadsByStage(filteredLeads), [filteredLeads]);
-  const activeLead = activeId ? leads.find((l) => l.id === activeId) : null;
-
   /* ---------- Drag handlers ---------- */
   function isColumnDrag(id: string) {
     return id.startsWith('col:');
   }
   function stageIdFromDragId(id: string) {
     return id.startsWith('col:') ? id.slice(4) : id;
-  }
-
-  function handleDragStart(e: DragStartEvent) {
-    setActiveId(e.active.id as string);
   }
 
   function handleDragOver(e: DragOverEvent) {
@@ -510,7 +505,6 @@ export function Pipeline() {
   }
 
   function handleDragEnd(e: DragEndEvent) {
-    setActiveId(null);
     const { active, over } = e;
     if (!over) return;
 
@@ -705,7 +699,6 @@ export function Pipeline() {
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetection}
-        onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
@@ -809,11 +802,6 @@ export function Pipeline() {
           })}
         </div>
         </SortableContext>
-
-        {/* Overlay que sigue al cursor durante drag */}
-        <DragOverlay>
-          {activeLead && <LeadCard lead={activeLead} isOverlay />}
-        </DragOverlay>
       </DndContext>
 
       {/* Right Drawer */}

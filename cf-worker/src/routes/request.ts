@@ -66,15 +66,35 @@ export async function handleAuthRequest(req: Request, env: Env): Promise<Respons
   // strippan schemes no-http.
   const link = `${origin}/auth/verify?token=${encodeURIComponent(token)}`;
 
-  await sendMagicLinkEmail({
-    to: email,
-    link,
-    code,
-    apiKey: env.RESEND_API_KEY,
-    from: env.RESEND_FROM,
-  });
+  // El envío de email es BEST-EFFORT.
+  //
+  // Por qué: si el dominio sender no está verificado en Resend (sandbox),
+  // solo se puede mandar email al owner de la cuenta Resend (en nuestro
+  // caso pyter.import@gmail.com). Cualquier otro destinatario devuelve
+  // 403. Si lo hiciéramos sync, el endpoint fallaría con 500 y el
+  // miembro invitado vería "Failed to fetch" en su app — no podría
+  // avanzar a la pantalla con "Opción 2 — pegá el código".
+  //
+  // En cambio devolvemos ok=true (el magic_link YA está persistido en
+  // DB) + flag emailFailed para que la UI muestre algo distintivo. El
+  // owner puede entonces compartir el código manualmente via
+  // /workspaces/.../access-code y el invitado lo pega.
+  let emailFailed = false;
+  try {
+    await sendMagicLinkEmail({
+      to: email,
+      link,
+      code,
+      apiKey: env.RESEND_API_KEY,
+      from: env.RESEND_FROM,
+    });
+  } catch (e) {
+    emailFailed = true;
+    // eslint-disable-next-line no-console
+    console.warn("[auth/request] email send failed (magic_link igual creado):", e);
+  }
 
-  return json({ ok: true, sentTo: email, expiresInMin: ttlMin });
+  return json({ ok: true, sentTo: email, expiresInMin: ttlMin, emailFailed });
 }
 
 /* ── helpers ─────────────────────────────────────────────────────────── */

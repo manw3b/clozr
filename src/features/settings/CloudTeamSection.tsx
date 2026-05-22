@@ -16,11 +16,11 @@
  */
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, ShieldCheck, UserMinus, AlertCircle, Mail, RefreshCw } from "lucide-react";
+import { Plus, Trash2, ShieldCheck, UserMinus, AlertCircle, Mail, RefreshCw, KeyRound, Copy, X } from "lucide-react";
 import { useCloudAuthStore } from "../../store/cloudAuthStore";
 import { useUIStore } from "../../store/uiStore";
 import {
-  listMembers, inviteMember, patchMemberRole, revokeMember,
+  listMembers, inviteMember, patchMemberRole, revokeMember, issueAccessCode,
   type MemberRow,
 } from "../../lib/cloudAuth";
 import { color, radius, space, text, weight } from "../../tokens";
@@ -53,6 +53,14 @@ export function CloudTeamSection() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "vendedor" | "viewer">("vendedor");
   const [submitting, setSubmitting] = useState(false);
+  // Estado del modal "Código de acceso" — cuando el owner clickea el
+  // botón de un miembro invited, generamos código y mostramos en modal.
+  const [accessCodeModal, setAccessCodeModal] = useState<null | {
+    email: string;
+    code: string;
+    expiresInMin: number;
+    generating?: boolean;
+  }>(null);
 
   useEffect(() => {
     if (!loggedIn || !activeWorkspaceId) {
@@ -114,6 +122,41 @@ export function CloudTeamSection() {
     }
     showToast(`Rol actualizado a ${ROLE_LABELS[newRole]}`, "success");
     loadMembers();
+  }
+
+  async function handleIssueCode(m: MemberRow) {
+    if (!activeWorkspaceId) return;
+    setAccessCodeModal({ email: m.email, code: "", expiresInMin: 0, generating: true });
+    const res = await issueAccessCode(jwt, activeWorkspaceId, m.id);
+    if (!res.ok) {
+      setAccessCodeModal(null);
+      showToast(`No se pudo generar el código: ${res.error}`, "error");
+      return;
+    }
+    setAccessCodeModal({
+      email: res.data.email,
+      code: res.data.code,
+      expiresInMin: res.data.expiresInMin,
+    });
+  }
+
+  function copyInstructionsToClipboard(): void {
+    if (!accessCodeModal) return;
+    const wsName = activeWs?.name ?? "el equipo";
+    const text = `Hola! Te incluí en ${wsName} en Clozr.
+
+1) Descargá Clozr (Windows): https://github.com/manw3b/clozr/releases/latest
+2) Instalalo y abrí la app
+3) Andá a Ajustes → Cuenta en la nube
+4) Email: ${accessCodeModal.email}
+5) Click "Enviar magic link" (si tira error de email, no importa)
+6) Pegá este código en "Opción 2 — Pegá el código": ${accessCodeModal.code}
+
+El código vence en ${accessCodeModal.expiresInMin} minutos.`;
+    navigator.clipboard.writeText(text).then(
+      () => showToast("Instrucciones copiadas al portapapeles", "success"),
+      () => showToast("No se pudo copiar (manualmente: seleccioná el texto)", "error"),
+    );
   }
 
   async function handleRevoke(m: MemberRow) {
@@ -302,7 +345,25 @@ export function CloudTeamSection() {
                   </div>
                 </div>
                 {canManage && !isSelf && m.role !== "owner" && (
-                  <div style={{ display: "flex", gap: 6 }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    {/* Si está invited, botón principal: generar código.
+                        Mientras Resend esté en sandbox, el email no le
+                        llega — esta es la forma de onboardear sin email. */}
+                    {isPending && (
+                      <button
+                        onClick={() => handleIssueCode(m)}
+                        style={{
+                          ...btnGhost,
+                          padding: "5px 10px",
+                          color: color.primary,
+                          borderColor: color.primary,
+                        }}
+                        title="Generar código de acceso para compartir por WhatsApp"
+                      >
+                        <KeyRound size={13} />
+                        Generar código
+                      </button>
+                    )}
                     {/* Quick role switcher */}
                     <select
                       value={m.role}
@@ -341,6 +402,96 @@ export function CloudTeamSection() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Modal código de acceso */}
+      {accessCodeModal && (
+        <div
+          onClick={() => !accessCodeModal.generating && setAccessCodeModal(null)}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 9999, padding: 24,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: 480, width: "100%",
+              background: color.surface, borderRadius: radius.lg,
+              padding: 28, position: "relative",
+              border: `1px solid ${color.border}`,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+            }}
+          >
+            <button
+              onClick={() => setAccessCodeModal(null)}
+              disabled={accessCodeModal.generating}
+              style={{
+                position: "absolute", top: 12, right: 12,
+                background: "transparent", border: "none",
+                color: color.textMuted, cursor: "pointer", padding: 6,
+                borderRadius: 6,
+              }}
+              aria-label="Cerrar"
+            >
+              <X size={18} />
+            </button>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+              <KeyRound size={20} color={color.primary} />
+              <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: color.text }}>
+                Código de acceso
+              </h3>
+            </div>
+            <p style={{ fontSize: 13, color: color.textDim, marginTop: 4, marginBottom: 20, lineHeight: 1.5 }}>
+              Compartile este código a <strong style={{ color: color.text }}>{accessCodeModal.email}</strong> por WhatsApp.
+              Lo va a necesitar para entrar a Clozr.
+            </p>
+
+            {accessCodeModal.generating ? (
+              <div style={{ textAlign: "center", padding: 30, color: color.textDim, fontSize: 13 }}>
+                Generando código...
+              </div>
+            ) : (
+              <>
+                {/* Código gigante */}
+                <div
+                  style={{
+                    fontFamily: "ui-monospace, 'SF Mono', Consolas, monospace",
+                    fontSize: 38, fontWeight: 700, letterSpacing: 6,
+                    padding: "20px 24px", background: color.surface2,
+                    border: `2px solid ${color.borderStrong}`,
+                    borderRadius: 12, textAlign: "center",
+                    color: color.text, marginBottom: 16,
+                    userSelect: "all",
+                  }}
+                >
+                  {accessCodeModal.code.slice(0, 3)} {accessCodeModal.code.slice(3)}
+                </div>
+
+                <button
+                  onClick={copyInstructionsToClipboard}
+                  style={{
+                    width: "100%", padding: "10px 16px", borderRadius: 8,
+                    background: color.primary, color: "#fff", border: "none",
+                    fontSize: 13, fontWeight: 600, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    marginBottom: 12,
+                  }}
+                >
+                  <Copy size={14} />
+                  Copiar instrucciones completas
+                </button>
+
+                <p style={{ fontSize: 12, color: color.textDim, lineHeight: 1.5, margin: 0 }}>
+                  Vence en <strong style={{ color: color.textMuted }}>{accessCodeModal.expiresInMin} minutos</strong>.
+                  La persona tiene que abrir Clozr → Ajustes → Cuenta en la nube → email + este código en "Opción 2".
+                </p>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

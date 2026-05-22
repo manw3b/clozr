@@ -253,6 +253,19 @@ export function revokeMember(jwt: string | null, workspaceId: string, membership
   });
 }
 
+/**
+ * Genera un código de acceso para un miembro invited. Le permite al
+ * owner/admin compartirlo directo con el miembro (por WhatsApp, etc)
+ * sin depender del email automático.
+ */
+export function issueAccessCode(jwt: string | null, workspaceId: string, membershipId: string) {
+  return authFetch<{ ok: true; code: string; email: string; expiresInMin: number }>(
+    jwt,
+    `/workspaces/${workspaceId}/members/${membershipId}/access-code`,
+    { method: "POST" },
+  );
+}
+
 /* ── Deep link URL parsing ───────────────────────────────────────────── */
 
 export interface DeepLinkResult {

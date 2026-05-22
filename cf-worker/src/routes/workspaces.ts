@@ -242,6 +242,86 @@ export async function handlePatchMember(
   return json({ ok: true, id: membershipId, role: body.role });
 }
 
+/* ── POST /workspaces/:id/members/:mid/access-code ───────────────────── */
+
+/**
+ * Genera un magic_link manual para que el owner se lo pase al miembro
+ * por fuera del email (WhatsApp, etc). Útil mientras Resend esté en
+ * sandbox: el miembro nunca recibe el email automático, pero el owner
+ * sí puede compartirle el código.
+ *
+ * El código generado es exactamente lo mismo que el flow normal de
+ * /auth/request, solo que NO mandamos email. El miembro lo usa con
+ * POST /auth/verify-code junto con su email — exact same endpoint
+ * que el login normal.
+ *
+ * Permisos: owner|admin del workspace. Solo para memberships con
+ * status='invited' (los activos ya pueden loguearse normal). El email
+ * va atado a la membership — el código solo sirve para ese email
+ * específico (porque verify-code busca por email + code juntos).
+ */
+export async function handleIssueAccessCode(
+  workspaceId: string,
+  membershipId: string,
+  req: Request,
+  env: Env,
+): Promise<Response> {
+  await ensureSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+
+  const me = await membership(env, workspaceId, auth.userId);
+  if (!me) return json({ error: "not_a_member" }, 403);
+  if (!canManageTeam(String(me.role))) return json({ error: "forbidden" }, 403);
+
+  const target = await tursoFirst(
+    env,
+    `SELECT email, status FROM memberships
+       WHERE id = ? AND workspace_id = ? AND status = 'invited'`,
+    [membershipId, workspaceId],
+  );
+  if (!target) return json({ error: "not_invited" }, 404);
+
+  // Generar magic_link como en /auth/request (mismo formato).
+  const token = randomHex(32);
+  const code = randomDigits(6);
+  const ttlMin = Number(env.MAGIC_LINK_TTL_MIN) || 15;
+  const expiresAt = new Date(Date.now() + ttlMin * 60_000).toISOString();
+
+  await tursoExec(
+    env,
+    `INSERT INTO magic_links (token, email, expires_at, code) VALUES (?, ?, ?, ?)`,
+    [token, String(target.email), expiresAt, code],
+  );
+
+  return json({
+    ok: true,
+    code,
+    email: String(target.email),
+    expiresInMin: ttlMin,
+  });
+}
+
+function randomHex(bytes: number): string {
+  const buf = new Uint8Array(bytes);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function randomDigits(n: number): string {
+  let out = "";
+  while (out.length < n) {
+    const buf = new Uint8Array(n);
+    crypto.getRandomValues(buf);
+    for (const b of buf) {
+      if (b >= 250) continue;
+      out += String(b % 10);
+      if (out.length === n) break;
+    }
+  }
+  return out;
+}
+
 /* ── DELETE /workspaces/:id/members/:mid ─────────────────────────────── */
 
 export async function handleRevokeMember(

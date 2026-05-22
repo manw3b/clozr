@@ -39,6 +39,7 @@ import {
   handleInviteMember,
   handlePatchMember,
   handleRevokeMember,
+  handleIssueAccessCode,
 } from "./routes/workspaces";
 
 export default {
@@ -54,11 +55,21 @@ export default {
       const route = `${req.method} ${url.pathname}`;
 
       // ── Rutas con path dinámico (/workspaces/:id/...) ─────────────
+      const wsAccessCodeMatch = url.pathname.match(
+        /^\/workspaces\/([^/]+)\/members\/([^/]+)\/access-code\/?$/,
+      );
       const wsMembersMatch = url.pathname.match(
         /^\/workspaces\/([^/]+)\/members(?:\/([^/]+))?\/?$/,
       );
       const wsInviteMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/invite\/?$/);
 
+      // access-code va ANTES que /members/:mid porque su path es más
+      // específico (/members/:mid/access-code matches both regex).
+      if (wsAccessCodeMatch && req.method === "POST") {
+        const wsId = wsAccessCodeMatch[1]!;
+        const mId = wsAccessCodeMatch[2]!;
+        return cors(req, env, await handleIssueAccessCode(wsId, mId, req, env));
+      }
       if (wsMembersMatch) {
         const wsId = wsMembersMatch[1]!;
         const mId = wsMembersMatch[2];

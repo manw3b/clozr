@@ -15,6 +15,7 @@ import {
   useContextMenu,
 } from "../../components/ContextMenu";
 import { tasksDb } from "../../lib/db/tasks";
+import { useCloudPolling } from "../../lib/useCloudPolling";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useUIStore } from "../../store/uiStore";
 import { useUndoableActions } from "../../store/useUndoableActions";
@@ -63,10 +64,12 @@ export function Tareas() {
       });
   }, [wid, userId, qc]);
 
+  const tasksRefetch = useCloudPolling("tasks");
   const { data: tasks = [] } = useQuery({
     queryKey: qk.tasks.list(wid),
     queryFn: () => tasksDb.getAll(wid),
     enabled: !!wid,
+    refetchInterval: tasksRefetch,
   });
 
   const toggleMut = useMutation({

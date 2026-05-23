@@ -60,16 +60,21 @@ export const followupsSpec: TableSpec = {
   orderBy: "due_at ASC",
 };
 
-/* ── Catalog items (R5) ──────────────────────────────────────────────── */
+/* ── Catalog items (R5+ extended) ────────────────────────────────────── */
 export const catalogSpec: TableSpec = {
   table: "catalog_items",
-  editable: ["name", "category", "subcategory", "price", "currency", "cost", "sku", "notes"],
+  editable: [
+    "name", "category", "subcategory", "price", "currency", "cost", "sku", "notes",
+    "track_stock", "stock", "stock_min", "active", "sort_order",
+    "image_path", "condition", "condition_details_json", "custom_fields_json",
+    "cost_usd",
+  ],
   required: ["name"],
   rolesRead: ALL_ROLES,
   rolesCreate: MGMT_ROLES,
   rolesEdit: MGMT_ROLES,
   rolesDelete: MGMT_ROLES,
-  orderBy: "category ASC, name ASC",
+  orderBy: "sort_order ASC, category ASC, name ASC",
 };
 
 /* ── Payment methods (R5) ────────────────────────────────────────────── */

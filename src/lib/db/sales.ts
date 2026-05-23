@@ -265,16 +265,25 @@ export async function createSale(
       }
     }
 
-    // 2) Stock auto-decrement — TODO #88: requiere migrar stock_items
-    //    (tabla separada del catalog en SQLite local) al cloud. El schema
-    //    cloud de catalog_items hoy no tiene columna stock. Lo dejo
-    //    pendiente porque el riesgo de oversell con 3 PCs concurrentes
-    //    es bajo, y migrar stock completo es trabajo de otra sesión.
-    //
-    //    Mientras tanto: si Caro vende un equipo que no hay en stock,
-    //    la venta se registra (correcto) pero el inventario LOCAL del
-    //    owner no se descuenta. Workaround: el owner revisa stock
-    //    manualmente o hace ajustes desde Inventario.
+    // 2) Stock auto-decrement (resuelto). Para cada item del catálogo
+    //    con track_stock=1 y from_stock=true, descontamos quantity del
+    //    cloud catalog_items.stock. catalogDb.decrementStock ya tiene
+    //    el dispatcher cloud (race condition aceptable: read-modify-write
+    //    sin lock; con 3 PCs vendiendo el MISMO SKU simultáneamente puede
+    //    haber off-by-one, pero es escenario rarísimo).
+    if (!data.out_of_stock_sale) {
+      const { decrementStock } = await import("./catalog");
+      for (const item of data.items) {
+        if (!item.catalog_item_id) continue;
+        if (!item.from_stock) continue;
+        try {
+          await decrementStock(item.catalog_item_id, item.quantity);
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn("[createSale cloud] decrement stock falló:", e);
+        }
+      }
+    }
 
     // Devolver Sale sintetizado — los callers esperan el shape completo.
     return {

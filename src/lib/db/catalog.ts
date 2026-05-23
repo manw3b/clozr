@@ -1,4 +1,6 @@
 import { dbSelect, dbExecute } from "./index";
+import { useCloudAuthStore } from "../../store/cloudAuthStore";
+import { catalogApi } from "../cloudAuth";
 import type {
   CatalogItem,
   CatalogImei,
@@ -10,7 +12,54 @@ import type {
   UpdateCatalogItemInput,
 } from "./types";
 
+/** Dispatcher cloud para catálogo (R5 extended). Solo cuando isCloudModeFor
+ *  ("catalog") es true. */
+function cloudCtx(): { jwt: string; wsId: string } | null {
+  const s = useCloudAuthStore.getState();
+  if (!s.isCloudModeFor("catalog")) return null;
+  if (!s.jwt || !s.activeWorkspaceId) return null;
+  return { jwt: s.jwt, wsId: s.activeWorkspaceId };
+}
+
+/** Mapea cloud row → CatalogItemWithImeis local. IMEIs vienen en 0/0
+ *  porque no las traemos del cloud todavía. Si necesitan, pide endpoint
+ *  específico de catalog_imei. */
+function cloudToLocal(c: Record<string, unknown>, localWid: string): CatalogItemWithImeis {
+  return {
+    id: String(c.id),
+    workspace_id: localWid,
+    name: String(c.name ?? ""),
+    category: (c.category as string | null) ?? null,
+    subcategory: (c.subcategory as string | null) ?? null,
+    price: (c.price as number | null) ?? null,
+    currency: (c.currency as string | null) ?? "ARS",
+    track_stock: Number(c.track_stock ?? 0),
+    stock: Number(c.stock ?? 0),
+    stock_min: Number(c.stock_min ?? 0),
+    active: Number(c.active ?? 1),
+    sort_order: Number(c.sort_order ?? 0),
+    custom_fields_json: (c.custom_fields_json as string | null) ?? null,
+    image_path: (c.image_path as string | null) ?? null,
+    condition: (c.condition as string | null) ?? "new",
+    condition_details_json: (c.condition_details_json as string | null) ?? null,
+    created_at: String(c.created_at ?? ""),
+    available_imeis: 0,
+    total_imeis: 0,
+  } as CatalogItemWithImeis;
+}
+
 export async function getAll(workspaceId: string): Promise<CatalogItemWithImeis[]> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    const res = await catalogApi.list(ctx.jwt, ctx.wsId);
+    if (res.ok) {
+      return (res.data.items as unknown as Array<Record<string, unknown>>)
+        .filter((c) => Number(c.active ?? 1) === 1)
+        .map((c) => cloudToLocal(c, workspaceId));
+    }
+    // eslint-disable-next-line no-console
+    console.warn("[catalogDb.getAll] cloud falló, fallback local:", res.error);
+  }
   const rows = await dbSelect<CatalogItemWithImeis>(
     `SELECT c.*,
       COUNT(CASE WHEN ci.sold_at IS NULL THEN 1 END) as available_imeis,
@@ -92,6 +141,46 @@ export async function create(
   const now = new Date().toISOString();
   const trackStock = data.track_stock ? 1 : 0;
   const condition = data.condition ?? "new";
+
+  const ctx = cloudCtx();
+  if (ctx) {
+    const res = await catalogApi.create(ctx.jwt, ctx.wsId, {
+      id, name: data.name,
+      category: data.category ?? null,
+      subcategory: data.subcategory ?? null,
+      price: data.price ?? null,
+      currency: data.currency ?? "ARS",
+      track_stock: trackStock,
+      stock: data.stock ?? 0,
+      stock_min: data.stock_min ?? 0,
+      active: 1,
+      sort_order: data.sort_order ?? 0,
+      custom_fields_json: data.custom_fields_json ?? null,
+      image_path: data.image_path ?? null,
+      condition,
+      condition_details_json: data.condition_details_json ?? null,
+    } as never);
+    if (!res.ok) throw new Error(`No se pudo crear item de catálogo en la nube: ${res.error}`);
+    return {
+      id, workspace_id: workspaceId,
+      name: data.name,
+      category: data.category ?? null,
+      subcategory: data.subcategory ?? null,
+      price: data.price ?? null,
+      currency: data.currency ?? "ARS",
+      track_stock: trackStock,
+      stock: data.stock ?? 0,
+      stock_min: data.stock_min ?? 0,
+      active: 1,
+      sort_order: data.sort_order ?? 0,
+      custom_fields_json: data.custom_fields_json ?? null,
+      image_path: data.image_path ?? null,
+      condition,
+      condition_details_json: data.condition_details_json ?? null,
+      created_at: now,
+    };
+  }
+
   await dbExecute(
     `INSERT INTO catalog_items
       (id, workspace_id, name, category, subcategory, price, currency,
@@ -161,6 +250,13 @@ export async function update(
 
   if (Object.keys(mapped).length === 0) return;
 
+  const ctx = cloudCtx();
+  if (ctx) {
+    const res = await catalogApi.update(ctx.jwt, ctx.wsId, id, mapped as never);
+    if (!res.ok) throw new Error(`No se pudo actualizar catálogo en la nube: ${res.error}`);
+    return;
+  }
+
   const fields = Object.keys(mapped)
     .map((k) => `${k} = ?`)
     .join(", ");
@@ -172,6 +268,14 @@ export async function update(
 }
 
 export async function softDelete(workspaceId: string, id: string): Promise<void> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    // En cloud "soft delete" lo hacemos seteando active=0 (no usamos
+    // deleted_at acá para mantener compat con queries que filtran por active=1).
+    const res = await catalogApi.update(ctx.jwt, ctx.wsId, id, { active: 0 } as never);
+    if (!res.ok) throw new Error(`No se pudo desactivar catálogo en la nube: ${res.error}`);
+    return;
+  }
   await dbExecute(
     "UPDATE catalog_items SET active = 0 WHERE workspace_id = ? AND id = ?",
     [workspaceId, id],
@@ -179,6 +283,27 @@ export async function softDelete(workspaceId: string, id: string): Promise<void>
 }
 
 export async function decrementStock(id: string, quantity: number): Promise<void> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    // Cloud no tiene atomic decrement como SQL UPDATE max(0, stock - ?).
+    // Hacemos read + calc + write. Race condition aceptable para nuestro
+    // volumen (3 PCs concurrentes, raro).
+    const listRes = await catalogApi.list(ctx.jwt, ctx.wsId);
+    if (!listRes.ok) {
+      // eslint-disable-next-line no-console
+      console.warn("[catalogDb.decrementStock] cloud list falló:", listRes.error);
+      return;
+    }
+    const found = (listRes.data.items as unknown as Array<Record<string, unknown>>)
+      .find((c) => c.id === id);
+    if (!found) return;
+    if (Number(found.track_stock ?? 0) !== 1) return;
+    const current = Number(found.stock ?? 0);
+    const next = Math.max(0, current - quantity);
+    if (next === current) return;
+    await catalogApi.update(ctx.jwt, ctx.wsId, id, { stock: next } as never);
+    return;
+  }
   await dbExecute(
     "UPDATE catalog_items SET stock = MAX(0, stock - ?) WHERE id = ? AND track_stock = 1",
     [quantity, id],

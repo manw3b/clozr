@@ -66,6 +66,20 @@ async function applySchema(env: Env): Promise<void> {
   // abra el email en su celular y escriba el código en la PC sin quemar
   // el token. Si ya existe la columna, ignore.
   await safeAddColumn(env, "magic_links", "code", "TEXT");
+
+  // 002 — agregar columnas faltantes a catalog_items para parity con el
+  // local. Necesario para que la migración de catalogDb funcione
+  // completa (R5 extended).
+  await safeAddColumn(env, "catalog_items", "track_stock", "INTEGER DEFAULT 0");
+  await safeAddColumn(env, "catalog_items", "stock", "INTEGER DEFAULT 0");
+  await safeAddColumn(env, "catalog_items", "stock_min", "INTEGER DEFAULT 0");
+  await safeAddColumn(env, "catalog_items", "active", "INTEGER DEFAULT 1");
+  await safeAddColumn(env, "catalog_items", "sort_order", "INTEGER DEFAULT 0");
+  await safeAddColumn(env, "catalog_items", "image_path", "TEXT");
+  await safeAddColumn(env, "catalog_items", "condition", "TEXT DEFAULT 'new'");
+  await safeAddColumn(env, "catalog_items", "condition_details_json", "TEXT");
+  await safeAddColumn(env, "catalog_items", "custom_fields_json", "TEXT");
+  await safeAddColumn(env, "catalog_items", "cost_usd", "REAL DEFAULT 0");
   // Index por (email, code) para que el lookup en verify-code sea rápido.
   // Es CREATE INDEX IF NOT EXISTS así que es idempotente sin try/catch.
   await tursoQuery(env, {
@@ -433,6 +447,23 @@ async function applySchema(env: Env): Promise<void> {
     {
       sql: `CREATE INDEX IF NOT EXISTS idx_catalog_items_workspace
             ON catalog_items(workspace_id, deleted_at, category)`,
+    },
+    // catalog_imei (espejo del local) — IMEIs individuales asignados
+    // a sales. Si una venta usa from_stock, sus IMEIs se marcan acá.
+    {
+      sql: `CREATE TABLE IF NOT EXISTS catalog_imei (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+        catalog_item_id TEXT NOT NULL,
+        imei TEXT NOT NULL,
+        sold_at TEXT,
+        sale_id TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_catalog_imei_workspace
+            ON catalog_imei(workspace_id, catalog_item_id, sold_at)`,
     },
     {
       sql: `CREATE TABLE IF NOT EXISTS payment_methods (

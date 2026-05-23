@@ -27,7 +27,13 @@ import {
 import { customersDb } from "../../lib/db/customers";
 import { dbSelect } from "../../lib/db";
 import { confirmAsync } from "../../lib/confirmAsync";
-import { color, radius, space, text, weight } from "../../tokens";
+import { color, space, text, weight } from "../../tokens";
+import { cloudStyles } from "./cloudStyles";
+
+const {
+  title: titleStyle, desc: descStyle, card: cardStyle,
+  btnPrimary, btnGhost, btnPrimarySm, btnGhostSm,
+} = cloudStyles;
 
 export function CloudDataSection() {
   const {
@@ -777,39 +783,4 @@ function SimpleFeatureCard(props: SimpleFeatureCardProps) {
   );
 }
 
-const btnPrimarySm: React.CSSProperties = {
-  padding: "4px 10px", background: color.primary, borderRadius: 6,
-  fontSize: 11, fontWeight: 600, color: "#fff", border: "none", cursor: "pointer",
-  display: "inline-flex", alignItems: "center", gap: 4,
-};
-const btnGhostSm: React.CSSProperties = {
-  padding: "4px 10px", background: "transparent",
-  border: `1px solid ${color.border}`, borderRadius: 6,
-  color: color.textMuted, fontSize: 11, fontWeight: 500, cursor: "pointer",
-};
-
-/* ── styles ──────────────────────────────────────────────────────────── */
-
-const titleStyle: React.CSSProperties = {
-  fontSize: 16, fontWeight: 700, color: color.text,
-  letterSpacing: -0.2, marginBottom: 4,
-};
-const descStyle: React.CSSProperties = {
-  fontSize: 13, color: color.textDim, marginBottom: 20, lineHeight: 1.5,
-};
-const cardStyle: React.CSSProperties = {
-  padding: space[4], background: color.surface,
-  border: `1px solid ${color.border}`, borderRadius: radius.lg,
-  maxWidth: 640,
-};
-const btnPrimary: React.CSSProperties = {
-  padding: "8px 18px", background: color.primary,
-  borderRadius: 8, fontSize: 13, fontWeight: 600,
-  color: "#fff", border: "none", cursor: "pointer",
-};
-const btnGhost: React.CSSProperties = {
-  display: "inline-flex", alignItems: "center", gap: 6,
-  padding: "6px 12px", background: "transparent",
-  border: `1px solid ${color.border}`, borderRadius: 8,
-  color: color.textMuted, fontSize: 12, fontWeight: 500, cursor: "pointer",
-};
+/* styles compartidos viven en ./cloudStyles.ts */

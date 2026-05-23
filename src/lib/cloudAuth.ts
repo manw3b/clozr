@@ -134,11 +134,29 @@ function b64urlDecode(s: string): string {
 /* ── API authenticated calls ─────────────────────────────────────────── */
 
 /**
+ * Listener para 401 (JWT expirado o revocado server-side). La app lo
+ * registra al boot via onAuthExpired() y limpia el cloudAuthStore +
+ * muestra toast. Lo dejamos como callback en vez de import directo para
+ * evitar circular dependency cloudAuth ↔ cloudAuthStore (este file no
+ * importa el store; el caller subscribe).
+ */
+let expiredHandler: (() => void) | null = null;
+/** Registra el handler global para 401. Llamarse UNA vez al boot de la app. */
+export function onAuthExpired(fn: () => void): void {
+  expiredHandler = fn;
+}
+
+/**
  * Hace un fetch al worker con el JWT del cloudAuthStore en el header.
  * Devuelve { ok, data } o { ok: false, error }. No throwa.
  *
  * El JWT lo lee dinámicamente del store en cada call para que un logout
  * en otra tab/instancia se respete inmediatamente.
+ *
+ * Si el server responde 401 (JWT expirado / session revocada), invoca
+ * el expiredHandler global UNA vez para que la app limpie sesión y
+ * muestre toast. Las requests subsiguientes no van a re-disparar
+ * porque jwt va a ser null después del clear.
  */
 async function authFetch<T>(
   jwt: string | null,
@@ -159,6 +177,12 @@ async function authFetch<T>(
     const data = text ? (JSON.parse(text) as unknown) : null;
     if (!res.ok) {
       const err = (data && typeof data === "object" && "error" in data) ? String((data as { error: unknown }).error) : `http_${res.status}`;
+      if (res.status === 401 && expiredHandler) {
+        // Dispara una sola vez por ráfaga — el handler se encarga de
+        // clearSession() lo que hará que la próxima authFetch reciba
+        // jwt=null y nunca llegue acá.
+        try { expiredHandler(); } catch { /* swallow */ }
+      }
       return { ok: false, error: err, status: res.status };
     }
     return { ok: true, data: data as T };

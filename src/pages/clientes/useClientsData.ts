@@ -7,16 +7,17 @@ import { customerContactsDb, type ContactKind } from "../../lib/db/customerConta
 import { customerTagsDb, type CustomerTag } from "../../lib/db/customerTags";
 import { dbCustomerToClient, dbSaleToDomain, deriveActivityStatus } from "../../lib/mappers";
 import { qk, invalidate } from "../../lib/queryKeys";
-import { useCloudPolling } from "../../lib/useCloudPolling";
+import { useCloudQueryConfig } from "../../lib/useCloudPolling";
 import type { Client, ClientDetail, ActivityItem } from "../../types/domain";
 
 export function useClientsList() {
   const { activeWorkspace } = useWorkspaceStore();
   const wid = activeWorkspace?.id ?? "";
-  const refetchInterval = useCloudPolling("customers");
+  const cloudCfg = useCloudQueryConfig("customers");
   return useQuery({
     queryKey: qk.clientes.list(wid),
-    refetchInterval,
+    refetchInterval: cloudCfg.refetchInterval,
+    staleTime: cloudCfg.staleTime,
     queryFn: async () => {
       const [dbCustomers, lastContactMap] = await Promise.all([
         customersDb.getAll(wid),
@@ -44,7 +45,6 @@ export function useClientsList() {
       });
     },
     enabled: !!wid,
-    staleTime: 30_000,
   });
 }
 

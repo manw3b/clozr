@@ -7,15 +7,16 @@ import { ensurePricingSchema } from "../../lib/db/ensureSchema";
 import { followupsDb } from "../../lib/db/followups";
 import { dbSaleRowToDomain } from "../../lib/mappers";
 import { qk, invalidate } from "../../lib/queryKeys";
-import { useCloudPolling } from "../../lib/useCloudPolling";
+import { useCloudQueryConfig } from "../../lib/useCloudPolling";
 
 export function useSalesList() {
   const { activeWorkspace } = useWorkspaceStore();
   const wid = activeWorkspace?.id ?? "";
-  const refetchInterval = useCloudPolling("sales");
+  const cloudCfg = useCloudQueryConfig("sales");
   return useQuery({
     queryKey: qk.ventas.byPeriod(wid, "all"),
-    refetchInterval,
+    refetchInterval: cloudCfg.refetchInterval,
+    staleTime: cloudCfg.staleTime,
     queryFn: async () => {
       const rows = await salesDb.getRows(wid, "all");
       return rows.map(dbSaleRowToDomain);

@@ -104,12 +104,15 @@ export async function getAll(workspaceId: string): Promise<Customer[]> {
   if (ctx) {
     const res = await fetchCustomersCloud(ctx.jwt, ctx.wsId);
     if (res.ok) {
-      const mapped = res.data.customers.map((c) => cloudToLocal(c, workspaceId));
-      // Write-through al cache local. Fire-and-forget para no demorar.
-      void Promise.allSettled(mapped.map((c) => upsertLocal(c)));
-      return mapped;
+      // NOTA: removí el write-through a SQLite local. Antes hacíamos
+      // upsertLocal de cada customer en cada poll, lo que con 200 customers
+      // y polling 5s daba ~2400 writes/min sin que NADIE consulte la cache
+      // local en cloud mode. Era pura sobrecarga.
+      // Si en el futuro queremos "modo offline" (ver datos cuando se cae
+      // internet), reintroducimos cache pero con un write rate más bajo
+      // (ej: solo al primer fetch del día, o un debounce 5min).
+      return res.data.customers.map((c) => cloudToLocal(c, workspaceId));
     }
-    // Si falla cloud, caemos al cache local (modo "ver pero no editar").
     // eslint-disable-next-line no-console
     console.warn("[customersDb.getAll] cloud failed, leyendo cache local:", res.error);
   }

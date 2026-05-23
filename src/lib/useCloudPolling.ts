@@ -32,22 +32,19 @@ type Feature =
   | "cash" | "followups" | "catalog"
   | "paymentMethods" | "customerTypes" | "customerTags";
 
-/** Intervalo default — 5 seg.
- *
- * Por qué 5s:
- *   - El equipo trabaja en paralelo, necesitan ver cambios casi al
- *     instante (no esperar 30s para que aparezca la venta que cargó
- *     el vendedor).
- *   - TanStack Query NO hace polling cuando la ventana está en background
- *     (`refetchIntervalInBackground: false` por default). Así que el
- *     costo en CF Workers es proporcional a "tiempo activo viendo la
- *     pantalla", no a "app abierta".
- *   - Estimación de costo con 3 PCs trabajando 8h/día = ~40k req/día,
- *     dentro del free tier de Cloudflare (100k/día).
- *
- * Si en el futuro vemos que 5s es muy rápido (latency molesta) o muy
- * lento (drag de pipeline se siente desincronizado), ajustamos acá. */
+/** Intervalo de polling — 5 seg cuando hay cloud activo. */
 const POLL_INTERVAL_MS = 5_000;
+
+/** staleTime cuando hay cloud:
+ *  - 4.5s — apenas menor que el polling. Así un cambio de pantalla DENTRO
+ *    de la ventana de polling NO dispara un refetch redundante (TanStack
+ *    sólo refetchea si el dato es "stale", y con el poll de 5s siempre
+ *    hay un fetch reciente).
+ *  - Antes era 0 (default TanStack) → cada navegación entre pantallas
+ *    hacía un refetch redundante. Con polling 5s + staleTime 0 podíamos
+ *    triplicar el tráfico real.
+ */
+const CLOUD_STALE_MS = 4_500;
 
 /**
  * Hook que el caller pasa directamente a TanStack Query como
@@ -55,21 +52,40 @@ const POLL_INTERVAL_MS = 5_000;
  * el polling se prende/apaga sin remountar nada.
  */
 export function useCloudPolling(feature: Feature): number | false {
-  // Suscribimos a los campos relevantes para que cambios disparen
-  // re-render. zustand selector — barato.
+  return useCloudQueryConfig(feature).refetchInterval;
+}
+
+/**
+ * Versión que devuelve { refetchInterval, staleTime } juntos. Recomendado
+ * para queries nuevas:
+ *
+ *   const { refetchInterval, staleTime } = useCloudQueryConfig("customers");
+ *   useQuery({ ..., refetchInterval, staleTime });
+ *
+ * En cloud mode: poll 5s + staleTime 4.5s (evita refetch redundantes en
+ * navegación). En local: sin polling + staleTime infinito (los datos
+ * locales nunca cambian sin que la app los mutate).
+ */
+export function useCloudQueryConfig(feature: Feature): {
+  refetchInterval: number | false;
+  staleTime: number;
+} {
   const jwt = useCloudAuthStore((s) => s.jwt);
   const activeWorkspaceId = useCloudAuthStore((s) => s.activeWorkspaceId);
   const expiresAt = useCloudAuthStore((s) => s.expiresAt);
   const bootstrapStatus = useCloudAuthStore((s) => s.bootstrapStatus);
   const workspaces = useCloudAuthStore((s) => s.workspaces);
 
-  // Replicamos la lógica de isCloudModeFor() sin invocarla por el get()
-  // — necesitamos reactividad a los selectores arriba.
-  if (!jwt || !expiresAt || expiresAt * 1000 < Date.now()) return false;
-  if (!activeWorkspaceId) return false;
-  const role = workspaces.find((w) => w.id === activeWorkspaceId)?.role;
-  if (role && role !== "owner") return POLL_INTERVAL_MS;
-  const status = bootstrapStatus[activeWorkspaceId]?.[feature];
-  if (status === "done" || status === "skip") return POLL_INTERVAL_MS;
-  return false;
+  const isCloud = (() => {
+    if (!jwt || !expiresAt || expiresAt * 1000 < Date.now()) return false;
+    if (!activeWorkspaceId) return false;
+    const role = workspaces.find((w) => w.id === activeWorkspaceId)?.role;
+    if (role && role !== "owner") return true;
+    const status = bootstrapStatus[activeWorkspaceId]?.[feature];
+    return status === "done" || status === "skip";
+  })();
+
+  return isCloud
+    ? { refetchInterval: POLL_INTERVAL_MS, staleTime: CLOUD_STALE_MS }
+    : { refetchInterval: false, staleTime: Infinity };
 }

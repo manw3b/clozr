@@ -7,7 +7,7 @@ import { cashSessionsDb } from "../../lib/db/cashSessions";
 import { getTodayISO } from "../../lib/hooks";
 import { dbCashMovementToDomain, cashCategoryToDb } from "../../lib/mappers";
 import { qk, invalidate } from "../../lib/queryKeys";
-import { useCloudPolling } from "../../lib/useCloudPolling";
+import { useCloudQueryConfig } from "../../lib/useCloudPolling";
 import type { CashSummary, CashMovementKind, CashCategory } from "../../types/domain";
 
 export type CashPeriod = "today" | "week" | "month";
@@ -47,11 +47,12 @@ export function useCashSummary(period: CashPeriod = "today") {
   const bid = activeBusiness?.id ?? "";
   const today = getTodayISO();
   const { from, to } = periodRange(period);
-  const refetchInterval = useCloudPolling("cash");
+  const cloudCfg = useCloudQueryConfig("cash");
 
   return useQuery({
     queryKey: qk.caja.summary(wid, bid, from, to),
-    refetchInterval,
+    refetchInterval: cloudCfg.refetchInterval,
+    staleTime: cloudCfg.staleTime,
     queryFn: async (): Promise<CashSummary> => {
       const [session, movementsRange, byCurrency] = await Promise.all([
         cashSessionsDb.ensureForDay(wid, bid, today),

@@ -19,6 +19,8 @@ import { autoBackupIfDue } from "./lib/backup";
 import { log } from "./lib/logger";
 import { useCloudAuthListener } from "./lib/useCloudAuthListener";
 import { useSyncCloudRole } from "./lib/useSyncCloudRole";
+import { onAuthExpired } from "./lib/cloudAuth";
+import { useCloudAuthStore } from "./store/cloudAuthStore";
 
 // AppShell stays eager — render shell immediately
 import { AppShell } from "./layout/AppShell";
@@ -158,6 +160,19 @@ export default function App() {
   // con el rol del workspace cloud activo. Así can() — que lee userRole —
   // aplica los permisos correctos sin tocar callsites.
   useSyncCloudRole();
+
+  // Auto-logout cuando el server responde 401 (JWT expirado, session
+  // revocada server-side por expulsion, etc). Lo registramos UNA vez al
+  // mount del App.
+  const { showToast } = useUIStore();
+  const clearCloudSession = useCloudAuthStore((s) => s.clearSession);
+  useEffect(() => {
+    onAuthExpired(() => {
+      clearCloudSession();
+      queryClient.clear();
+      showToast("Tu sesión expiró — entrá de nuevo desde Ajustes → Cuenta en la nube", "error");
+    });
+  }, [clearCloudSession, queryClient, showToast]);
 
   useGlobalShortcuts();
 

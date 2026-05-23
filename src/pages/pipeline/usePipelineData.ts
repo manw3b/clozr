@@ -7,17 +7,18 @@ import { settingsDb } from "../../lib/db/settings";
 import { dbItemToLead } from "../../lib/mappers";
 import { qk, invalidate } from "../../lib/queryKeys";
 import { followupForStage } from "../../lib/stageFollowups";
-import { useCloudPolling } from "../../lib/useCloudPolling";
+import { useCloudQueryConfig } from "../../lib/useCloudPolling";
 import { useUIStore } from "../../store/uiStore";
 import type { Lead, LeadStage } from "../../types/domain";
 
 export function usePipelineLeads() {
   const { activeWorkspace } = useWorkspaceStore();
   const wid = activeWorkspace?.id ?? "";
-  const refetchInterval = useCloudPolling("pipeline");
+  const cloudCfg = useCloudQueryConfig("pipeline");
   return useQuery({
     queryKey: qk.pipeline.leads(wid),
-    refetchInterval,
+    refetchInterval: cloudCfg.refetchInterval,
+    staleTime: cloudCfg.staleTime,
     queryFn: async () => {
       const items = await pipelineDb.getAll(wid);
       return items.map(dbItemToLead);

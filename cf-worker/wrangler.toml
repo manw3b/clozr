@@ -28,7 +28,7 @@ RESEND_FROM = "Clozr <onboarding@resend.dev>"
 MAGIC_LINK_TTL_MIN = "15"
 SESSION_TTL_DAYS = "30"
 DEEP_LINK_SCHEME = "clozr"
-# CORS — la app Tauri en dev corre en tauri://localhost (Mac) o
-# https://tauri.localhost (Windows WebView2). En prod el origin es similar.
-# Para pegarle desde el navegador en testing local sumamos http://localhost:1420.
-ALLOWED_ORIGINS = "tauri://localhost,https://tauri.localhost,http://localhost:1420"
+# NOTA: CORS está abierto (reflejamos el origin que venga) — la lista
+# ALLOWED_ORIGINS que estaba acá ya no se usa runtime. La saqué en
+# v1.3.38 cuando el WebView2 de Tauri 2 Windows nos dio "Failed to
+# fetch" porque su origin no matcheaba la lista whitelisteada.

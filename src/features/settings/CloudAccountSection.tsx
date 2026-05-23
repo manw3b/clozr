@@ -19,7 +19,15 @@ import { Mail, LogOut, CheckCircle2, RefreshCw, Plus, Building2, Check } from "l
 import { useCloudAuthStore } from "../../store/cloudAuthStore";
 import { useUIStore } from "../../store/uiStore";
 import { requestMagicLink, verifyCode, fetchMe, createWorkspace } from "../../lib/cloudAuth";
-import { color, radius, space, text, weight } from "../../tokens";
+import { color, space, text, weight } from "../../tokens";
+import { cloudStyles } from "./cloudStyles";
+
+// CloudAccountSection es la columna más angosta (form de login) — cardStyle
+// con maxWidth 520 en vez del 640 default de cloudStyles. inputStyle también
+// con mb=12 para apretar un poco el form.
+const cardStyle: React.CSSProperties = { ...cloudStyles.card, maxWidth: 520 };
+const inputStyle: React.CSSProperties = { ...cloudStyles.input, marginBottom: 12 };
+const { title: titleStyle, desc: descStyle, label: labelStyle, btnPrimary, btnGhost } = cloudStyles;
 
 const ROLE_LABELS: Record<string, string> = {
   owner: "Dueño",
@@ -399,73 +407,4 @@ export function CloudAccountSection() {
   );
 }
 
-/* ── styles ──────────────────────────────────────────────────────────── */
-
-const titleStyle: React.CSSProperties = {
-  fontSize: 16,
-  fontWeight: 700,
-  color: color.text,
-  letterSpacing: -0.2,
-  marginBottom: 4,
-};
-
-const descStyle: React.CSSProperties = {
-  fontSize: 13,
-  color: color.textDim,
-  marginBottom: 20,
-  lineHeight: 1.5,
-};
-
-const cardStyle: React.CSSProperties = {
-  padding: space[4],
-  background: color.surface,
-  border: `1px solid ${color.border}`,
-  borderRadius: radius.lg,
-  maxWidth: 520,
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: 12,
-  fontWeight: 500,
-  color: color.textMuted,
-  marginBottom: 6,
-  display: "block",
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "9px 12px",
-  background: color.surface2,
-  border: `1px solid ${color.borderStrong}`,
-  borderRadius: 8,
-  color: color.text,
-  fontSize: 13,
-  outline: "none",
-  boxSizing: "border-box",
-  marginBottom: 12,
-};
-
-const btnPrimary: React.CSSProperties = {
-  padding: "8px 18px",
-  background: color.primary,
-  borderRadius: 8,
-  fontSize: 13,
-  fontWeight: 600,
-  color: "#fff",
-  border: "none",
-  cursor: "pointer",
-};
-
-const btnGhost: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  padding: "6px 12px",
-  background: "transparent",
-  border: `1px solid ${color.border}`,
-  borderRadius: 8,
-  color: color.textMuted,
-  fontSize: 12,
-  fontWeight: 500,
-  cursor: "pointer",
-};
+/* styles compartidos viven en ./cloudStyles.ts */

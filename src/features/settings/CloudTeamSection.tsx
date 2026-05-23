@@ -23,6 +23,7 @@ import {
   listMembers, inviteMember, patchMemberRole, revokeMember, issueAccessCode,
   type MemberRow,
 } from "../../lib/cloudAuth";
+import { confirmAsync } from "../../lib/confirmAsync";
 import { color, radius, space, text, weight } from "../../tokens";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -163,7 +164,13 @@ El código vence en ${accessCodeModal.expiresInMin} minutos.`;
     if (!activeWorkspaceId) return;
     // Confirmar inline con un toast-no-confirm: en lugar de modal, usamos
     // toast con undo (TODO: usar useUndoableActions). Por ahora directo.
-    if (!confirm(`¿Expulsar a ${m.email} del equipo? Puede ser re-invitado luego.`)) return;
+    const ok = await confirmAsync({
+      title: "Expulsar del equipo",
+      message: `¿Expulsar a ${m.email} del equipo? Puede ser re-invitado luego.`,
+      confirmText: "Expulsar",
+      tone: "danger",
+    });
+    if (!ok) return;
     const res = await revokeMember(jwt, activeWorkspaceId, m.id);
     if (!res.ok) {
       const ERR: Record<string, string> = {

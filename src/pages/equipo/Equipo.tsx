@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { confirmAsync } from "../../lib/confirmAsync";
 import { Plus, Trash2, Mail, Phone } from "lucide-react";
 import { PageHeader } from "../../components/PageHeader";
 import { Button } from "../../components/Button";
@@ -157,8 +158,13 @@ export function Equipo() {
               variant="ghost"
               size="sm"
               iconLeft={<Trash2 size={13} />}
-              onClick={() => {
-                if (window.confirm(`¿Eliminar a ${m.name} del equipo?`)) {
+              onClick={async () => {
+                if (await confirmAsync({
+                  title: "Eliminar miembro",
+                  message: `¿Eliminar a ${m.name} del equipo?`,
+                  confirmText: "Eliminar",
+                  tone: "danger",
+                })) {
                   removeMut.mutate(m.user_id);
                 }
               }}
@@ -237,11 +243,16 @@ export function Equipo() {
               <ContextMenuItem
                 tone="danger"
                 icon={<Trash2 size={14} />}
-                onClick={() => {
-                  if (window.confirm(`¿Quitar a ${ctxMember.name} del equipo?`)) {
+                onClick={async () => {
+                  ctxMenu.close();
+                  if (await confirmAsync({
+                    title: "Quitar del equipo",
+                    message: `¿Quitar a ${ctxMember.name} del equipo?`,
+                    confirmText: "Quitar",
+                    tone: "danger",
+                  })) {
                     removeMut.mutate(ctxMember.user_id);
                   }
-                  ctxMenu.close();
                 }}
               >
                 Quitar del equipo

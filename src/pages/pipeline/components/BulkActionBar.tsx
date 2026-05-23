@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, ChevronDown, Trophy, XCircle, ArrowRight } from 'lucide-react';
 import { color, radius, space, text, weight, duration, ease } from '../../../tokens';
+import { confirmAsync } from '../../../lib/confirmAsync';
 import type { LeadStage } from '../../../types/domain';
 import { usePipelineStages } from '../usePipelineStages';
 
@@ -39,14 +40,15 @@ export function BulkActionBar({ count, onClear, onChangeStage }: BulkActionBarPr
     };
   }, [moveOpen]);
 
-  function move(stage: LeadStage) {
+  async function move(stage: LeadStage) {
     if (lostStage && stage === lostStage.id) {
-      if (
-        !window.confirm(
-          `¿Marcar ${count} ${count === 1 ? 'lead' : 'leads'} como perdido?`,
-        )
-      )
-        return;
+      const ok = await confirmAsync({
+        title: "Marcar como perdidos",
+        message: `¿Marcar ${count} ${count === 1 ? 'lead' : 'leads'} como perdido?`,
+        confirmText: "Marcar perdidos",
+        tone: "danger",
+      });
+      if (!ok) return;
     }
     onChangeStage(stage);
     setMoveOpen(false);

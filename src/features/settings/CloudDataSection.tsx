@@ -26,6 +26,7 @@ import {
 } from "../../lib/cloudAuth";
 import { customersDb } from "../../lib/db/customers";
 import { dbSelect } from "../../lib/db";
+import { confirmAsync } from "../../lib/confirmAsync";
 import { color, radius, space, text, weight } from "../../tokens";
 
 export function CloudDataSection() {
@@ -145,9 +146,14 @@ export function CloudDataSection() {
     }
   }
 
-  function handleSkipImport() {
+  async function handleSkipImport() {
     if (!activeWorkspaceId) return;
-    if (!confirm("¿Saltear el import? Los clientes locales NO se van a subir a la nube y solo los vas a ver vos. Los nuevos clientes que crees después sí van a la nube y los va a ver tu equipo.")) return;
+    const ok = await confirmAsync({
+      title: "Saltear import de clientes",
+      message: "¿Saltear el import? Los clientes locales NO se van a subir a la nube y solo los vas a ver vos. Los nuevos clientes que crees después sí van a la nube y los va a ver tu equipo.",
+      confirmText: "Saltear",
+    });
+    if (!ok) return;
     setBootstrapStatus(activeWorkspaceId, "customers", "skip");
     showToast("Bootstrap salteado — los nuevos clientes irán a la nube", "success");
   }
@@ -236,9 +242,14 @@ export function CloudDataSection() {
     }
   }
 
-  function handleSkipPipeline() {
+  async function handleSkipPipeline() {
     if (!activeWorkspaceId) return;
-    if (!confirm("¿Saltear? Los leads locales NO se subirán; solo los nuevos irán a la nube.")) return;
+    const ok = await confirmAsync({
+      title: "Saltear pipeline",
+      message: "¿Saltear? Los leads locales NO se subirán; solo los nuevos irán a la nube.",
+      confirmText: "Saltear",
+    });
+    if (!ok) return;
     setBootstrapStatus(activeWorkspaceId, "pipeline", "skip");
     showToast("Pipeline salteado", "success");
   }
@@ -718,8 +729,13 @@ function SimpleFeatureCard(props: SimpleFeatureCardProps) {
     } finally { setUploading(false); }
   }
 
-  function handleSkip() {
-    if (!confirm(`¿Saltear "${label}"? Los locales no se suben. Los nuevos sí irán a la nube.`)) return;
+  async function handleSkip() {
+    const ok = await confirmAsync({
+      title: `Saltear ${label}`,
+      message: `¿Saltear "${label}"? Los locales no se suben. Los nuevos sí irán a la nube.`,
+      confirmText: "Saltear",
+    });
+    if (!ok) return;
     props.setBootstrapStatus(props.activeWorkspaceId, feature, "skip");
     props.showToast(`${label}: salteado`, "success");
   }

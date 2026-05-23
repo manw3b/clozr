@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { confirmAsync } from "../../../lib/confirmAsync";
 import { Search, Plus, Trash2, UserPlus, Check } from "lucide-react";
 import { Modal, ModalField } from "../../../components/Modal";
 import { Button } from "../../../components/Button";
@@ -363,9 +364,14 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
           <>
             <Button
               variant="ghost"
-              onClick={() => {
+              onClick={async () => {
                 if (isDirty()) {
-                  if (window.confirm("¿Cerrar y descartar la venta?")) {
+                  if (await confirmAsync({
+                    title: "Descartar venta",
+                    message: "¿Cerrar y descartar la venta? Vas a perder los cambios.",
+                    confirmText: "Descartar",
+                    tone: "danger",
+                  })) {
                     reset();
                     onClose();
                   }

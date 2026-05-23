@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { WaQuickPicker } from '../../../components/WaQuickPicker';
 import { Avatar } from '../../../components/Avatar';
+import { confirmAsync } from '../../../lib/confirmAsync';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney, formatRelative } from '../../../lib/format';
 import type { Lead, LeadStage } from '../../../types/domain';
@@ -419,11 +420,17 @@ function QuickActionsMenu({
     };
   }, [open]);
 
-  function moveTo(stage: LeadStage) {
+  async function moveTo(stage: LeadStage) {
     if (stage === 'perdido') {
       // Confirm para evitar perder un lead por accidente (cubre tanto drag
       // como acceso por menú — el drag-confirm va en Pipeline.tsx)
-      if (!window.confirm(`¿Marcar el lead de ${lead.clientName} como perdido?`)) return;
+      const ok = await confirmAsync({
+        title: "Marcar como perdido",
+        message: `¿Marcar el lead de ${lead.clientName} como perdido?`,
+        confirmText: "Marcar perdido",
+        tone: "danger",
+      });
+      if (!ok) return;
     }
     if (onChangeStage && stage !== lead.stage) onChangeStage(lead, stage);
     setOpen(false);

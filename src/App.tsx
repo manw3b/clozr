@@ -8,6 +8,8 @@ import { useAuthStore } from "./store/authStore";
 import { useExchangeRateStore } from "./store/exchangeRateStore";
 import { useSyncActiveDolarToExchangeRate } from "./store/useDolaresAr";
 import { UndoToastHost } from "./components/UndoToastHost";
+import { ConfirmHost } from "./components/ConfirmHost";
+import { confirmAsync } from "./lib/confirmAsync";
 import { WhatsNewModal } from "./components/WhatsNewModal";
 import { seedAppleCatalog, seedWatchAndMac, refreshIphoneCatalog, refreshIpadCatalog } from "./lib/db/quickStock";
 import { paymentMethodsDb } from "./lib/db/paymentMethods";
@@ -292,8 +294,8 @@ export default function App() {
         onNavigate={(id) => setActiveScreen(id as ScreenId)}
         workspace={{ name: activeBusiness?.name ?? activeWorkspace.name, emoji: activeBusiness?.emoji ?? activeWorkspace.emoji }}
         user={{ name: userName ?? "Usuario", email: "" }}
-        onLogout={() => {
-          if (window.confirm("¿Cerrar sesión?")) {
+        onLogout={async () => {
+          if (await confirmAsync({ title: "Cerrar sesión", message: "¿Cerrar sesión?", confirmText: "Cerrar sesión" })) {
             clearUser();
             queryClient.clear();
           }
@@ -332,6 +334,7 @@ export default function App() {
       <CommandPalette />
       <ShortcutsHelp />
       <Toaster />
+      <ConfirmHost />
     </>
   );
 }

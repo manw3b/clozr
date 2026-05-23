@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Phone, Check, Download, Eye } from "lucide-react";
+import { confirmAsync } from "../../lib/confirmAsync";
 import { WhatsAppIcon } from "../../components/icons/WhatsAppIcon";
 import { openWhatsApp, openTel } from "../../lib/openExternal";
 import {
@@ -217,13 +218,13 @@ export function Deudas() {
               variant="ghost"
               size="sm"
               iconLeft={<Check size={13} />}
-              onClick={(e) => {
+              onClick={async (e) => {
                 e.stopPropagation();
-                if (
-                  window.confirm(
-                    `¿Marcar como pagadas las ${r.pendingSales} ventas pendientes de ${r.customerName}?`,
-                  )
-                ) {
+                if (await confirmAsync({
+                  title: "Marcar como pagadas",
+                  message: `¿Marcar como pagadas las ${r.pendingSales} ventas pendientes de ${r.customerName}?`,
+                  confirmText: "Marcar pagadas",
+                })) {
                   for (const s of r.sales) markPaidMut.mutate(s.id);
                 }
               }}

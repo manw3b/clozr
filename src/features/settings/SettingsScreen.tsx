@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, X } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { settingsDb } from "../../lib/db/settings";
+import { confirmAsync } from "../../lib/confirmAsync";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
@@ -324,7 +325,13 @@ function ProfileSection() {
 
   const handleClearPin = async () => {
     if (!userId) return;
-    if (!window.confirm("¿Quitar tu PIN? Cualquiera con acceso al equipo podrá entrar a tu sesión sin clave.")) return;
+    const ok = await confirmAsync({
+      title: "Quitar PIN",
+      message: "¿Quitar tu PIN? Cualquiera con acceso al equipo podrá entrar a tu sesión sin clave.",
+      confirmText: "Quitar PIN",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       const { authDb } = await import("../../lib/db/auth");
       await authDb.clearPin(userId);

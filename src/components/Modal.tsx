@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { color, radius, space, text, weight } from '../tokens';
+import { confirmAsync } from '../lib/confirmAsync';
 
 interface ModalProps {
   /** Use 'open'. 'isOpen' also accepted for legacy compatibility. */
@@ -74,7 +75,7 @@ export function Modal({
     });
   }
 
-  function attemptClose(intentional: boolean) {
+  async function attemptClose(intentional: boolean) {
     const dirty = isDirtyRef.current?.() ?? false;
     if (!dirty) {
       onCloseRef.current();
@@ -86,7 +87,13 @@ export function Modal({
       return;
     }
     // intentional close (X, Esc, Cancel): confirm
-    if (window.confirm(confirmTextRef.current)) {
+    const ok = await confirmAsync({
+      title: "Descartar cambios",
+      message: confirmTextRef.current,
+      confirmText: "Descartar",
+      tone: "danger",
+    });
+    if (ok) {
       onCloseRef.current();
     } else {
       triggerShake();
@@ -102,11 +109,16 @@ export function Modal({
           onCloseRef.current();
           return;
         }
-        if (window.confirm(confirmTextRef.current)) {
-          onCloseRef.current();
-        } else {
-          triggerShake();
-        }
+        // Async confirm — no podemos await en keydown, así que delegamos.
+        confirmAsync({
+          title: "Descartar cambios",
+          message: confirmTextRef.current,
+          confirmText: "Descartar",
+          tone: "danger",
+        }).then((ok) => {
+          if (ok) onCloseRef.current();
+          else triggerShake();
+        });
       }
     }
     window.addEventListener('keydown', onKey);

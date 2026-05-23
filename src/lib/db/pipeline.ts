@@ -6,8 +6,78 @@ import type {
   CreateActivityInput,
   UrgentPipelineItem,
 } from "./types";
+import { useCloudAuthStore } from "../../store/cloudAuthStore";
+import {
+  fetchPipelineItems,
+  createPipelineItemCloud,
+  updatePipelineItemCloud,
+  type CloudPipelineItem,
+} from "../cloudAuth";
+
+/**
+ * pipelineDb — local↔cloud dispatcher (F2-B R2).
+ * Cuando isCloudModeFor("pipeline") devuelve true, las operaciones
+ * críticas pegan al worker y hacen write-through a SQLite local.
+ * Las operaciones de "actividad" (addActivity, getActivities) y la
+ * de "urgent" quedan locales por ahora — se migrarán cuando sean
+ * críticas para multi-PC.
+ */
+
+function cloudCtx(): { jwt: string; wsId: string } | null {
+  const s = useCloudAuthStore.getState();
+  if (!s.isCloudModeFor("pipeline")) return null;
+  if (!s.jwt || !s.activeWorkspaceId) return null;
+  return { jwt: s.jwt, wsId: s.activeWorkspaceId };
+}
+
+function cloudToLocal(c: CloudPipelineItem, localWorkspaceId: string): PipelineItem {
+  return {
+    id: c.id,
+    workspace_id: localWorkspaceId,
+    customer_id: c.customer_id,
+    customer_name: c.customer_name,
+    stage_id: c.stage_id,
+    stage_name: c.stage_name,
+    stage_order: c.stage_order,
+    status: c.status,
+    estimated_value: c.estimated_value,
+    currency: (c.currency ?? "ARS") as "ARS" | "USD",
+    inactive_days: c.inactive_days ?? 0,
+    closed_at: c.closed_at,
+    created_by: c.created_by,
+    created_at: c.created_at,
+    updated_at: c.updated_at,
+    last_activity_at: null,
+    product: c.product,
+    next_action_at: c.next_action_at,
+    next_action_label: c.next_action_label,
+    owner_id: c.owner_id,
+    owner_name: c.owner_name,
+    short_note: c.short_note,
+    priority: c.priority,
+    position: c.position,
+    wholesale_code: c.wholesale_code,
+    visit_at: c.visit_at,
+    lead_source: c.lead_source,
+    catalog_item_id: c.catalog_item_id,
+  } as PipelineItem;
+}
 
 export async function getAll(workspaceId: string): Promise<PipelineItem[]> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    const res = await fetchPipelineItems(ctx.jwt, ctx.wsId);
+    if (res.ok) {
+      // Filtramos status='open' acá (en cloud no filtramos en la query
+      // porque queremos exponer también closed_at en algunos casos).
+      return res.data.items
+        .filter((i) => i.status === "open")
+        .map((i) => cloudToLocal(i, workspaceId));
+    }
+    // Fallback al cache local si cloud falla.
+    // eslint-disable-next-line no-console
+    console.warn("[pipelineDb.getAll] cloud falló, leyendo cache local:", res.error);
+  }
   return dbSelect<PipelineItem>(
     `SELECT p.*, c.name AS customer_name,
       (SELECT performed_at FROM pipeline_activities
@@ -45,6 +115,53 @@ export async function create(
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const currency = data.currency ?? "USD";
+
+  const ctx = cloudCtx();
+  if (ctx) {
+    const res = await createPipelineItemCloud(ctx.jwt, ctx.wsId, {
+      id,
+      customer_id: data.customer_id,
+      customer_name: data.customer_name ?? null,
+      stage_id: data.stage_id,
+      stage_name: data.stage_name,
+      stage_order: data.stage_order,
+      status: "open",
+      estimated_value: data.estimated_value ?? null,
+      currency,
+      product: data.product ?? null,
+      priority: data.priority ?? null,
+      next_action_at: data.next_action_at ?? null,
+      next_action_label: data.next_action_label ?? null,
+      short_note: data.short_note ?? null,
+      lead_source: data.lead_source ?? null,
+      catalog_item_id: data.catalog_item_id ?? null,
+    });
+    if (!res.ok) throw new Error(`No se pudo crear lead en la nube: ${res.error}`);
+    // Devolvemos el item localmente sintetizado — el caller espera
+    // PipelineItem completo; no esperamos otro GET.
+    return {
+      id, workspace_id: workspaceId,
+      customer_id: data.customer_id,
+      customer_name: data.customer_name ?? null,
+      stage_id: data.stage_id, stage_name: data.stage_name, stage_order: data.stage_order,
+      status: "open",
+      estimated_value: data.estimated_value ?? null,
+      currency, inactive_days: 0, closed_at: null,
+      created_by: data.created_by ?? null, created_at: now, updated_at: now,
+      last_activity_at: null,
+      product: data.product ?? null,
+      next_action_at: data.next_action_at ?? null,
+      next_action_label: data.next_action_label ?? null,
+      owner_id: null, owner_name: null,
+      short_note: data.short_note ?? null,
+      priority: data.priority ?? null,
+      position: null,
+      wholesale_code: null, visit_at: null,
+      lead_source: data.lead_source ?? null,
+      catalog_item_id: data.catalog_item_id ?? null,
+    } as PipelineItem;
+  }
+
   await dbExecute(
     `INSERT INTO pipeline_items (
       id, workspace_id, customer_id, customer_name, stage_id, stage_name, stage_order,
@@ -112,6 +229,16 @@ export async function updateStage(
   stageName: string,
   stageOrder: number,
 ): Promise<void> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    const res = await updatePipelineItemCloud(ctx.jwt, ctx.wsId, id, {
+      stage_id: stageId,
+      stage_name: stageName,
+      stage_order: stageOrder,
+    });
+    if (!res.ok) throw new Error(`No se pudo mover stage en la nube: ${res.error}`);
+    return;
+  }
   const now = new Date().toISOString();
   await dbExecute(
     "UPDATE pipeline_items SET stage_id = ?, stage_name = ?, stage_order = ?, updated_at = ? WHERE id = ?",
@@ -120,6 +247,13 @@ export async function updateStage(
 }
 
 export async function closeItem(id: string, status: "won" | "lost"): Promise<void> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    const now = new Date().toISOString();
+    const res = await updatePipelineItemCloud(ctx.jwt, ctx.wsId, id, { status, closed_at: now });
+    if (!res.ok) throw new Error(`No se pudo cerrar lead en la nube: ${res.error}`);
+    return;
+  }
   const now = new Date().toISOString();
   await dbExecute(
     "UPDATE pipeline_items SET status = ?, closed_at = ?, updated_at = ? WHERE id = ?",
@@ -130,6 +264,12 @@ export async function closeItem(id: string, status: "won" | "lost"): Promise<voi
 /** Pospone la próxima acción del lead a `nextActionAt` (ISO string). Si
  *  ya había un label de próxima acción, se mantiene. */
 export async function snooze(id: string, nextActionAt: string): Promise<void> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    const res = await updatePipelineItemCloud(ctx.jwt, ctx.wsId, id, { next_action_at: nextActionAt });
+    if (!res.ok) throw new Error(`No se pudo posponer en la nube: ${res.error}`);
+    return;
+  }
   const now = new Date().toISOString();
   await dbExecute(
     "UPDATE pipeline_items SET next_action_at = ?, updated_at = ? WHERE id = ?",
@@ -156,6 +296,22 @@ export async function scheduleVisit(
     stageOrder: number;
   },
 ): Promise<void> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    const patch: Record<string, unknown> = {
+      stage_id: data.stageId,
+      stage_name: data.stageName,
+      stage_order: data.stageOrder,
+      visit_at: data.visitAt,
+      next_action_at: data.visitAt,
+      next_action_label: "Visita agendada",
+    };
+    if (data.product != null) patch.product = data.product;
+    if (data.wholesaleCode != null) patch.wholesale_code = data.wholesaleCode;
+    const res = await updatePipelineItemCloud(ctx.jwt, ctx.wsId, id, patch);
+    if (!res.ok) throw new Error(`No se pudo agendar en la nube: ${res.error}`);
+    return;
+  }
   const now = new Date().toISOString();
   await dbExecute(
     `UPDATE pipeline_items SET

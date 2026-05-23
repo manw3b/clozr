@@ -48,6 +48,10 @@ import {
   handleDeleteCustomer,
   handleImportCustomers,
 } from "./routes/customers";
+import {
+  handleListStages, handleCreateStage, handleUpdateStage, handleDeleteStage, handleImportStages,
+  handleListItems, handleCreateItem, handleUpdateItem, handleDeleteItem, handleImportItems,
+} from "./routes/pipeline";
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -94,6 +98,43 @@ export default {
         if (!cId && req.method === "POST")   return cors(req, env, await handleCreateCustomer(wsId, req, env));
         if (cId && req.method === "PATCH")   return cors(req, env, await handleUpdateCustomer(wsId, cId, req, env));
         if (cId && req.method === "DELETE")  return cors(req, env, await handleDeleteCustomer(wsId, cId, req, env));
+      }
+
+      // Pipeline paths (F2-B R2):
+      //   GET/POST            /workspaces/:wid/pipeline/stages
+      //   PATCH/DELETE        /workspaces/:wid/pipeline/stages/:sid
+      //   POST                /workspaces/:wid/pipeline/stages/import
+      //   GET/POST            /workspaces/:wid/pipeline/items
+      //   PATCH/DELETE        /workspaces/:wid/pipeline/items/:iid
+      //   POST                /workspaces/:wid/pipeline/items/import
+      const wsStagesImportMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/pipeline\/stages\/import\/?$/);
+      const wsItemsImportMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/pipeline\/items\/import\/?$/);
+      const wsStageMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/pipeline\/stages(?:\/([^/]+))?\/?$/);
+      const wsItemMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/pipeline\/items(?:\/([^/]+))?\/?$/);
+
+      if (wsStagesImportMatch && req.method === "POST") {
+        const wsId = wsStagesImportMatch[1]!;
+        return cors(req, env, await handleImportStages(wsId, req, env));
+      }
+      if (wsItemsImportMatch && req.method === "POST") {
+        const wsId = wsItemsImportMatch[1]!;
+        return cors(req, env, await handleImportItems(wsId, req, env));
+      }
+      if (wsStageMatch) {
+        const wsId = wsStageMatch[1]!;
+        const sId = wsStageMatch[2];
+        if (!sId && req.method === "GET")    return cors(req, env, await handleListStages(wsId, req, env));
+        if (!sId && req.method === "POST")   return cors(req, env, await handleCreateStage(wsId, req, env));
+        if (sId && req.method === "PATCH")   return cors(req, env, await handleUpdateStage(wsId, sId, req, env));
+        if (sId && req.method === "DELETE")  return cors(req, env, await handleDeleteStage(wsId, sId, req, env));
+      }
+      if (wsItemMatch) {
+        const wsId = wsItemMatch[1]!;
+        const iId = wsItemMatch[2];
+        if (!iId && req.method === "GET")    return cors(req, env, await handleListItems(wsId, req, env));
+        if (!iId && req.method === "POST")   return cors(req, env, await handleCreateItem(wsId, req, env));
+        if (iId && req.method === "PATCH")   return cors(req, env, await handleUpdateItem(wsId, iId, req, env));
+        if (iId && req.method === "DELETE")  return cors(req, env, await handleDeleteItem(wsId, iId, req, env));
       }
 
       // access-code va ANTES que /members/:mid porque su path es más

@@ -1,5 +1,12 @@
 import { dbSelect, dbExecute, runWrite } from "./index";
 import type { PipelineStage, CustomerTypeRow, CatalogCategoryRow } from "./types";
+import { useCloudAuthStore } from "../../store/cloudAuthStore";
+import {
+  fetchPipelineStages,
+  createPipelineStageCloud,
+  updatePipelineStageCloud,
+  deletePipelineStageCloud,
+} from "../cloudAuth";
 
 // ── Pipeline stages ──────────────────────────────────────────────────
 
@@ -14,7 +21,53 @@ const DEFAULT_PIPELINE_STAGES: Array<Omit<PipelineStage, "workspace_id" | "creat
   { id: "perdido", name: "Perdido", stage_order: 7, color: "red", is_won: 0, is_lost: 1 },
 ];
 
+/**
+ * Dispatcher local↔cloud para pipeline_stages. Cuando isCloudModeFor
+ * ("pipeline") está ON, leemos del cloud. Si el cloud devuelve [], es
+ * porque el bootstrap no se hizo todavía — entonces seedeamos en el
+ * cloud con los DEFAULT_PIPELINE_STAGES. Esto pasa una sola vez por
+ * workspace y deja la app lista para todos.
+ */
 export async function getPipelineStages(workspaceId: string): Promise<PipelineStage[]> {
+  const cs = useCloudAuthStore.getState();
+  if (cs.isCloudModeFor("pipeline") && cs.jwt && cs.activeWorkspaceId) {
+    const wsId = cs.activeWorkspaceId;
+    const res = await fetchPipelineStages(cs.jwt, wsId);
+    if (res.ok) {
+      if (res.data.stages.length > 0) {
+        return res.data.stages.map((s) => ({
+          id: s.id,
+          workspace_id: workspaceId, // local workspace id para compat con UI
+          name: s.name,
+          stage_order: s.stage_order,
+          color: s.color ?? "gray",
+          is_won: s.is_won,
+          is_lost: s.is_lost,
+          created_at: s.created_at,
+        }));
+      }
+      // Cloud sin stages — seedear con defaults.
+      for (const s of DEFAULT_PIPELINE_STAGES) {
+        await createPipelineStageCloud(cs.jwt, wsId, {
+          id: s.id, name: s.name, stage_order: s.stage_order,
+          color: s.color, is_won: s.is_won, is_lost: s.is_lost,
+        });
+      }
+      // Re-fetch para devolver lo que quedó persistido.
+      const after = await fetchPipelineStages(cs.jwt, wsId);
+      if (after.ok) {
+        return after.data.stages.map((s) => ({
+          id: s.id, workspace_id: workspaceId, name: s.name,
+          stage_order: s.stage_order, color: s.color ?? "gray",
+          is_won: s.is_won, is_lost: s.is_lost, created_at: s.created_at,
+        }));
+      }
+    }
+    // Fallback cache local si cloud falla.
+    // eslint-disable-next-line no-console
+    console.warn("[settingsDb.getPipelineStages] cloud falló, fallback local:", res.ok ? "empty" : res.error);
+  }
+
   const rows = await dbSelect<PipelineStage>(
     "SELECT * FROM pipeline_stages WHERE workspace_id = ? ORDER BY stage_order ASC",
     [workspaceId],
@@ -41,6 +94,36 @@ export async function getPipelineStages(workspaceId: string): Promise<PipelineSt
 // completa para que dos guardados no se pisen y que el upsert + delete
 // orphan corran en orden previsible.
 export async function savePipelineStages(workspaceId: string, stages: PipelineStage[]): Promise<void> {
+  const cs = useCloudAuthStore.getState();
+  if (cs.isCloudModeFor("pipeline") && cs.jwt && cs.activeWorkspaceId) {
+    const wsId = cs.activeWorkspaceId;
+    // Cloud: cargar lo que hay y reconciliar (upsert + delete los que
+    // no están en el payload nuevo).
+    const current = await fetchPipelineStages(cs.jwt, wsId);
+    const currentIds = new Set((current.ok ? current.data.stages : []).map((s) => s.id));
+    for (const s of stages) {
+      if (currentIds.has(s.id)) {
+        await updatePipelineStageCloud(cs.jwt, wsId, s.id, {
+          name: s.name, stage_order: s.stage_order, color: s.color,
+          is_won: s.is_won, is_lost: s.is_lost,
+        });
+      } else {
+        await createPipelineStageCloud(cs.jwt, wsId, {
+          id: s.id, name: s.name, stage_order: s.stage_order,
+          color: s.color, is_won: s.is_won, is_lost: s.is_lost,
+        });
+      }
+    }
+    // Soft-delete las que ya no están.
+    const newIds = new Set(stages.map((s) => s.id));
+    for (const old of currentIds) {
+      if (!newIds.has(old)) {
+        await deletePipelineStageCloud(cs.jwt, wsId, old);
+      }
+    }
+    return;
+  }
+
   await runWrite(async () => {
     try {
       for (const s of stages) {

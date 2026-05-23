@@ -56,16 +56,19 @@ interface CloudAuthState {
    * mostrar (lo cambia el flow de import).
    * 'skip' = el user decidió arrancar limpio sin subir los locales.
    */
-  bootstrapStatus: Record<string, { customers?: "pending" | "done" | "skip" }>;
+  bootstrapStatus: Record<string, {
+    customers?: "pending" | "done" | "skip";
+    pipeline?: "pending" | "done" | "skip";
+  }>;
 
   setSession: (args: { jwt: string; email: string; userId: string; sessionId: string; expiresAt: number }) => void;
   setWorkspaces: (ws: CloudWorkspace[]) => void;
   setActiveWorkspace: (id: string | null) => void;
   /** Agrega o reemplaza un workspace en la lista. Útil después de crear. */
   upsertWorkspace: (ws: CloudWorkspace) => void;
-  setBootstrapStatus: (workspaceId: string, feature: "customers", status: "pending" | "done" | "skip") => void;
+  setBootstrapStatus: (workspaceId: string, feature: "customers" | "pipeline", status: "pending" | "done" | "skip") => void;
   /** True si el workspace activo terminó el bootstrap de la feature. */
-  isCloudModeFor: (feature: "customers") => boolean;
+  isCloudModeFor: (feature: "customers" | "pipeline") => boolean;
   clearSession: () => void;
   /** True si tenemos JWT y NO está expirado. */
   isLoggedIn: () => boolean;

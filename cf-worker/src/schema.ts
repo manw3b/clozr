@@ -191,6 +191,79 @@ async function applySchema(env: Env): Promise<void> {
             ON customers(workspace_id, name)`,
     },
   );
+
+  // ── F2-B R2: Pipeline compartido ──────────────────────────────────
+  //
+  // pipeline_stages: las columnas del kanban (Prospecto, Contactado,
+  // Cobrado, etc). Configurables por workspace.
+  //
+  // pipeline_items: los leads. customer_id NO tiene FK estricta porque
+  // a veces el customer puede no estar aún en el cloud (caso edge);
+  // pero en la práctica el frontend se asegura de crear customer antes
+  // de crear lead.
+  //
+  // Mismo patrón que customers: id igual al local, workspace_id apunta
+  // al cloud_workspaces, soft-delete via deleted_at.
+  await tursoQuery(
+    env,
+    {
+      sql: `CREATE TABLE IF NOT EXISTS pipeline_stages (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+        name TEXT NOT NULL,
+        stage_order INTEGER NOT NULL DEFAULT 0,
+        color TEXT DEFAULT 'gray',
+        is_won INTEGER NOT NULL DEFAULT 0,
+        is_lost INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
+      )`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_pipeline_stages_workspace
+            ON pipeline_stages(workspace_id, deleted_at, stage_order)`,
+    },
+    {
+      sql: `CREATE TABLE IF NOT EXISTS pipeline_items (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+        customer_id TEXT NOT NULL,
+        customer_name TEXT,
+        stage_id TEXT NOT NULL,
+        stage_name TEXT NOT NULL,
+        stage_order INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'open',
+        estimated_value REAL,
+        currency TEXT DEFAULT 'ARS',
+        product TEXT,
+        priority TEXT,
+        position INTEGER,
+        next_action_at TEXT,
+        next_action_label TEXT,
+        owner_id TEXT,
+        owner_name TEXT,
+        short_note TEXT,
+        lead_source TEXT,
+        catalog_item_id TEXT,
+        wholesale_code TEXT,
+        visit_at TEXT,
+        inactive_days INTEGER DEFAULT 0,
+        closed_at TEXT,
+        created_by TEXT REFERENCES users(id),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
+      )`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_pipeline_items_workspace
+            ON pipeline_items(workspace_id, deleted_at, stage_order)`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_pipeline_items_customer
+            ON pipeline_items(workspace_id, customer_id, deleted_at)`,
+    },
+  );
 }
 
 /**

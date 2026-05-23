@@ -338,6 +338,94 @@ export function importCustomersCloud(
   });
 }
 
+/* ── /workspaces/:id/pipeline (F2-B R2) ─────────────────────────────── */
+
+export interface CloudPipelineStage {
+  id: string;
+  name: string;
+  stage_order: number;
+  color: string | null;
+  is_won: number;
+  is_lost: number;
+  created_at: string;
+}
+
+export interface CloudPipelineItem {
+  id: string;
+  workspace_id: string;
+  customer_id: string;
+  customer_name: string | null;
+  stage_id: string;
+  stage_name: string;
+  stage_order: number;
+  status: string;
+  estimated_value: number | null;
+  currency: string | null;
+  product: string | null;
+  priority: string | null;
+  position: number | null;
+  next_action_at: string | null;
+  next_action_label: string | null;
+  owner_id: string | null;
+  owner_name: string | null;
+  short_note: string | null;
+  lead_source: string | null;
+  catalog_item_id: string | null;
+  wholesale_code: string | null;
+  visit_at: string | null;
+  inactive_days: number | null;
+  closed_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/* Stages */
+export function fetchPipelineStages(jwt: string | null, workspaceId: string) {
+  return authFetch<{ stages: CloudPipelineStage[] }>(jwt, `/workspaces/${workspaceId}/pipeline/stages`);
+}
+export function createPipelineStageCloud(jwt: string | null, workspaceId: string, payload: Partial<CloudPipelineStage> & { id?: string; name: string }) {
+  return authFetch<{ ok: true; id: string }>(jwt, `/workspaces/${workspaceId}/pipeline/stages`, {
+    method: "POST", body: JSON.stringify(payload),
+  });
+}
+export function updatePipelineStageCloud(jwt: string | null, workspaceId: string, stageId: string, payload: Partial<CloudPipelineStage>) {
+  return authFetch<{ ok: true }>(jwt, `/workspaces/${workspaceId}/pipeline/stages/${stageId}`, {
+    method: "PATCH", body: JSON.stringify(payload),
+  });
+}
+export function deletePipelineStageCloud(jwt: string | null, workspaceId: string, stageId: string) {
+  return authFetch<{ ok: true }>(jwt, `/workspaces/${workspaceId}/pipeline/stages/${stageId}`, { method: "DELETE" });
+}
+export function importPipelineStagesCloud(jwt: string | null, workspaceId: string, stages: Array<Partial<CloudPipelineStage> & { id: string; name: string }>) {
+  return authFetch<{ ok: true; imported: number; skipped: number }>(jwt, `/workspaces/${workspaceId}/pipeline/stages/import`, {
+    method: "POST", body: JSON.stringify({ stages }),
+  });
+}
+
+/* Items */
+export function fetchPipelineItems(jwt: string | null, workspaceId: string) {
+  return authFetch<{ items: CloudPipelineItem[] }>(jwt, `/workspaces/${workspaceId}/pipeline/items`);
+}
+export function createPipelineItemCloud(jwt: string | null, workspaceId: string, payload: Partial<CloudPipelineItem> & { id?: string; customer_id: string; stage_id: string; stage_name: string }) {
+  return authFetch<{ ok: true; id: string }>(jwt, `/workspaces/${workspaceId}/pipeline/items`, {
+    method: "POST", body: JSON.stringify(payload),
+  });
+}
+export function updatePipelineItemCloud(jwt: string | null, workspaceId: string, itemId: string, payload: Partial<CloudPipelineItem>) {
+  return authFetch<{ ok: true }>(jwt, `/workspaces/${workspaceId}/pipeline/items/${itemId}`, {
+    method: "PATCH", body: JSON.stringify(payload),
+  });
+}
+export function deletePipelineItemCloud(jwt: string | null, workspaceId: string, itemId: string) {
+  return authFetch<{ ok: true }>(jwt, `/workspaces/${workspaceId}/pipeline/items/${itemId}`, { method: "DELETE" });
+}
+export function importPipelineItemsCloud(jwt: string | null, workspaceId: string, items: Array<Partial<CloudPipelineItem> & { id: string; customer_id: string; stage_id: string; stage_name: string }>) {
+  return authFetch<{ ok: true; imported: number; skipped: number; errors: Array<{ id: string; error: string }> }>(jwt, `/workspaces/${workspaceId}/pipeline/items/import`, {
+    method: "POST", body: JSON.stringify({ items }),
+  });
+}
+
 /**
  * Genera un código de acceso para un miembro invited. Le permite al
  * owner/admin compartirlo directo con el miembro (por WhatsApp, etc)

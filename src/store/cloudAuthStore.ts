@@ -124,10 +124,28 @@ export const useCloudAuthStore = create<CloudAuthState>()(
         })),
 
       isCloudModeFor: (feature) => {
-        const { activeWorkspaceId, bootstrapStatus, isLoggedIn } = get();
+        const { activeWorkspaceId, bootstrapStatus, isLoggedIn, workspaces } = get();
         if (!isLoggedIn()) return false;
         if (!activeWorkspaceId) return false;
-        return bootstrapStatus[activeWorkspaceId]?.[feature] === "done";
+
+        // Reglas de cloud mode:
+        //   - Owner: tiene datos LOCALES propios (acumulados antes de
+        //     conectarse al cloud). Cloud mode se activa cuando él
+        //     decide subirlos ('done') o saltearlos ('skip'). Hasta que
+        //     decida, queda 'pending' y la app sigue leyendo del SQLite
+        //     local — no perdería sus 47 clientes históricos por error.
+        //
+        //   - Miembros invitados (admin/vendedor/viewer): NO tienen
+        //     datos locales propios — entraron al workspace por invite.
+        //     Para ellos cloud mode siempre ON, así ven los datos que
+        //     subió el owner. Si su PC tiene datos locales por accidente
+        //     (corrieron Clozr antes solos), igual van al cloud porque
+        //     no son "suyos" en el contexto de este workspace cloud.
+        const role = workspaces.find((w) => w.id === activeWorkspaceId)?.role;
+        if (role && role !== "owner") return true;
+
+        const status = bootstrapStatus[activeWorkspaceId]?.[feature];
+        return status === "done" || status === "skip";
       },
 
       clearSession: () =>

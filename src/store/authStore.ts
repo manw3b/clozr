@@ -1,7 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { UserRole, Permission } from "../lib/permissions";
+import { PERMISSIONS, can, assertCan } from "../lib/permissions";
 
-export type UserRole = "owner" | "admin" | "vendedor" | "viewer";
+// Re-export para back-compat con los ~50 callsites que importan de acá.
+export type { UserRole, Permission };
+export { PERMISSIONS, can, assertCan };
 
 interface AuthState {
   userId: string | null;
@@ -26,67 +30,6 @@ export const useAuthStore = create<AuthState>()(
     { name: "clozr-auth" },
   ),
 );
-
-/* ─────────────────────────────────────────────────────────────────────
- * Matriz de permisos (granular). Cada permiso lista los roles habilitados.
- * ───────────────────────────────────────────────────────────────────── */
-
-export const PERMISSIONS: Readonly<Record<string, readonly UserRole[]>> = {
-  // Lecturas sensibles
-  viewCost: ["owner", "admin"],
-
-  // Catálogo / pricing / inventario
-  editPricing: ["owner", "admin"],
-  editCatalogItem: ["owner", "admin"],
-  deleteCatalogItem: ["owner", "admin"],
-  manageFeatured: ["owner", "admin"],
-
-  // Ventas
-  createSale: ["owner", "admin", "vendedor"],
-  deleteSale: ["owner", "admin"],
-  regularizeSale: ["owner", "admin"],
-  markSalePaid: ["owner", "admin", "vendedor"],
-
-  // Caja
-  createCashMovement: ["owner", "admin", "vendedor"],
-  deleteCashMovement: ["owner", "admin"],
-
-  // Clientes / pipeline
-  createClient: ["owner", "admin", "vendedor"],
-  editClient: ["owner", "admin", "vendedor"],
-  deleteClient: ["owner", "admin"],
-  createLead: ["owner", "admin", "vendedor"],
-  editLead: ["owner", "admin", "vendedor"],
-
-  // Configuración
-  managePaymentMethods: ["owner", "admin"],
-  manageCustomerTypes: ["owner", "admin"],
-  manageBusiness: ["owner", "admin"],
-  manageWorkspaceSettings: ["owner", "admin"],
-  manageTeam: ["owner"],
-  manageExchangeRate: ["owner", "admin"],
-  /** Crear/editar/borrar templates de tareas obligatorias del equipo. */
-  manageAssignedTasks: ["owner", "admin"],
-} as const;
-
-export type Permission = keyof typeof PERMISSIONS;
-
-export function can(role: UserRole, permission: Permission): boolean {
-  return PERMISSIONS[permission]?.includes(role) ?? false;
-}
-
-/**
- * Throws si el rol actual no puede ejecutar la acción.
- * Uso típico en mutationFn de TanStack Query — el error sube y se muestra
- * vía la handler global de errores (que ya mostramos como toast).
- */
-export function assertCan(role: UserRole, permission: Permission): void {
-  if (!can(role, permission)) {
-    throw new Error(
-      `Permiso denegado: tu rol "${role}" no puede "${permission}". Pedí al dueño o encargado.`,
-    );
-  }
-}
 
 /* ── Helpers legacy (compatibilidad con código existente) ────────── */
 export function canViewCost(role: UserRole): boolean {

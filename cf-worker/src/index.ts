@@ -62,6 +62,7 @@ import {
   handleGenericDelete, handleGenericImport,
 } from "./routes/_generic";
 import { SIMPLE_TABLE_SPECS } from "./routes/simpleTables";
+import { handleDecrementStock } from "./routes/catalog-stock";
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -208,6 +209,18 @@ export default {
         if (sId && req.method === "DELETE")  return cors(req, env, await handleDeleteSale(wsId, sId, req, env));
       }
 
+      // Decrement stock atómico (C1) — DEBE ir antes del loop generic
+      // porque sino /catalog/:id/decrement-stock matchearía como un
+      // /catalog/:id PATCH inválido o algo raro.
+      const wsDecrementStockMatch = url.pathname.match(
+        /^\/workspaces\/([^/]+)\/catalog\/([^/]+)\/decrement-stock\/?$/,
+      );
+      if (wsDecrementStockMatch && req.method === "POST") {
+        return cors(req, env, await handleDecrementStock(
+          wsDecrementStockMatch[1]!, wsDecrementStockMatch[2]!, req, env,
+        ));
+      }
+
       // Simple tables (R4+R5) — usan generic dispatcher.
       //   tasks, cash, followups, catalog, payment-methods, customer-types, customer-tags
       //   GET/POST       /workspaces/:wid/<table>
@@ -339,6 +352,38 @@ function checkRate(req: Request, key: string, limit: number, windowMs: number): 
   bucket.count++;
   return true;
 }
+
+/**
+ * matchPath — pattern matcher con `:param` syntax para routes nuevas (C4).
+ * Reemplaza el patrón `url.pathname.match(/regex/)` por algo declarativo.
+ *
+ * Uso:
+ *   const m = matchPath("/workspaces/:wid/catalog/:id/decrement-stock", url.pathname);
+ *   if (m) { const { wid, id } = m; ... }
+ *
+ * El refactor de las ~30 rutas existentes a este helper queda como
+ * trabajo incremental — cuando se modifica/agrega una ruta, se adopta.
+ * No migramos todas de golpe porque las regex actuales son seguras y
+ * un refactor masivo es riesgoso para 0 ganancia funcional.
+ */
+function matchPath(pattern: string, pathname: string): Record<string, string> | null {
+  // Convertimos "/workspaces/:wid/sales/:sid" → regex
+  // "^/workspaces/([^/]+)/sales/([^/]+)/?$" y guardamos los nombres.
+  const paramNames: string[] = [];
+  const re = pattern.replace(/:([a-zA-Z_]+)/g, (_, name: string) => {
+    paramNames.push(name);
+    return "([^/]+)";
+  });
+  const match = pathname.match(new RegExp(`^${re}/?$`));
+  if (!match) return null;
+  const params: Record<string, string> = {};
+  for (let i = 0; i < paramNames.length; i++) {
+    const v = match[i + 1];
+    if (v) params[paramNames[i]!] = v;
+  }
+  return params;
+}
+void matchPath; // export-less; usable from este file. TS no warning.
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

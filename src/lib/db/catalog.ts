@@ -1,6 +1,6 @@
 import { dbSelect, dbExecute } from "./index";
 import { useCloudAuthStore } from "../../store/cloudAuthStore";
-import { catalogApi } from "../cloudAuth";
+import { catalogApi, decrementCatalogStock } from "../cloudAuth";
 import type {
   CatalogItem,
   CatalogImei,
@@ -285,23 +285,16 @@ export async function softDelete(workspaceId: string, id: string): Promise<void>
 export async function decrementStock(id: string, quantity: number): Promise<void> {
   const ctx = cloudCtx();
   if (ctx) {
-    // Cloud no tiene atomic decrement como SQL UPDATE max(0, stock - ?).
-    // Hacemos read + calc + write. Race condition aceptable para nuestro
-    // volumen (3 PCs concurrentes, raro).
-    const listRes = await catalogApi.list(ctx.jwt, ctx.wsId);
-    if (!listRes.ok) {
+    // C1: endpoint atómico backend — `UPDATE ... MAX(0, stock - ?)` en
+    // una sola query, sin race condition. Antes hacíamos read+calc+write,
+    // que con 2 vendedores creando ventas del mismo producto al mismo
+    // tiempo subdescontaba en 1. El endpoint sólo afecta filas con
+    // track_stock=1, así que productos sin tracking siguen igual.
+    const res = await decrementCatalogStock(ctx.jwt, ctx.wsId, id, quantity);
+    if (!res.ok) {
       // eslint-disable-next-line no-console
-      console.warn("[catalogDb.decrementStock] cloud list falló:", listRes.error);
-      return;
+      console.warn("[catalogDb.decrementStock] cloud decrement falló:", res.error);
     }
-    const found = (listRes.data.items as unknown as Array<Record<string, unknown>>)
-      .find((c) => c.id === id);
-    if (!found) return;
-    if (Number(found.track_stock ?? 0) !== 1) return;
-    const current = Number(found.stock ?? 0);
-    const next = Math.max(0, current - quantity);
-    if (next === current) return;
-    await catalogApi.update(ctx.jwt, ctx.wsId, id, { stock: next } as never);
     return;
   }
   await dbExecute(

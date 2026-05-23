@@ -20,7 +20,7 @@
 import type { Env } from "../index";
 import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
-import { tursoExec, tursoFirst, tursoQuery, type TursoArg } from "../turso";
+import { tursoExec, tursoFirst, tursoQuery, tursoTransaction, type TursoArg } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
 
 const ROLES_READ = new Set(["owner", "admin", "vendedor", "viewer"]);
@@ -123,10 +123,10 @@ export async function handleCreateSale(workspaceId: string, req: Request, env: E
   const cols = ["id", "workspace_id", "created_by", ...Object.keys(saleFields)];
   const vals: TursoArg[] = [id, workspaceId, auth.userId, ...Object.values(saleFields)];
 
-  // Insertamos sale + items + payments en una sola pipeline. Turso ejecuta
-  // en orden; si alguno falla, los demás ya ejecutados quedan persistidos
-  // (no es transaccional ACID true). Para esta fase es aceptable — el
-  // frontend re-trya. Para "true atomicity" usaríamos batch tx HTTP.
+  // C2: insertamos sale + items + payments en una transacción atómica
+  // via tursoTransaction (BEGIN/COMMIT en la misma pipeline). Si CUALQUIER
+  // insert falla, ROLLBACK — no queda una sale a medio crear con items
+  // sin payments o viceversa.
   const stmts: Array<{ sql: string; args: TursoArg[] }> = [
     {
       sql: `INSERT INTO sales (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`,
@@ -169,7 +169,7 @@ export async function handleCreateSale(workspaceId: string, req: Request, env: E
   }
 
   try {
-    await tursoQuery(env, ...stmts);
+    await tursoTransaction(env, ...stmts);
   } catch (e) {
     const msg = e instanceof Error ? e.message.toLowerCase() : String(e);
     if (msg.includes("unique") || msg.includes("primary key")) {

@@ -178,6 +178,50 @@ export async function tursoExec(
   await tursoQuery(env, { sql, args });
 }
 
+/**
+ * Ejecuta N statements como una transacción atómica (C2).
+ *
+ * Estrategia: prependeamos BEGIN y appendeamos COMMIT a la pipeline.
+ * libsql ejecuta todo en la misma conexión dentro de un solo HTTP call,
+ * así que BEGIN/COMMIT funcionan. Si CUALQUIER statement falla:
+ *   - libsql aborta el resto del pipeline
+ *   - El COMMIT no se ejecuta
+ *   - Por mata-perro, mandamos un ROLLBACK explícito en una segunda
+ *     pipeline (es no-op si la transacción ya se cerró por error, pero
+ *     defensa para casos exóticos donde libsql deja la connection en
+ *     un estado raro).
+ *   - Re-throw el error original al caller.
+ *
+ * Limitación: si todas las statements parecen correctas pero el COMMIT
+ * falla por otro motivo (raro), los lockeos previos se sueltan en el
+ * cleanup. Esto es solo válido dentro de un mismo pipeline; no soporta
+ * multi-request transactions (esas necesitarían baton + KV state).
+ */
+export async function tursoTransaction(
+  env: Env,
+  ...statements: Array<{ sql: string; args?: TursoArg[] }>
+): Promise<void> {
+  if (statements.length === 0) return;
+  try {
+    await tursoQuery(
+      env,
+      { sql: "BEGIN" },
+      ...statements,
+      { sql: "COMMIT" },
+    );
+  } catch (err) {
+    // Best-effort rollback. Si ya hubo ROLLBACK implícito (que libsql
+    // suele hacer al ver un error mid-pipeline), este ROLLBACK extra
+    // simplemente errorea con "no transaction in progress" — lo tragamos.
+    try {
+      await tursoQuery(env, { sql: "ROLLBACK" });
+    } catch {
+      // intentional
+    }
+    throw err;
+  }
+}
+
 function serializeArg(v: TursoArg): { type: "text" | "integer" | "null" | "float"; value?: string } {
   if (v === null) return { type: "null" };
   if (typeof v === "number") {

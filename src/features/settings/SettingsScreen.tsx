@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Plus, X } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { settingsDb } from "../../lib/db/settings";
@@ -9,17 +9,25 @@ import { useUIStore } from "../../store/uiStore";
 import Select from "../../components/ui/Select";
 import ImageUpload from "../../components/ui/ImageUpload";
 import { ExchangeRateChip } from "../../components/ExchangeRateChip";
-import { PaymentMethodsSection } from "./PaymentMethodsSection";
-import { CatalogPricingSection } from "./CatalogPricingSection";
-import { FeaturedModelsSection } from "./FeaturedModelsSection";
-import { CustomerTagsSection } from "./CustomerTagsSection";
-import { WhatsAppTemplatesSection } from "./WhatsAppTemplatesSection";
-import { DolaresArSection } from "./DolaresArSection";
-import { AboutSection } from "./AboutSection";
-import { AssignedTasksSection } from "./AssignedTasksSection";
-import { CloudAccountSection } from "./CloudAccountSection";
-import { CloudTeamSection } from "./CloudTeamSection";
-import { CloudDataSection } from "./CloudDataSection";
+
+// Cada sección externa se lazy-loadea: el bundle inicial de Settings tenía
+// ~123 kB porque importaba TODO sincrónico aunque el user solo abra una
+// sección. Ahora cada sección es su propio chunk de Vite — el primer paint
+// baja a las secciones "inline" (General/Profile/Pipeline/CustomerTypes/Data)
+// y el resto se descarga on-demand al clickear la tab. Pérdida: un spinner
+// de ~150ms la primera vez que abrís cada tab. Ganancia: arranque de
+// Settings ~3-5x más rápido y menos memoria si nunca tocás ciertas tabs.
+const PaymentMethodsSection = lazy(() => import("./PaymentMethodsSection").then(m => ({ default: m.PaymentMethodsSection })));
+const CatalogPricingSection = lazy(() => import("./CatalogPricingSection").then(m => ({ default: m.CatalogPricingSection })));
+const FeaturedModelsSection = lazy(() => import("./FeaturedModelsSection").then(m => ({ default: m.FeaturedModelsSection })));
+const CustomerTagsSection = lazy(() => import("./CustomerTagsSection").then(m => ({ default: m.CustomerTagsSection })));
+const WhatsAppTemplatesSection = lazy(() => import("./WhatsAppTemplatesSection").then(m => ({ default: m.WhatsAppTemplatesSection })));
+const DolaresArSection = lazy(() => import("./DolaresArSection").then(m => ({ default: m.DolaresArSection })));
+const AboutSection = lazy(() => import("./AboutSection").then(m => ({ default: m.AboutSection })));
+const AssignedTasksSection = lazy(() => import("./AssignedTasksSection").then(m => ({ default: m.AssignedTasksSection })));
+const CloudAccountSection = lazy(() => import("./CloudAccountSection").then(m => ({ default: m.CloudAccountSection })));
+const CloudTeamSection = lazy(() => import("./CloudTeamSection").then(m => ({ default: m.CloudTeamSection })));
+const CloudDataSection = lazy(() => import("./CloudDataSection").then(m => ({ default: m.CloudDataSection })));
 import { qk } from "../../lib/queryKeys";
 import type { PipelineStage, CustomerTypeRow } from "../../lib/db/types";
 // Paleta unificada — la misma que usa el kanban del pipeline para el
@@ -1159,7 +1167,14 @@ export default function SettingsScreen() {
 
         {/* Right content */}
         <div style={{ flex: 1, overflow: "auto", padding: "var(--space-6) var(--space-8)" }}>
-          {renderSection()}
+          {/* Suspense para las secciones lazy. Fallback chico — el panel
+              ya está visible, solo aparece mientras se baja el chunk de
+              la sección (~150ms primera vez, cacheado después). */}
+          <Suspense fallback={
+            <div style={{ padding: 24, fontSize: 13, color: "var(--text-dim)" }}>Cargando…</div>
+          }>
+            {renderSection()}
+          </Suspense>
         </div>
       </div>
     </div>

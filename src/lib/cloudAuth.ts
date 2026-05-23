@@ -506,6 +506,24 @@ export interface CloudCatalogItem {
 }
 export const catalogApi = cloudTable<CloudCatalogItem>("catalog");
 
+/**
+ * Decrement atómico de stock — backend hace `UPDATE ... stock = MAX(0, stock - ?)`
+ * en una sola query. Fix de race condition que tenía la versión cliente.
+ * Devuelve el nuevo stock después del decremento (clamped a 0).
+ */
+export async function decrementCatalogStock(
+  jwt: string,
+  workspaceId: string,
+  itemId: string,
+  quantity: number,
+) {
+  return authFetch<{ stock: number; track_stock: number }>(
+    jwt,
+    `/workspaces/${workspaceId}/catalog/${itemId}/decrement-stock`,
+    { method: "POST", body: JSON.stringify({ quantity }) },
+  );
+}
+
 export interface CloudPaymentMethod {
   id: string; name: string; sort_order: number; enabled: number; currency: string;
 }

@@ -1,7 +1,11 @@
 import { dbSelect, dbExecute } from "./index";
 import { markStockItemSoldWithSale } from "./quickStock";
 import { useCloudAuthStore } from "../../store/cloudAuthStore";
-import { fetchSales, type CloudSale } from "../cloudAuth";
+import {
+  fetchSales, createSaleCloud, updateSaleCloud,
+  addSalePaymentCloud,
+  type CloudSale,
+} from "../cloudAuth";
 import type {
   Sale,
   SaleItem,
@@ -108,6 +112,81 @@ export async function createSale(
 ): Promise<Sale> {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
+
+  // ── Cloud path ───────────────────────────────────────────────────
+  // Si estamos en cloud mode, creamos en Turso (sale + items + payments
+  // en una pipeline atómica). El frontend ve la misma Sale de retorno.
+  //
+  // IMPORTANTE: el cloud path NO maneja IMEI auto-FIFO, descuento de
+  // stock, ni cash_movements derivados. Esas operaciones siguen siendo
+  // LOCAL y se ejecutan abajo en el path SQLite. Cuando cloud mode
+  // tenga inventory + cash escribiendo cloud (futuro), unificamos.
+  const cloudC = cloudCtx();
+  if (cloudC) {
+    const subtotal = data.items.reduce(
+      (sum, item) => sum + item.unit_price * item.quantity,
+      0,
+    );
+    const rate = data.usd_to_ars ?? 0;
+    const totalPaid = data.payments.reduce((sum, p) => {
+      if ((p.currency ?? "ARS") === "USD" || rate <= 0) return sum + p.amount;
+      return sum + p.amount / rate;
+    }, 0);
+    const balance = subtotal - totalPaid;
+    const isPaid = balance <= 0.01 ? 1 : 0;
+    const primaryPayment =
+      data.payments.find((p) => !p.is_deposit) ?? data.payments[0];
+    const paymentMethod = primaryPayment?.method ?? null;
+    const outOfStock = data.out_of_stock_sale ? 1 : 0;
+
+    const res = await createSaleCloud(cloudC.jwt, cloudC.wsId, {
+      id,
+      customer_id: data.customer_id ?? null,
+      customer_name: data.customer_name ?? null,
+      seller_id: data.seller_id ?? null,
+      seller_name: data.seller_name ?? null,
+      subtotal, total: subtotal, total_paid: totalPaid, balance, is_paid: isPaid,
+      notes: data.notes ?? null,
+      payment_method: paymentMethod,
+      out_of_stock_sale: outOfStock,
+      sale_date: now,
+      items: data.items.map((it) => ({
+        id: crypto.randomUUID(),
+        catalog_item_id: it.catalog_item_id ?? null,
+        description: it.description,
+        quantity: it.quantity,
+        unit_price: it.unit_price,
+        base_price: it.base_price ?? null,
+        subtotal: it.unit_price * it.quantity,
+        imei: it.imei ?? null,
+        from_stock: it.from_stock ? 1 : 0,
+      })),
+      payments: data.payments.map((p) => ({
+        id: crypto.randomUUID(),
+        method: p.method,
+        currency: p.currency ?? "ARS",
+        amount: p.amount,
+        is_deposit: p.is_deposit ? 1 : 0,
+      })),
+    });
+    if (!res.ok) throw new Error(`No se pudo crear venta en la nube: ${res.error}`);
+
+    // Devolver Sale sintetizado — los callers esperan el shape completo.
+    return {
+      id, workspace_id: workspaceId,
+      business_id: data.business_id ?? null,
+      customer_id: data.customer_id ?? null,
+      customer_name: data.customer_name ?? null,
+      seller_id: data.seller_id ?? null,
+      seller_name: data.seller_name ?? null,
+      subtotal, total: subtotal, total_paid: totalPaid, balance, is_paid: isPaid,
+      notes: data.notes ?? null,
+      sale_date: now, created_at: now,
+      payment_method: paymentMethod,
+      out_of_stock_sale: outOfStock,
+      regularized_at: null, regularized_by: null,
+    };
+  }
 
   // sales.subtotal y sales.total siempre en USD (fuente de verdad). items.unit_price es USD.
   const subtotal = data.items.reduce(
@@ -291,6 +370,20 @@ export async function createSale(
 }
 
 export async function updateSale(saleId: string, data: UpdateSaleInput): Promise<void> {
+  const cloudC = cloudCtx();
+  if (cloudC) {
+    // En cloud sólo soportamos PATCH de campos top-level (notes, totales).
+    // Los pagos se manejan vía addPayment endpoint. Cambiar la lista
+    // completa de pagos requiere wipe + re-add → fuera de alcance ahora.
+    const totalPaid = data.payments.reduce((sum, p) => sum + p.amount, 0);
+    const res = await updateSaleCloud(cloudC.jwt, cloudC.wsId, saleId, {
+      notes: data.notes,
+      total_paid: totalPaid,
+    });
+    if (!res.ok) throw new Error(`No se pudo actualizar venta en la nube: ${res.error}`);
+    return;
+  }
+
   const rows = await dbSelect<{ total: number }>(
     "SELECT total FROM sales WHERE id = ?",
     [saleId],
@@ -316,6 +409,14 @@ export async function updateSale(saleId: string, data: UpdateSaleInput): Promise
 }
 
 export async function markAsPaid(saleId: string): Promise<void> {
+  const cloudC = cloudCtx();
+  if (cloudC) {
+    const res = await updateSaleCloud(cloudC.jwt, cloudC.wsId, saleId, {
+      is_paid: 1, balance: 0,
+    } as Partial<CloudSale>);
+    if (!res.ok) throw new Error(`No se pudo marcar como pagada: ${res.error}`);
+    return;
+  }
   await dbExecute(
     "UPDATE sales SET is_paid = 1, balance = 0, total_paid = total WHERE id = ?",
     [saleId],
@@ -340,6 +441,22 @@ export async function addPayment(
   saleId: string,
   payment: { method: string; currency: "ARS" | "USD"; amount: number },
 ): Promise<void> {
+  const cloudC = cloudCtx();
+  if (cloudC) {
+    // El endpoint cloud /payments recalcula total_paid/balance/is_paid
+    // server-side. NO clampeamos amount al balance en el cloud — el
+    // server acepta amounts mayores (caso "pago de más"), aunque la UI
+    // del cliente puede pre-validar.
+    const res = await addSalePaymentCloud(cloudC.jwt, cloudC.wsId, saleId, {
+      method: payment.method,
+      currency: payment.currency,
+      amount: payment.amount,
+      is_deposit: 0,
+    });
+    if (!res.ok) throw new Error(`No se pudo registrar el pago en la nube: ${res.error}`);
+    return;
+  }
+
   // 1) Leer total de la venta para calcular balance nuevo
   const rows = await dbSelect<{ total: number; total_paid: number }>(
     "SELECT total, total_paid FROM sales WHERE id = ?",

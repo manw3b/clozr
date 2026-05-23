@@ -117,6 +117,36 @@ export async function createMovement(
 ): Promise<CashMovement> {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
+
+  const ctx = cashCloudCtx();
+  if (ctx) {
+    // Mapeo local→cloud: type/direction → kind/category
+    //   direction 'in' → kind 'income'
+    //   direction 'out' → kind 'expense'
+    //   type → category (lo guardamos crudo, no hay mapping estricto)
+    const res = await cashApi.create(ctx.jwt, ctx.wsId, {
+      id,
+      kind: data.direction === "out" ? "expense" : "income",
+      amount: data.amount,
+      currency: data.currency ?? "ARS",
+      description: data.description ?? null,
+      category: data.type,
+      customer_name: data.customer_name ?? null,
+      moved_at: now,
+    } as never);
+    if (!res.ok) throw new Error(`No se pudo crear movimiento en la nube: ${res.error}`);
+    return {
+      id, workspace_id: workspaceId, business_id: businessId,
+      type: data.type, direction: data.direction,
+      amount: data.amount, currency: data.currency ?? "ARS",
+      description: data.description ?? null,
+      customer_id: data.customer_id ?? null,
+      customer_name: data.customer_name ?? null,
+      reference_id: null, reference_type: null,
+      created_at: now,
+    };
+  }
+
   await dbExecute(
     `INSERT INTO cash_movements
        (id, workspace_id, business_id, type, direction, amount, currency, description,

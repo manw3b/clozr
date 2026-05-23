@@ -346,24 +346,28 @@ El código vence en ${accessCodeModal.expiresInMin} minutos.`;
                 </div>
                 {canManage && !isSelf && m.role !== "owner" && (
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    {/* Si está invited, botón principal: generar código.
-                        Mientras Resend esté en sandbox, el email no le
-                        llega — esta es la forma de onboardear sin email. */}
-                    {isPending && (
-                      <button
-                        onClick={() => handleIssueCode(m)}
-                        style={{
-                          ...btnGhost,
-                          padding: "5px 10px",
-                          color: color.primary,
-                          borderColor: color.primary,
-                        }}
-                        title="Generar código de acceso para compartir por WhatsApp"
-                      >
-                        <KeyRound size={13} />
-                        Generar código
-                      </button>
-                    )}
+                    {/* Botón "Generar código" SIEMPRE disponible mientras
+                        Resend esté en sandbox — el email no le llega a
+                        nadie que no sea vos. El miembro lo necesita tanto
+                        para el primer login (status=invited) como para
+                        re-loguearse si pierde la sesión (status=active).
+                        Cuando verifiquemos dominio Resend, podemos ocultar
+                        el botón para active y dejar solo para invited. */}
+                    <button
+                      onClick={() => handleIssueCode(m)}
+                      style={{
+                        ...btnGhost,
+                        padding: "5px 10px",
+                        color: color.primary,
+                        borderColor: color.primary,
+                      }}
+                      title={isPending
+                        ? "Generar código de acceso para compartir por WhatsApp"
+                        : "Generar código para que vuelva a entrar (perdió sesión, otra PC, etc)"}
+                    >
+                      <KeyRound size={13} />
+                      Generar código
+                    </button>
                     {/* Quick role switcher */}
                     <select
                       value={m.role}

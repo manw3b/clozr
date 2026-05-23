@@ -1,11 +1,49 @@
 import { dbSelect, dbExecute } from "./index";
+import { useCloudAuthStore } from "../../store/cloudAuthStore";
+import { followupsApi } from "../cloudAuth";
 import type { Followup, CreateFollowupInput } from "./types";
+
+function fuCloudCtx(): { jwt: string; wsId: string } | null {
+  const s = useCloudAuthStore.getState();
+  if (!s.isCloudModeFor("followups")) return null;
+  if (!s.jwt || !s.activeWorkspaceId) return null;
+  return { jwt: s.jwt, wsId: s.activeWorkspaceId };
+}
+
+function cloudFollowupToLocal(c: Record<string, unknown>, localWid: string, localBid: string): Followup {
+  return {
+    id: String(c.id),
+    workspace_id: localWid,
+    business_id: localBid,
+    customer_id: String(c.customer_id),
+    customer_name: (c.customer_name as string | null) ?? null,
+    reason: (c.reason as string | null) ?? null,
+    text: String(c.text ?? ""),
+    due_date: String(c.due_at ?? ""),
+    days_since_contact: (c.days_since_contact as number | null) ?? null,
+    amount: (c.amount as number | null) ?? null,
+    notes: (c.notes as string | null) ?? null,
+    completed: c.completed_at ? 1 : 0,
+    completed_at: (c.completed_at as string | null) ?? null,
+    created_at: String(c.created_at ?? ""),
+  } as unknown as Followup;
+}
 
 export async function getForDay(
   workspaceId: string,
   businessId: string,
   date: string,
 ): Promise<Followup[]> {
+  const ctx = fuCloudCtx();
+  if (ctx) {
+    const res = await followupsApi.list(ctx.jwt, ctx.wsId);
+    if (res.ok) {
+      return (res.data.items as unknown as Array<Record<string, unknown>>)
+        .map((c) => cloudFollowupToLocal(c, workspaceId, businessId))
+        .filter((f) => f.due_date <= date || (f.due_date === date && f.completed === 0))
+        .sort((a, b) => (a.completed - b.completed) || a.due_date.localeCompare(b.due_date));
+    }
+  }
   return dbSelect<Followup>(
     `SELECT * FROM followups
      WHERE workspace_id = ? AND business_id = ?
@@ -16,6 +54,15 @@ export async function getForDay(
 }
 
 export async function getAll(workspaceId: string, businessId: string): Promise<Followup[]> {
+  const ctx = fuCloudCtx();
+  if (ctx) {
+    const res = await followupsApi.list(ctx.jwt, ctx.wsId);
+    if (res.ok) {
+      return (res.data.items as unknown as Array<Record<string, unknown>>)
+        .map((c) => cloudFollowupToLocal(c, workspaceId, businessId))
+        .sort((a, b) => (a.completed - b.completed) || a.due_date.localeCompare(b.due_date));
+    }
+  }
   return dbSelect<Followup>(
     `SELECT * FROM followups
      WHERE workspace_id = ? AND business_id = ?

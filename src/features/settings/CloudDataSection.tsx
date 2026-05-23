@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Cloud, CloudOff, CheckCircle2, AlertCircle, Loader2, Users, Workflow } from "lucide-react";
+import { Cloud, CloudOff, CheckCircle2, AlertCircle, Loader2, Users, Workflow, ShoppingCart, Coins, ClipboardCheck, Bell, Package, CreditCard, Tag } from "lucide-react";
 import { useCloudAuthStore } from "../../store/cloudAuthStore";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useUIStore } from "../../store/uiStore";
@@ -20,6 +20,9 @@ import {
   importCustomersCloud, fetchCustomers,
   importPipelineStagesCloud, importPipelineItemsCloud,
   fetchPipelineItems,
+  importSalesCloud, fetchSales,
+  tasksApi, cashApi, followupsApi,
+  catalogApi, paymentMethodsApi, customerTypesApi, customerTagsApi,
 } from "../../lib/cloudAuth";
 import { customersDb } from "../../lib/db/customers";
 import { dbSelect } from "../../lib/db";
@@ -443,21 +446,331 @@ export function CloudDataSection() {
         )}
       </div>
 
-      {/* Próximas features */}
-      <h3 style={{ fontSize: 12, fontWeight: 600, color: color.textDim, textTransform: "uppercase", letterSpacing: 0.5, margin: "24px 0 12px" }}>
-        Próximamente
-      </h3>
-      <div style={{ ...cardStyle, opacity: 0.6 }}>
-        <div style={{ fontSize: text.sm, color: color.textMuted }}>
-          Ventas · Caja · Tareas · Catálogo
-        </div>
-        <div style={{ fontSize: text.xs, color: color.textDim, marginTop: 4 }}>
-          Vamos a migrar cada feature en su propio round.
-        </div>
+      {/* R3-R5 — feature cards genéricas */}
+      <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+        <SimpleFeatureCard
+          icon={ShoppingCart} label="Ventas + pagos" feature="sales"
+          desc="Las ventas y sus pagos compartidos. Tu equipo ve qué se cobró y qué queda pendiente."
+          fetchLocal={async () => {
+            const rs = await dbSelect<{ n: number }>("SELECT COUNT(*) AS n FROM sales WHERE workspace_id = ?", [localWid]);
+            return rs[0]?.n ?? 0;
+          }}
+          fetchCloud={async () => { const r = await fetchSales(jwt, activeWorkspaceId!); return r.ok ? r.data.sales?.length ?? 0 : 0; }}
+          collectLocal={async () => {
+            const sales = await dbSelect<Record<string, unknown>>("SELECT * FROM sales WHERE workspace_id = ?", [localWid]);
+            return sales.map((s) => ({ id: String(s.id), ...s }));
+          }}
+          uploadFn={async (items) => {
+            const r = await importSalesCloud(jwt, activeWorkspaceId!, items as never);
+            return r.ok ? { imported: r.data.imported, skipped: r.data.skipped } : { error: r.error };
+          }}
+          requires={["customers"]}
+          isOwner={isOwner}
+          bootstrapStatus={bootstrapStatus}
+          activeWorkspaceId={activeWorkspaceId!}
+          setBootstrapStatus={setBootstrapStatus}
+          showToast={showToast}
+          customersStatus={customersStatus}
+        />
+        <SimpleFeatureCard
+          icon={ClipboardCheck} label="Tareas" feature="tasks"
+          desc="Las tareas pendientes del equipo. Cuando Caro completa una, vos lo ves."
+          fetchLocal={async () => (await dbSelect<{ n: number }>("SELECT COUNT(*) AS n FROM tasks WHERE workspace_id = ?", [localWid]))[0]?.n ?? 0}
+          fetchCloud={async () => { const r = await tasksApi.list(jwt, activeWorkspaceId!); return r.ok ? r.data.items.length : 0; }}
+          collectLocal={async () => {
+            const rows = await dbSelect<Record<string, unknown>>("SELECT * FROM tasks WHERE workspace_id = ?", [localWid]);
+            return rows.map((r) => ({ id: String(r.id), ...r }));
+          }}
+          uploadFn={async (items) => {
+            const r = await fetch(`https://clozr-auth.pyter-import.workers.dev/workspaces/${activeWorkspaceId}/tasks/import`, {
+              method: "POST",
+              headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+              body: JSON.stringify({ items }),
+            });
+            const j = await r.json() as { imported?: number; skipped?: number; error?: string };
+            return r.ok ? { imported: j.imported ?? 0, skipped: j.skipped ?? 0 } : { error: j.error ?? "http_error" };
+          }}
+          isOwner={isOwner}
+          bootstrapStatus={bootstrapStatus}
+          activeWorkspaceId={activeWorkspaceId!}
+          setBootstrapStatus={setBootstrapStatus}
+          showToast={showToast}
+        />
+        <SimpleFeatureCard
+          icon={Coins} label="Caja (movimientos)" feature="cash"
+          desc="Ingresos y egresos de caja. Tu equipo ve el saldo en tiempo real."
+          fetchLocal={async () => (await dbSelect<{ n: number }>("SELECT COUNT(*) AS n FROM cash_movements WHERE workspace_id = ?", [localWid]))[0]?.n ?? 0}
+          fetchCloud={async () => { const r = await cashApi.list(jwt, activeWorkspaceId!); return r.ok ? r.data.items.length : 0; }}
+          collectLocal={async () => {
+            const rows = await dbSelect<Record<string, unknown>>("SELECT * FROM cash_movements WHERE workspace_id = ?", [localWid]);
+            return rows.map((r) => ({
+              id: String(r.id),
+              kind: String(r.kind),
+              amount: Number(r.amount),
+              currency: String(r.currency ?? "ARS"),
+              description: r.description as string | null,
+              category: r.category as string | null,
+              sale_id: r.sale_id as string | null,
+              customer_name: r.customer_name as string | null,
+              payment_method: r.payment_method as string | null,
+              moved_at: String(r.created_at ?? r.moved_at ?? ""),
+            }));
+          }}
+          uploadFn={async (items) => {
+            const r = await fetch(`https://clozr-auth.pyter-import.workers.dev/workspaces/${activeWorkspaceId}/cash/import`, {
+              method: "POST",
+              headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+              body: JSON.stringify({ items }),
+            });
+            const j = await r.json() as { imported?: number; skipped?: number; error?: string };
+            return r.ok ? { imported: j.imported ?? 0, skipped: j.skipped ?? 0 } : { error: j.error ?? "http_error" };
+          }}
+          isOwner={isOwner}
+          bootstrapStatus={bootstrapStatus}
+          activeWorkspaceId={activeWorkspaceId!}
+          setBootstrapStatus={setBootstrapStatus}
+          showToast={showToast}
+        />
+        <SimpleFeatureCard
+          icon={Bell} label="Follow-ups" feature="followups"
+          desc="Recordatorios de seguimiento de clientes."
+          fetchLocal={async () => (await dbSelect<{ n: number }>("SELECT COUNT(*) AS n FROM followups WHERE workspace_id = ?", [localWid]))[0]?.n ?? 0}
+          fetchCloud={async () => { const r = await followupsApi.list(jwt, activeWorkspaceId!); return r.ok ? r.data.items.length : 0; }}
+          collectLocal={async () => {
+            const rows = await dbSelect<Record<string, unknown>>("SELECT * FROM followups WHERE workspace_id = ?", [localWid]);
+            return rows.map((r) => ({
+              id: String(r.id),
+              customer_id: String(r.customer_id),
+              customer_name: r.customer_name as string | null,
+              reason: r.reason as string | null,
+              text: String(r.text ?? ""),
+              due_at: String(r.due_date ?? r.due_at ?? ""),
+              days_since_contact: r.days_since_contact as number | null,
+              amount: r.amount as number | null,
+              notes: r.notes as string | null,
+              completed_at: r.completed_at as string | null,
+            }));
+          }}
+          uploadFn={async (items) => {
+            const r = await fetch(`https://clozr-auth.pyter-import.workers.dev/workspaces/${activeWorkspaceId}/followups/import`, {
+              method: "POST",
+              headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+              body: JSON.stringify({ items }),
+            });
+            const j = await r.json() as { imported?: number; skipped?: number; error?: string };
+            return r.ok ? { imported: j.imported ?? 0, skipped: j.skipped ?? 0 } : { error: j.error ?? "http_error" };
+          }}
+          requires={["customers"]}
+          isOwner={isOwner}
+          bootstrapStatus={bootstrapStatus}
+          activeWorkspaceId={activeWorkspaceId!}
+          setBootstrapStatus={setBootstrapStatus}
+          showToast={showToast}
+          customersStatus={customersStatus}
+        />
+        <SimpleFeatureCard
+          icon={Package} label="Catálogo" feature="catalog"
+          desc="Productos disponibles. Comparte precios y stock con tu equipo."
+          fetchLocal={async () => (await dbSelect<{ n: number }>("SELECT COUNT(*) AS n FROM catalog_items WHERE workspace_id = ?", [localWid]))[0]?.n ?? 0}
+          fetchCloud={async () => { const r = await catalogApi.list(jwt, activeWorkspaceId!); return r.ok ? r.data.items.length : 0; }}
+          collectLocal={async () => {
+            const rows = await dbSelect<Record<string, unknown>>("SELECT * FROM catalog_items WHERE workspace_id = ?", [localWid]);
+            return rows.map((r) => ({ id: String(r.id), ...r }));
+          }}
+          uploadFn={async (items) => {
+            const r = await fetch(`https://clozr-auth.pyter-import.workers.dev/workspaces/${activeWorkspaceId}/catalog/import`, {
+              method: "POST",
+              headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+              body: JSON.stringify({ items }),
+            });
+            const j = await r.json() as { imported?: number; skipped?: number; error?: string };
+            return r.ok ? { imported: j.imported ?? 0, skipped: j.skipped ?? 0 } : { error: j.error ?? "http_error" };
+          }}
+          isOwner={isOwner}
+          bootstrapStatus={bootstrapStatus}
+          activeWorkspaceId={activeWorkspaceId!}
+          setBootstrapStatus={setBootstrapStatus}
+          showToast={showToast}
+        />
+        <SimpleFeatureCard
+          icon={CreditCard} label="Métodos de pago" feature="paymentMethods"
+          desc="Las formas de pago aceptadas (efectivo, MP, transferencia, etc)."
+          fetchLocal={async () => (await dbSelect<{ n: number }>("SELECT COUNT(*) AS n FROM payment_methods WHERE workspace_id = ?", [localWid]))[0]?.n ?? 0}
+          fetchCloud={async () => { const r = await paymentMethodsApi.list(jwt, activeWorkspaceId!); return r.ok ? r.data.items.length : 0; }}
+          collectLocal={async () => {
+            const rows = await dbSelect<Record<string, unknown>>("SELECT * FROM payment_methods WHERE workspace_id = ?", [localWid]);
+            return rows.map((r) => ({ id: String(r.id), ...r }));
+          }}
+          uploadFn={async (items) => {
+            const r = await fetch(`https://clozr-auth.pyter-import.workers.dev/workspaces/${activeWorkspaceId}/payment-methods/import`, {
+              method: "POST",
+              headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+              body: JSON.stringify({ items }),
+            });
+            const j = await r.json() as { imported?: number; skipped?: number; error?: string };
+            return r.ok ? { imported: j.imported ?? 0, skipped: j.skipped ?? 0 } : { error: j.error ?? "http_error" };
+          }}
+          isOwner={isOwner}
+          bootstrapStatus={bootstrapStatus}
+          activeWorkspaceId={activeWorkspaceId!}
+          setBootstrapStatus={setBootstrapStatus}
+          showToast={showToast}
+        />
+        <SimpleFeatureCard
+          icon={Users} label="Tipos de cliente" feature="customerTypes"
+          desc="Tu segmentación de clientes (final, mayorista, etc)."
+          fetchLocal={async () => (await dbSelect<{ n: number }>("SELECT COUNT(*) AS n FROM customer_types WHERE workspace_id = ?", [localWid]))[0]?.n ?? 0}
+          fetchCloud={async () => { const r = await customerTypesApi.list(jwt, activeWorkspaceId!); return r.ok ? r.data.items.length : 0; }}
+          collectLocal={async () => {
+            const rows = await dbSelect<Record<string, unknown>>("SELECT * FROM customer_types WHERE workspace_id = ?", [localWid]);
+            return rows.map((r) => ({ id: String(r.id), ...r }));
+          }}
+          uploadFn={async (items) => {
+            const r = await fetch(`https://clozr-auth.pyter-import.workers.dev/workspaces/${activeWorkspaceId}/customer-types/import`, {
+              method: "POST",
+              headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+              body: JSON.stringify({ items }),
+            });
+            const j = await r.json() as { imported?: number; skipped?: number; error?: string };
+            return r.ok ? { imported: j.imported ?? 0, skipped: j.skipped ?? 0 } : { error: j.error ?? "http_error" };
+          }}
+          isOwner={isOwner}
+          bootstrapStatus={bootstrapStatus}
+          activeWorkspaceId={activeWorkspaceId!}
+          setBootstrapStatus={setBootstrapStatus}
+          showToast={showToast}
+        />
+        <SimpleFeatureCard
+          icon={Tag} label="Etiquetas de cliente" feature="customerTags"
+          desc="Etiquetas para marcar clientes (VIP, deudor, etc)."
+          fetchLocal={async () => (await dbSelect<{ n: number }>("SELECT COUNT(*) AS n FROM customer_tags WHERE workspace_id = ?", [localWid]))[0]?.n ?? 0}
+          fetchCloud={async () => { const r = await customerTagsApi.list(jwt, activeWorkspaceId!); return r.ok ? r.data.items.length : 0; }}
+          collectLocal={async () => {
+            const rows = await dbSelect<Record<string, unknown>>("SELECT * FROM customer_tags WHERE workspace_id = ?", [localWid]);
+            return rows.map((r) => ({ id: String(r.id), ...r }));
+          }}
+          uploadFn={async (items) => {
+            const r = await fetch(`https://clozr-auth.pyter-import.workers.dev/workspaces/${activeWorkspaceId}/customer-tags/import`, {
+              method: "POST",
+              headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+              body: JSON.stringify({ items }),
+            });
+            const j = await r.json() as { imported?: number; skipped?: number; error?: string };
+            return r.ok ? { imported: j.imported ?? 0, skipped: j.skipped ?? 0 } : { error: j.error ?? "http_error" };
+          }}
+          isOwner={isOwner}
+          bootstrapStatus={bootstrapStatus}
+          activeWorkspaceId={activeWorkspaceId!}
+          setBootstrapStatus={setBootstrapStatus}
+          showToast={showToast}
+        />
       </div>
     </div>
   );
 }
+
+/* ── Reusable feature card (DRY para R3-R5) ──────────────────────────── */
+
+interface SimpleFeatureCardProps {
+  icon: React.ComponentType<{ size?: number | string; color?: string }>;
+  label: string;
+  feature: "sales" | "tasks" | "cash" | "followups" | "catalog" | "paymentMethods" | "customerTypes" | "customerTags";
+  desc: string;
+  fetchLocal: () => Promise<number>;
+  fetchCloud: () => Promise<number>;
+  collectLocal: () => Promise<unknown[]>;
+  uploadFn: (items: unknown[]) => Promise<{ imported: number; skipped: number } | { error: string }>;
+  requires?: Array<"customers">;
+  isOwner: boolean;
+  bootstrapStatus: Record<string, Record<string, "pending" | "done" | "skip" | undefined>>;
+  activeWorkspaceId: string;
+  setBootstrapStatus: (wsId: string, feature: SimpleFeatureCardProps["feature"], status: "pending" | "done" | "skip") => void;
+  showToast: (msg: string, kind?: "success" | "error") => void;
+  customersStatus?: "pending" | "done" | "skip";
+}
+
+function SimpleFeatureCard(props: SimpleFeatureCardProps) {
+  const { icon: Icon, label, feature, desc, requires, isOwner } = props;
+  const status = props.bootstrapStatus[props.activeWorkspaceId]?.[feature] ?? "pending";
+  const [localN, setLocalN] = useState<number | null>(null);
+  const [cloudN, setCloudN] = useState<number | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const blockedByCustomers = requires?.includes("customers") && props.customersStatus === "pending";
+
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([props.fetchLocal(), props.fetchCloud()]).then(([l, c]) => {
+      if (mounted) { setLocalN(l); setCloudN(c); }
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, [feature, status]);
+
+  async function handleUpload() {
+    if (blockedByCustomers) { props.showToast("Primero subí Clientes", "error"); return; }
+    setUploading(true);
+    try {
+      const items = await props.collectLocal();
+      const res = await props.uploadFn(items);
+      if ("error" in res) { props.showToast(`No se pudo: ${res.error}`, "error"); return; }
+      props.setBootstrapStatus(props.activeWorkspaceId, feature, "done");
+      props.showToast(`Subidos ${res.imported} ${label.toLowerCase()}` + (res.skipped > 0 ? ` (${res.skipped} ya estaban)` : ""), "success");
+      setCloudN(res.imported + res.skipped);
+    } finally { setUploading(false); }
+  }
+
+  function handleSkip() {
+    if (!confirm(`¿Saltear "${label}"? Los locales no se suben. Los nuevos sí irán a la nube.`)) return;
+    props.setBootstrapStatus(props.activeWorkspaceId, feature, "skip");
+    props.showToast(`${label}: salteado`, "success");
+  }
+
+  return (
+    <div style={cardStyle}>
+      <div style={{ display: "flex", alignItems: "center", gap: space[3], marginBottom: 8 }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: 8,
+          background: status === "done" ? color.successBg : `${color.primary}22`,
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>
+          <Icon size={16} color={status === "done" ? color.success : color.primary} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text }}>{label}</div>
+          <div style={{ fontSize: text.xs, color: color.textDim, marginTop: 2 }}>
+            {status === "done" && <><CheckCircle2 size={11} color={color.success} style={{ verticalAlign: "middle" }} /> Sincronizado · {cloudN ?? "…"} en la nube</>}
+            {status === "skip" && <><Cloud size={11} color={color.warning} style={{ verticalAlign: "middle" }} /> Salteado · {cloudN ?? "…"} en la nube</>}
+            {status === "pending" && <><CloudOff size={11} color={color.textMuted} style={{ verticalAlign: "middle" }} /> Local · {localN ?? "…"} en tu PC, {cloudN ?? "…"} en la nube</>}
+          </div>
+        </div>
+        {status === "pending" && isOwner && (
+          <div style={{ display: "flex", gap: 4 }}>
+            <button onClick={handleUpload} disabled={uploading || blockedByCustomers} style={btnPrimarySm} title={blockedByCustomers ? "Subí Clientes primero" : undefined}>
+              {uploading ? <Loader2 size={12} className="spin" /> : <Cloud size={12} />} Subir
+            </button>
+            <button onClick={handleSkip} disabled={uploading} style={btnGhostSm}>Saltear</button>
+          </div>
+        )}
+        {status === "pending" && !isOwner && (
+          <span style={{ fontSize: text.xs, color: color.textDim, display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <AlertCircle size={11} color={color.warning} /> Solo dueño
+          </span>
+        )}
+      </div>
+      <div style={{ fontSize: text.xs, color: color.textDim, lineHeight: 1.5, marginLeft: 44 }}>{desc}</div>
+    </div>
+  );
+}
+
+const btnPrimarySm: React.CSSProperties = {
+  padding: "4px 10px", background: color.primary, borderRadius: 6,
+  fontSize: 11, fontWeight: 600, color: "#fff", border: "none", cursor: "pointer",
+  display: "inline-flex", alignItems: "center", gap: 4,
+};
+const btnGhostSm: React.CSSProperties = {
+  padding: "4px 10px", background: "transparent",
+  border: `1px solid ${color.border}`, borderRadius: 6,
+  color: color.textMuted, fontSize: 11, fontWeight: 500, cursor: "pointer",
+};
 
 /* ── styles ──────────────────────────────────────────────────────────── */
 

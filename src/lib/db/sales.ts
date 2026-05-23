@@ -1,5 +1,7 @@
 import { dbSelect, dbExecute } from "./index";
 import { markStockItemSoldWithSale } from "./quickStock";
+import { useCloudAuthStore } from "../../store/cloudAuthStore";
+import { fetchSales, type CloudSale } from "../cloudAuth";
 import type {
   Sale,
   SaleItem,
@@ -13,7 +15,43 @@ import type {
   SaleRow,
 } from "./types";
 
+/** Dispatcher cloud para sales (R3). Las funciones críticas (getAll,
+ *  reportes que cruzan tabla, addPayment) chequean este flag. */
+function cloudCtx(): { jwt: string; wsId: string } | null {
+  const s = useCloudAuthStore.getState();
+  if (!s.isCloudModeFor("sales")) return null;
+  if (!s.jwt || !s.activeWorkspaceId) return null;
+  return { jwt: s.jwt, wsId: s.activeWorkspaceId };
+}
+
+function cloudSaleToLocal(c: CloudSale, localWid: string): Sale {
+  return {
+    id: c.id,
+    workspace_id: localWid,
+    customer_id: c.customer_id,
+    customer_name: c.customer_name,
+    seller_id: c.seller_id,
+    seller_name: c.seller_name,
+    subtotal: c.subtotal, total: c.total, total_paid: c.total_paid, balance: c.balance,
+    is_paid: c.is_paid,
+    payment_method: c.payment_method,
+    notes: c.notes,
+    out_of_stock_sale: c.out_of_stock_sale,
+    regularized_at: c.regularized_at,
+    regularized_by: c.regularized_by,
+    sale_date: c.sale_date ?? c.created_at,
+    created_at: c.created_at,
+  } as Sale;
+}
+
 export async function getAll(workspaceId: string): Promise<Sale[]> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    const res = await fetchSales(ctx.jwt, ctx.wsId);
+    if (res.ok) return res.data.sales.map((s) => cloudSaleToLocal(s, workspaceId));
+    // eslint-disable-next-line no-console
+    console.warn("[salesDb.getAll] cloud falló, fallback local:", res.error);
+  }
   return dbSelect<Sale>(
     "SELECT * FROM sales WHERE workspace_id = ? ORDER BY sale_date DESC",
     [workspaceId],

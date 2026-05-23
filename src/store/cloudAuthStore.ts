@@ -59,6 +59,14 @@ interface CloudAuthState {
   bootstrapStatus: Record<string, {
     customers?: "pending" | "done" | "skip";
     pipeline?: "pending" | "done" | "skip";
+    sales?: "pending" | "done" | "skip";
+    tasks?: "pending" | "done" | "skip";
+    cash?: "pending" | "done" | "skip";
+    followups?: "pending" | "done" | "skip";
+    catalog?: "pending" | "done" | "skip";
+    paymentMethods?: "pending" | "done" | "skip";
+    customerTypes?: "pending" | "done" | "skip";
+    customerTags?: "pending" | "done" | "skip";
   }>;
 
   setSession: (args: { jwt: string; email: string; userId: string; sessionId: string; expiresAt: number }) => void;
@@ -66,9 +74,15 @@ interface CloudAuthState {
   setActiveWorkspace: (id: string | null) => void;
   /** Agrega o reemplaza un workspace en la lista. Útil después de crear. */
   upsertWorkspace: (ws: CloudWorkspace) => void;
-  setBootstrapStatus: (workspaceId: string, feature: "customers" | "pipeline", status: "pending" | "done" | "skip") => void;
+  setBootstrapStatus: (
+    workspaceId: string,
+    feature: "customers" | "pipeline" | "sales" | "tasks" | "cash" | "followups" | "catalog" | "paymentMethods" | "customerTypes" | "customerTags",
+    status: "pending" | "done" | "skip",
+  ) => void;
   /** True si el workspace activo terminó el bootstrap de la feature. */
-  isCloudModeFor: (feature: "customers" | "pipeline") => boolean;
+  isCloudModeFor: (
+    feature: "customers" | "pipeline" | "sales" | "tasks" | "cash" | "followups" | "catalog" | "paymentMethods" | "customerTypes" | "customerTags",
+  ) => boolean;
   clearSession: () => void;
   /** True si tenemos JWT y NO está expirado. */
   isLoggedIn: () => boolean;

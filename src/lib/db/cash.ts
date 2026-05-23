@@ -1,11 +1,57 @@
 import { dbSelect, dbExecute } from "./index";
-import type { CashMovement, CashSummary, CreateCashMovementInput } from "./types";
+import { useCloudAuthStore } from "../../store/cloudAuthStore";
+import { cashApi } from "../cloudAuth";
+import type { CashMovement, CashSummary, CreateCashMovementInput, CashMovementType, CashDirection } from "./types";
+
+function cashCloudCtx(): { jwt: string; wsId: string } | null {
+  const s = useCloudAuthStore.getState();
+  if (!s.isCloudModeFor("cash")) return null;
+  if (!s.jwt || !s.activeWorkspaceId) return null;
+  return { jwt: s.jwt, wsId: s.activeWorkspaceId };
+}
 
 export async function getMovements(
   workspaceId: string,
   businessId: string,
   opts: { from?: string; to?: string; limit?: number } = {},
 ): Promise<CashMovement[]> {
+  const ctx = cashCloudCtx();
+  if (ctx) {
+    const res = await cashApi.list(ctx.jwt, ctx.wsId);
+    if (res.ok) {
+      // Mapeo cloud → local: el shape cloud usa kind/category; el local
+      // usa type/direction. Derivamos:
+      //   kind 'income' → direction 'in', type 'venta'
+      //   kind 'expense' → direction 'out', type 'gasto'
+      // No es 1:1 perfecto pero es el mejor mapping sin info adicional.
+      let items = (res.data.items as unknown as Array<Record<string, unknown>>).map((m): CashMovement => {
+        const kind = String(m.kind ?? "income");
+        const direction: CashDirection = kind === "expense" ? "out" : "in";
+        const type: CashMovementType = (kind === "expense" ? "gasto" : "venta") as CashMovementType;
+        return {
+          id: String(m.id),
+          workspace_id: workspaceId,
+          business_id: businessId,
+          type,
+          direction,
+          amount: Number(m.amount ?? 0),
+          currency: String(m.currency ?? "ARS"),
+          description: (m.description as string | null) ?? null,
+          customer_id: null,
+          customer_name: (m.customer_name as string | null) ?? null,
+          reference_id: (m.sale_id as string | null) ?? null,
+          reference_type: m.sale_id ? "sale" : null,
+          created_at: String(m.moved_at ?? m.created_at ?? ""),
+        };
+      });
+      if (opts.from) items = items.filter((m) => m.created_at >= opts.from!);
+      if (opts.to)   items = items.filter((m) => m.created_at <= opts.to!);
+      if (opts.limit) items = items.slice(0, opts.limit);
+      return items;
+    }
+    // eslint-disable-next-line no-console
+    console.warn("[cashDb.getMovements] cloud falló:", res.error);
+  }
   let sql = "SELECT * FROM cash_movements WHERE workspace_id = ? AND business_id = ?";
   const params: unknown[] = [workspaceId, businessId];
   if (opts.from) { sql += " AND date(created_at) >= ?"; params.push(opts.from); }

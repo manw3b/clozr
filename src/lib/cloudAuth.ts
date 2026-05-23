@@ -426,6 +426,151 @@ export function importPipelineItemsCloud(jwt: string | null, workspaceId: string
   });
 }
 
+/* ── helper genérico para tablas simples (R4+R5) ─────────────────────── */
+
+/**
+ * Genera funciones CRUD + import para una tabla "simple" del worker.
+ * Hace lo mismo que escribir 5 funciones a mano pero con menos código.
+ */
+export function cloudTable<T>(segment: string) {
+  return {
+    list: (jwt: string | null, workspaceId: string) =>
+      authFetch<{ items: T[] }>(jwt, `/workspaces/${workspaceId}/${segment}`),
+    create: (jwt: string | null, workspaceId: string, payload: Partial<T> & { id?: string }) =>
+      authFetch<{ ok: true; id: string }>(jwt, `/workspaces/${workspaceId}/${segment}`, {
+        method: "POST", body: JSON.stringify(payload),
+      }),
+    update: (jwt: string | null, workspaceId: string, id: string, payload: Partial<T>) =>
+      authFetch<{ ok: true }>(jwt, `/workspaces/${workspaceId}/${segment}/${id}`, {
+        method: "PATCH", body: JSON.stringify(payload),
+      }),
+    remove: (jwt: string | null, workspaceId: string, id: string) =>
+      authFetch<{ ok: true }>(jwt, `/workspaces/${workspaceId}/${segment}/${id}`, { method: "DELETE" }),
+    import: (jwt: string | null, workspaceId: string, items: Array<Partial<T> & { id: string }>) =>
+      authFetch<{ ok: true; imported: number; skipped: number; errors: Array<{ id: string; error: string }> }>(
+        jwt, `/workspaces/${workspaceId}/${segment}/import`,
+        { method: "POST", body: JSON.stringify({ items }) },
+      ),
+  };
+}
+
+/* ── tablas R4+R5 (typed shape mínimo; cada Db local conoce el shape full) */
+
+export interface CloudTask {
+  id: string; title: string; due_at: string | null; completed: number; type: string;
+  [k: string]: unknown;
+}
+export const tasksApi = cloudTable<CloudTask>("tasks");
+
+export interface CloudCashMovement {
+  id: string; kind: string; amount: number; currency: string; description: string | null;
+  category: string | null; moved_at: string; [k: string]: unknown;
+}
+export const cashApi = cloudTable<CloudCashMovement>("cash");
+
+export interface CloudFollowup {
+  id: string; customer_id: string; customer_name: string | null;
+  reason: string | null; text: string; due_at: string; amount: number | null;
+  [k: string]: unknown;
+}
+export const followupsApi = cloudTable<CloudFollowup>("followups");
+
+export interface CloudCatalogItem {
+  id: string; name: string; category: string | null; price: number | null;
+  currency: string | null; cost: number | null; sku: string | null;
+  [k: string]: unknown;
+}
+export const catalogApi = cloudTable<CloudCatalogItem>("catalog");
+
+export interface CloudPaymentMethod {
+  id: string; name: string; sort_order: number; enabled: number; currency: string;
+}
+export const paymentMethodsApi = cloudTable<CloudPaymentMethod>("payment-methods");
+
+export interface CloudCustomerType {
+  id: string; name: string; description: string | null; color: string | null; sort_order: number;
+}
+export const customerTypesApi = cloudTable<CloudCustomerType>("customer-types");
+
+export interface CloudCustomerTag {
+  id: string; name: string; color: string | null;
+}
+export const customerTagsApi = cloudTable<CloudCustomerTag>("customer-tags");
+
+/* ── sales (con items + payments) ────────────────────────────────────── */
+
+export interface CloudSale {
+  id: string;
+  workspace_id: string;
+  customer_id: string | null;
+  customer_name: string | null;
+  seller_id: string | null;
+  seller_name: string | null;
+  subtotal: number; total: number; total_paid: number; balance: number;
+  is_paid: number;
+  payment_method: string | null;
+  notes: string | null;
+  out_of_stock_sale: number | null;
+  regularized_at: string | null;
+  regularized_by: string | null;
+  sale_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CloudSaleItem {
+  id: string; sale_id: string; catalog_item_id: string | null;
+  description: string; quantity: number; unit_price: number;
+  base_price: number | null; subtotal: number; imei: string | null;
+  from_stock: number;
+}
+
+export interface CloudSalePayment {
+  id: string; sale_id: string; method: string; currency: string;
+  amount: number; is_deposit: number; created_at: string;
+}
+
+export function fetchSales(jwt: string | null, workspaceId: string) {
+  return authFetch<{ sales: CloudSale[] }>(jwt, `/workspaces/${workspaceId}/sales`);
+}
+export function fetchSale(jwt: string | null, workspaceId: string, saleId: string) {
+  return authFetch<{ sale: CloudSale; items: CloudSaleItem[]; payments: CloudSalePayment[] }>(
+    jwt, `/workspaces/${workspaceId}/sales/${saleId}`,
+  );
+}
+export function createSaleCloud(
+  jwt: string | null,
+  workspaceId: string,
+  payload: Partial<CloudSale> & { id?: string; items?: Partial<CloudSaleItem>[]; payments?: Partial<CloudSalePayment>[] },
+) {
+  return authFetch<{ ok: true; id: string }>(jwt, `/workspaces/${workspaceId}/sales`, {
+    method: "POST", body: JSON.stringify(payload),
+  });
+}
+export function updateSaleCloud(jwt: string | null, workspaceId: string, saleId: string, payload: Partial<CloudSale>) {
+  return authFetch<{ ok: true }>(jwt, `/workspaces/${workspaceId}/sales/${saleId}`, {
+    method: "PATCH", body: JSON.stringify(payload),
+  });
+}
+export function deleteSaleCloud(jwt: string | null, workspaceId: string, saleId: string) {
+  return authFetch<{ ok: true }>(jwt, `/workspaces/${workspaceId}/sales/${saleId}`, { method: "DELETE" });
+}
+export function addSalePaymentCloud(jwt: string | null, workspaceId: string, saleId: string, payload: Partial<CloudSalePayment>) {
+  return authFetch<{ ok: true; id: string }>(jwt, `/workspaces/${workspaceId}/sales/${saleId}/payments`, {
+    method: "POST", body: JSON.stringify(payload),
+  });
+}
+export function importSalesCloud(
+  jwt: string | null,
+  workspaceId: string,
+  sales: Array<Partial<CloudSale> & { id: string; items?: Partial<CloudSaleItem>[]; payments?: Partial<CloudSalePayment>[] }>,
+) {
+  return authFetch<{ ok: true; imported: number; skipped: number; errors: Array<{ id: string; error: string }> }>(
+    jwt, `/workspaces/${workspaceId}/sales/import`,
+    { method: "POST", body: JSON.stringify({ sales }) },
+  );
+}
+
 /**
  * Genera un código de acceso para un miembro invited. Le permite al
  * owner/admin compartirlo directo con el miembro (por WhatsApp, etc)

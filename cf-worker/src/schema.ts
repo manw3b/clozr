@@ -264,6 +264,223 @@ async function applySchema(env: Env): Promise<void> {
             ON pipeline_items(workspace_id, customer_id, deleted_at)`,
     },
   );
+
+  // ── F2-B R3: Ventas + items + pagos ──────────────────────────────
+  await tursoQuery(
+    env,
+    {
+      sql: `CREATE TABLE IF NOT EXISTS sales (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+        customer_id TEXT,
+        customer_name TEXT,
+        seller_id TEXT,
+        seller_name TEXT,
+        subtotal REAL DEFAULT 0,
+        total REAL DEFAULT 0,
+        total_paid REAL DEFAULT 0,
+        balance REAL DEFAULT 0,
+        is_paid INTEGER DEFAULT 0,
+        payment_method TEXT,
+        notes TEXT,
+        out_of_stock_sale INTEGER DEFAULT 0,
+        regularized_at TEXT,
+        regularized_by TEXT,
+        sale_date TEXT,
+        created_by TEXT REFERENCES users(id),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
+      )`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_sales_workspace
+            ON sales(workspace_id, deleted_at, sale_date)`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_sales_customer
+            ON sales(workspace_id, customer_id, deleted_at)`,
+    },
+    {
+      sql: `CREATE TABLE IF NOT EXISTS sale_items (
+        id TEXT PRIMARY KEY,
+        sale_id TEXT NOT NULL REFERENCES sales(id),
+        catalog_item_id TEXT,
+        description TEXT NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        unit_price REAL NOT NULL,
+        base_price REAL,
+        subtotal REAL NOT NULL,
+        imei TEXT,
+        from_stock INTEGER DEFAULT 0
+      )`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)`,
+    },
+    {
+      sql: `CREATE TABLE IF NOT EXISTS sale_payments (
+        id TEXT PRIMARY KEY,
+        sale_id TEXT NOT NULL REFERENCES sales(id),
+        method TEXT NOT NULL,
+        currency TEXT DEFAULT 'ARS',
+        amount REAL NOT NULL,
+        is_deposit INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_sale_payments_sale ON sale_payments(sale_id)`,
+    },
+  );
+
+  // ── F2-B R4: Tareas + cash_movements + followups ─────────────────
+  await tursoQuery(
+    env,
+    {
+      sql: `CREATE TABLE IF NOT EXISTS tasks (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+        type TEXT DEFAULT 'rutina',
+        frequency TEXT,
+        title TEXT NOT NULL,
+        notes TEXT,
+        due_at TEXT,
+        completed INTEGER DEFAULT 0,
+        completed_at TEXT,
+        completed_by TEXT,
+        assigned_to TEXT,
+        customer_id TEXT,
+        template_id TEXT,
+        target_count INTEGER,
+        progress INTEGER DEFAULT 0,
+        created_by TEXT REFERENCES users(id),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
+      )`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_tasks_workspace
+            ON tasks(workspace_id, deleted_at, completed)`,
+    },
+    {
+      sql: `CREATE TABLE IF NOT EXISTS cash_movements (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+        kind TEXT NOT NULL,
+        amount REAL NOT NULL,
+        currency TEXT DEFAULT 'ARS',
+        description TEXT,
+        category TEXT,
+        sale_id TEXT,
+        customer_name TEXT,
+        payment_method TEXT,
+        moved_at TEXT NOT NULL DEFAULT (datetime('now')),
+        created_by TEXT REFERENCES users(id),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
+      )`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_cash_movements_workspace
+            ON cash_movements(workspace_id, deleted_at, moved_at)`,
+    },
+    {
+      sql: `CREATE TABLE IF NOT EXISTS followups (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+        business_id TEXT,
+        customer_id TEXT NOT NULL,
+        customer_name TEXT,
+        reason TEXT,
+        text TEXT NOT NULL,
+        due_at TEXT NOT NULL,
+        days_since_contact INTEGER,
+        amount REAL,
+        notes TEXT,
+        completed_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
+      )`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_followups_workspace
+            ON followups(workspace_id, deleted_at, due_at)`,
+    },
+  );
+
+  // ── F2-B R5: Catálogo + payment_methods + customer_types/tags ────
+  await tursoQuery(
+    env,
+    {
+      sql: `CREATE TABLE IF NOT EXISTS catalog_items (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+        name TEXT NOT NULL,
+        category TEXT,
+        subcategory TEXT,
+        price REAL,
+        currency TEXT DEFAULT 'ARS',
+        cost REAL,
+        sku TEXT,
+        notes TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
+      )`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_catalog_items_workspace
+            ON catalog_items(workspace_id, deleted_at, category)`,
+    },
+    {
+      sql: `CREATE TABLE IF NOT EXISTS payment_methods (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+        name TEXT NOT NULL,
+        sort_order INTEGER DEFAULT 0,
+        enabled INTEGER DEFAULT 1,
+        currency TEXT DEFAULT 'ARS',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
+      )`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_payment_methods_workspace
+            ON payment_methods(workspace_id, deleted_at, sort_order)`,
+    },
+    {
+      sql: `CREATE TABLE IF NOT EXISTS customer_types (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+        name TEXT NOT NULL,
+        description TEXT,
+        color TEXT,
+        sort_order INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
+      )`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_customer_types_workspace
+            ON customer_types(workspace_id, deleted_at)`,
+    },
+    {
+      sql: `CREATE TABLE IF NOT EXISTS customer_tags (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+        name TEXT NOT NULL,
+        color TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
+      )`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_customer_tags_workspace
+            ON customer_tags(workspace_id, deleted_at)`,
+    },
+  );
 }
 
 /**

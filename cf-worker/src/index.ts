@@ -52,6 +52,15 @@ import {
   handleListStages, handleCreateStage, handleUpdateStage, handleDeleteStage, handleImportStages,
   handleListItems, handleCreateItem, handleUpdateItem, handleDeleteItem, handleImportItems,
 } from "./routes/pipeline";
+import {
+  handleListSales, handleGetSale, handleCreateSale, handleUpdateSale,
+  handleDeleteSale, handleAddPayment, handleImportSales,
+} from "./routes/sales";
+import {
+  handleGenericList, handleGenericCreate, handleGenericUpdate,
+  handleGenericDelete, handleGenericImport,
+} from "./routes/_generic";
+import { SIMPLE_TABLE_SPECS } from "./routes/simpleTables";
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -135,6 +144,52 @@ export default {
         if (!iId && req.method === "POST")   return cors(req, env, await handleCreateItem(wsId, req, env));
         if (iId && req.method === "PATCH")   return cors(req, env, await handleUpdateItem(wsId, iId, req, env));
         if (iId && req.method === "DELETE")  return cors(req, env, await handleDeleteItem(wsId, iId, req, env));
+      }
+
+      // Sales paths (R3):
+      //   GET/POST              /workspaces/:wid/sales
+      //   GET/PATCH/DELETE      /workspaces/:wid/sales/:sid
+      //   POST                  /workspaces/:wid/sales/:sid/payments
+      //   POST                  /workspaces/:wid/sales/import
+      const wsSalesImportMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales\/import\/?$/);
+      const wsSalePaymentMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales\/([^/]+)\/payments\/?$/);
+      const wsSaleMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales(?:\/([^/]+))?\/?$/);
+
+      if (wsSalesImportMatch && req.method === "POST") {
+        return cors(req, env, await handleImportSales(wsSalesImportMatch[1]!, req, env));
+      }
+      if (wsSalePaymentMatch && req.method === "POST") {
+        return cors(req, env, await handleAddPayment(wsSalePaymentMatch[1]!, wsSalePaymentMatch[2]!, req, env));
+      }
+      if (wsSaleMatch) {
+        const wsId = wsSaleMatch[1]!;
+        const sId = wsSaleMatch[2];
+        if (!sId && req.method === "GET")    return cors(req, env, await handleListSales(wsId, req, env));
+        if (!sId && req.method === "POST")   return cors(req, env, await handleCreateSale(wsId, req, env));
+        if (sId && req.method === "GET")     return cors(req, env, await handleGetSale(wsId, sId, req, env));
+        if (sId && req.method === "PATCH")   return cors(req, env, await handleUpdateSale(wsId, sId, req, env));
+        if (sId && req.method === "DELETE")  return cors(req, env, await handleDeleteSale(wsId, sId, req, env));
+      }
+
+      // Simple tables (R4+R5) — usan generic dispatcher.
+      //   tasks, cash, followups, catalog, payment-methods, customer-types, customer-tags
+      //   GET/POST       /workspaces/:wid/<table>
+      //   PATCH/DELETE   /workspaces/:wid/<table>/:id
+      //   POST           /workspaces/:wid/<table>/import
+      for (const [seg, spec] of Object.entries(SIMPLE_TABLE_SPECS)) {
+        const importMatch = url.pathname.match(new RegExp(`^/workspaces/([^/]+)/${seg}/import/?$`));
+        const recMatch = url.pathname.match(new RegExp(`^/workspaces/([^/]+)/${seg}(?:/([^/]+))?/?$`));
+        if (importMatch && req.method === "POST") {
+          return cors(req, env, await handleGenericImport(spec, importMatch[1]!, req, env));
+        }
+        if (recMatch) {
+          const wsId = recMatch[1]!;
+          const rId = recMatch[2];
+          if (!rId && req.method === "GET")    return cors(req, env, await handleGenericList(spec, wsId, req, env));
+          if (!rId && req.method === "POST")   return cors(req, env, await handleGenericCreate(spec, wsId, req, env));
+          if (rId && req.method === "PATCH")   return cors(req, env, await handleGenericUpdate(spec, wsId, rId, req, env));
+          if (rId && req.method === "DELETE")  return cors(req, env, await handleGenericDelete(spec, wsId, rId, req, env));
+        }
       }
 
       // access-code va ANTES que /members/:mid porque su path es más

@@ -1,10 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MyDay } from "./MyDay";
-import { NewSaleModal } from "../ventas/components/NewSaleModal";
 import { useCreateSale } from "../ventas/useSalesData";
-import { NewTaskModal } from "../tareas/components/NewTaskModal";
-import { CollectPaymentModal } from "../../components/CollectPaymentModal";
+
+// D7: modales lazy. NewSaleModal solo se monta cuando newSaleOpen=true,
+// igual NewTaskModal y CollectPaymentModal. Antes los 3 venían bundleados
+// con MyDay (que es eager) → ~50 kB extra en el chunk principal aunque
+// el user nunca toque "Nueva venta". Ahora son chunks separados que se
+// bajan on-demand (~150ms primera vez, cacheado después).
+const NewSaleModal = lazy(() =>
+  import("../ventas/components/NewSaleModal").then((m) => ({ default: m.NewSaleModal })),
+);
+const NewTaskModal = lazy(() =>
+  import("../tareas/components/NewTaskModal").then((m) => ({ default: m.NewTaskModal })),
+);
+const CollectPaymentModal = lazy(() =>
+  import("../../components/CollectPaymentModal").then((m) => ({ default: m.CollectPaymentModal })),
+);
 import { assignedTasksDb } from "../../lib/db/assignedTasks";
 import type { DueCollection } from "../../types/domain";
 import { useWorkspaceStore } from "../../store/workspaceStore";
@@ -266,30 +278,40 @@ export function MyDayContainer() {
         if (target) setActiveScreen(target);
       }}
     />
-    <NewSaleModal
-      open={newSaleOpen}
-      onClose={() => setNewSaleOpen(false)}
-      onSubmit={async (data) => {
-        await createSaleMut.mutateAsync(data);
-        showToast(data.outOfStock ? "Venta fuera de stock registrada" : "Venta registrada", "success");
-      }}
-    />
-    <NewTaskModal open={newTaskOpen} onClose={() => setNewTaskOpen(false)} />
-    <CollectPaymentModal
-      open={!!collectingFrom}
-      onClose={() => setCollectingFrom(null)}
-      sale={
-        collectingFrom
-          ? {
-              id: collectingFrom.saleId,
-              clientName: collectingFrom.clientName,
-              total: collectingFrom.total,
-              balance: collectingFrom.amount,
-              currency: collectingFrom.currency,
-            }
-          : null
-      }
-    />
+    {/* Mount condicional + Suspense — los modales lazy bajan su chunk
+        recién cuando el user abre el modal por primera vez. */}
+    {newSaleOpen && (
+      <Suspense fallback={null}>
+        <NewSaleModal
+          open={newSaleOpen}
+          onClose={() => setNewSaleOpen(false)}
+          onSubmit={async (data) => {
+            await createSaleMut.mutateAsync(data);
+            showToast(data.outOfStock ? "Venta fuera de stock registrada" : "Venta registrada", "success");
+          }}
+        />
+      </Suspense>
+    )}
+    {newTaskOpen && (
+      <Suspense fallback={null}>
+        <NewTaskModal open={newTaskOpen} onClose={() => setNewTaskOpen(false)} />
+      </Suspense>
+    )}
+    {collectingFrom && (
+      <Suspense fallback={null}>
+        <CollectPaymentModal
+          open={!!collectingFrom}
+          onClose={() => setCollectingFrom(null)}
+          sale={{
+            id: collectingFrom.saleId,
+            clientName: collectingFrom.clientName,
+            total: collectingFrom.total,
+            balance: collectingFrom.amount,
+            currency: collectingFrom.currency,
+          }}
+        />
+      </Suspense>
+    )}
     </>
   );
 }

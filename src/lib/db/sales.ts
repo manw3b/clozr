@@ -7,6 +7,7 @@ import {
   cashApi,
   type CloudSale,
 } from "../cloudAuth";
+import { log } from "../logger";
 import type {
   Sale,
   SaleItem,
@@ -54,8 +55,7 @@ export async function getAll(workspaceId: string): Promise<Sale[]> {
   if (ctx) {
     const res = await fetchSales(ctx.jwt, ctx.wsId);
     if (res.ok) return res.data.sales.map((s) => cloudSaleToLocal(s, workspaceId));
-    // eslint-disable-next-line no-console
-    console.warn("[salesDb.getAll] cloud falló, fallback local:", res.error);
+    log.warn("getAll cloud falló, fallback local", { scope: "salesDb", data: { error: res.error } });
   }
   return dbSelect<Sale>(
     "SELECT * FROM sales WHERE workspace_id = ? ORDER BY sale_date DESC",
@@ -137,8 +137,7 @@ export async function getItems(saleId: string): Promise<SaleItem[]> {
       const entry = await fetchSaleCloudCached(ctx.jwt, ctx.wsId, saleId);
       return entry.items;
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.warn("[salesDb.getItems] cloud falló, fallback local:", e);
+      log.warn("getItems cloud falló, fallback local", { scope: "salesDb", err: e });
     }
   }
   return dbSelect<SaleItem>(
@@ -154,8 +153,7 @@ export async function getPayments(saleId: string): Promise<SalePayment[]> {
       const entry = await fetchSaleCloudCached(ctx.jwt, ctx.wsId, saleId);
       return entry.payments;
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.warn("[salesDb.getPayments] cloud falló, fallback local:", e);
+      log.warn("getPayments cloud falló, fallback local", { scope: "salesDb", err: e });
     }
   }
   return dbSelect<SalePayment>(
@@ -260,8 +258,7 @@ export async function createSale(
           moved_at: now,
         } as never);
       } catch (e) {
-        // eslint-disable-next-line no-console
-        console.warn("[createSale cloud] cash_movement falló:", e);
+        log.warn("createSale cash_movement side-effect falló", { scope: "salesDb", err: e });
       }
     }
 
@@ -279,8 +276,7 @@ export async function createSale(
         try {
           await decrementStock(item.catalog_item_id, item.quantity);
         } catch (e) {
-          // eslint-disable-next-line no-console
-          console.warn("[createSale cloud] decrement stock falló:", e);
+          log.warn("createSale decrement stock side-effect falló", { scope: "salesDb", err: e });
         }
       }
     }

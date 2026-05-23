@@ -7,6 +7,7 @@ import type {
   UrgentPipelineItem,
 } from "./types";
 import { useCloudAuthStore } from "../../store/cloudAuthStore";
+import { log } from "../logger";
 import {
   fetchPipelineItems,
   createPipelineItemCloud,
@@ -75,8 +76,7 @@ export async function getAll(workspaceId: string): Promise<PipelineItem[]> {
         .map((i) => cloudToLocal(i, workspaceId));
     }
     // Fallback al cache local si cloud falla.
-    // eslint-disable-next-line no-console
-    console.warn("[pipelineDb.getAll] cloud falló, leyendo cache local:", res.error);
+    log.warn("getAll cloud falló, fallback local", { scope: "pipelineDb", data: { error: res.error } });
   }
   return dbSelect<PipelineItem>(
     `SELECT p.*, c.name AS customer_name,

@@ -73,8 +73,8 @@ export function CloudDataSection() {
     let mounted = true;
     Promise.all([
       // Conteo de local SQLite — siempre devuelve del local raw.
-      // Para esto usamos un import directo (TODO: helper).
-      // Por ahora, cuenta lo que tenga el local DB (independiente de cloud).
+      // Hacemos dynamic import para skipear el cloud-dispatcher de
+      // customersDb.getAll. Funciona bien; no vale la pena un helper.
       import("../../lib/db/index").then(({ dbSelect }) =>
         dbSelect<{ n: number }>(
           "SELECT COUNT(*) AS n FROM customers WHERE workspace_id = ?",

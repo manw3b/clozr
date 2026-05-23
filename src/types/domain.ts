@@ -1,6 +1,15 @@
 /**
- * Tipos compartidos del dominio Clozr.
- * Estos van a usarse por TanStack Query, Zustand stores y los plugins de Tauri/SQLite.
+ * Tipos del DOMINIO UI de Clozr.
+ *
+ * Convención del proyecto (TWO-LAYER):
+ *   - Este file = shape que la UI consume (TanStack Query data, Zustand
+ *     state, props de componentes).
+ *   - `src/lib/db/types.ts` = shape RAW de la fila SQLite/Turso.
+ *   - `src/lib/mappers.ts` traduce entre ambos.
+ *
+ * Algunos nombres se REPITEN entre ambos files (Sale, Task, CashMovement,
+ * SaleItem, CashSummary) pero con shapes distintos a propósito. Si vas
+ * a editar uno, revisá si el mapper sigue cubriendo el round-trip.
  */
 
 export type ClientType = 'final' | 'revendedor' | 'mayorista' | 'empresa';

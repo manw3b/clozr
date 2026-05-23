@@ -1,6 +1,7 @@
 import { dbSelect, dbExecute, runWrite } from "./index";
 import type { PipelineStage, CustomerTypeRow, CatalogCategoryRow } from "./types";
 import { useCloudAuthStore } from "../../store/cloudAuthStore";
+import { log } from "../logger";
 import {
   fetchPipelineStages,
   createPipelineStageCloud,
@@ -64,8 +65,7 @@ export async function getPipelineStages(workspaceId: string): Promise<PipelineSt
       }
     }
     // Fallback cache local si cloud falla.
-    // eslint-disable-next-line no-console
-    console.warn("[settingsDb.getPipelineStages] cloud falló, fallback local:", res.ok ? "empty" : res.error);
+    log.warn("getPipelineStages cloud falló, fallback local", { scope: "settingsDb", data: { detail: res.ok ? "empty" : res.error } });
   }
 
   const rows = await dbSelect<PipelineStage>(

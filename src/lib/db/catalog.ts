@@ -1,6 +1,7 @@
 import { dbSelect, dbExecute } from "./index";
 import { useCloudAuthStore } from "../../store/cloudAuthStore";
 import { catalogApi, decrementCatalogStock } from "../cloudAuth";
+import { log } from "../logger";
 import type {
   CatalogItem,
   CatalogImei,
@@ -57,8 +58,7 @@ export async function getAll(workspaceId: string): Promise<CatalogItemWithImeis[
         .filter((c) => Number(c.active ?? 1) === 1)
         .map((c) => cloudToLocal(c, workspaceId));
     }
-    // eslint-disable-next-line no-console
-    console.warn("[catalogDb.getAll] cloud falló, fallback local:", res.error);
+    log.warn("getAll cloud falló, fallback local", { scope: "catalogDb", data: { error: res.error } });
   }
   const rows = await dbSelect<CatalogItemWithImeis>(
     `SELECT c.*,
@@ -292,8 +292,7 @@ export async function decrementStock(id: string, quantity: number): Promise<void
     // track_stock=1, así que productos sin tracking siguen igual.
     const res = await decrementCatalogStock(ctx.jwt, ctx.wsId, id, quantity);
     if (!res.ok) {
-      // eslint-disable-next-line no-console
-      console.warn("[catalogDb.decrementStock] cloud decrement falló:", res.error);
+      log.warn("decrementStock cloud falló", { scope: "catalogDb", data: { error: res.error } });
     }
     return;
   }

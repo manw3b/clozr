@@ -8,6 +8,7 @@ import {
   deleteCustomerCloud,
   type CloudCustomer,
 } from "../cloudAuth";
+import { log } from "../logger";
 
 /**
  * customersDb — capa unificada local ↔ cloud.
@@ -51,7 +52,10 @@ function cloudToLocal(c: CloudCustomer, localWorkspaceId: string): Customer {
     address: c.address,
     notes: c.notes,
     avatar_path: c.avatar_path,
-    total_sales: 0, // TODO R3: derivar del cloud sales
+    // R3 ya está completo pero el endpoint /customers no hace JOIN con sales
+    // para no inflar el payload del list. Si necesitamos total_sales en cloud,
+    // agregar columna agregada al endpoint (sum del SUM(total) por customer_id).
+    total_sales: 0,
     created_by: c.created_by,
     created_at: c.created_at,
     updated_at: c.updated_at,
@@ -92,8 +96,7 @@ async function upsertLocal(c: Customer): Promise<void> {
       ],
     );
   } catch (e) {
-    // eslint-disable-next-line no-console
-    console.warn("[customersDb] write-through local cache failed:", e);
+    log.warn("write-through local cache failed", { scope: "customersDb", err: e });
   }
 }
 
@@ -113,8 +116,7 @@ export async function getAll(workspaceId: string): Promise<Customer[]> {
       // (ej: solo al primer fetch del día, o un debounce 5min).
       return res.data.customers.map((c) => cloudToLocal(c, workspaceId));
     }
-    // eslint-disable-next-line no-console
-    console.warn("[customersDb.getAll] cloud failed, leyendo cache local:", res.error);
+    log.warn("getAll cloud failed, fallback local", { scope: "customersDb", data: { error: res.error } });
   }
   return dbSelect<Customer>(
     "SELECT * FROM customers WHERE workspace_id = ? ORDER BY name ASC",
@@ -263,8 +265,7 @@ export async function update(
         values,
       );
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.warn("[customersDb.update] write-through falló:", e);
+      log.warn("update write-through falló", { scope: "customersDb", err: e });
     }
     return;
   }
@@ -296,8 +297,7 @@ export async function remove(workspaceId: string, id: string): Promise<void> {
         [workspaceId, id],
       );
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.warn("[customersDb.remove] write-through falló:", e);
+      log.warn("remove write-through falló", { scope: "customersDb", err: e });
     }
     return;
   }

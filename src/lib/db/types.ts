@@ -1,3 +1,18 @@
+/**
+ * Tipos RAW del schema SQLite (local) + Turso (cloud, mismo shape).
+ *
+ * Convención del proyecto (TWO-LAYER):
+ *   - Este file = shape exacto de la fila DB (columnas, nullables como
+ *     en SQL, ints en vez de booleans, etc).
+ *   - `src/types/domain.ts` = shape limpio para la UI.
+ *   - `src/lib/mappers.ts` traduce entre ambos.
+ *
+ * Algunos nombres se REPITEN en domain.ts (Sale, Task, CashMovement,
+ * SaleItem, CashSummary) con shapes distintos a propósito. Si modificás
+ * el schema SQL, agregá la columna acá y actualizá el mapper si la UI
+ * la necesita.
+ */
+
 // Stored value in customers.type — now driven by customer_types table
 export type CustomerType = string;
 

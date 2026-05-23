@@ -1,6 +1,7 @@
 import { dbSelect, dbExecute } from "./index";
 import { useCloudAuthStore } from "../../store/cloudAuthStore";
 import { cashApi } from "../cloudAuth";
+import { log } from "../logger";
 import type { CashMovement, CashSummary, CreateCashMovementInput, CashMovementType, CashDirection } from "./types";
 
 function cashCloudCtx(): { jwt: string; wsId: string } | null {
@@ -49,8 +50,7 @@ export async function getMovements(
       if (opts.limit) items = items.slice(0, opts.limit);
       return items;
     }
-    // eslint-disable-next-line no-console
-    console.warn("[cashDb.getMovements] cloud falló:", res.error);
+    log.warn("getMovements cloud falló", { scope: "cashDb", data: { error: res.error } });
   }
   let sql = "SELECT * FROM cash_movements WHERE workspace_id = ? AND business_id = ?";
   const params: unknown[] = [workspaceId, businessId];

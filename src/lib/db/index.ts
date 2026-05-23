@@ -1,4 +1,5 @@
 import Database, { type QueryResult } from "@tauri-apps/plugin-sql";
+import { log } from "../logger";
 
 const DB_PATH = "sqlite:clozr.db";
 let _dbPromise: Promise<Database> | null = null;
@@ -32,7 +33,7 @@ async function bootstrapDb(): Promise<Database> {
     await ensureSchemaOn(db);
   } catch (e) {
     // Si el bootstrap falla, seguimos igual — la app puede funcionar parcialmente
-    console.warn("ensureSchemaOn failed:", e);
+    log.warn("ensureSchemaOn failed", { scope: "db", err: e });
   }
   return db;
 }

@@ -165,8 +165,9 @@ El código vence en ${accessCodeModal.expiresInMin} minutos.`;
 
   async function handleRevoke(m: MemberRow) {
     if (!activeWorkspaceId) return;
-    // Confirmar inline con un toast-no-confirm: en lugar de modal, usamos
-    // toast con undo (TODO: usar useUndoableActions). Por ahora directo.
+    // Confirm con modal. Originalmente la idea era undoable-toast pero
+    // expulsar al equipo es una acción rara y crítica — un modal de
+    // confirmación tiene más sentido que un toast efímero con "deshacer".
     const ok = await confirmAsync({
       title: "Expulsar del equipo",
       message: `¿Expulsar a ${m.email} del equipo? Puede ser re-invitado luego.`,

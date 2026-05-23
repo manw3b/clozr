@@ -1,6 +1,7 @@
 import { dbSelect, dbExecute } from "./index";
 import { useCloudAuthStore } from "../../store/cloudAuthStore";
 import { tasksApi, type CloudTask } from "../cloudAuth";
+import { log } from "../logger";
 import type { Task, CreateTaskInput } from "./types";
 
 function cloudCtx(): { jwt: string; wsId: string } | null {
@@ -36,8 +37,7 @@ export async function getAll(workspaceId: string): Promise<Task[]> {
   if (ctx) {
     const res = await tasksApi.list(ctx.jwt, ctx.wsId);
     if (res.ok) return res.data.items.map((t) => cloudTaskToLocal(t, workspaceId));
-    // eslint-disable-next-line no-console
-    console.warn("[tasksDb.getAll] cloud falló:", res.error);
+    log.warn("getAll cloud falló", { scope: "tasksDb", data: { error: res.error } });
   }
   return dbSelect<Task>(
     "SELECT * FROM tasks WHERE workspace_id = ? ORDER BY created_at ASC",

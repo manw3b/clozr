@@ -12,13 +12,66 @@
  * Cuando F2 necesite muchas migraciones, pasamos a un sistema versionado.
  */
 
-import { tursoQuery, type Env } from "./turso";
+import { tursoQuery, tursoFirst, type Env } from "./turso";
 
 let initPromise: Promise<void> | null = null;
 
+/**
+ * D2: además del dedup in-memory por isolate (initPromise), agregamos
+ * un version-check rápido contra una mini-tabla `schema_meta`. Si el
+ * número de versión coincide con SCHEMA_VERSION (constante hardcoded
+ * que bump cuando agregamos DDL), skipeamos las ~50 statements.
+ *
+ * Resultado por cold start: 1 SELECT contra schema_meta vs 50 DDL antes.
+ * Cuando bump SCHEMA_VERSION, el próximo cold start corre todo de
+ * nuevo (idempotente) y actualiza el version row.
+ *
+ * Bump cuando agregues un CREATE TABLE / ALTER TABLE / safeAddColumn.
+ */
+const SCHEMA_VERSION = 1;
+
 export function ensureSchema(env: Env): Promise<void> {
-  if (!initPromise) initPromise = applySchema(env);
+  if (!initPromise) initPromise = applySchemaIfNeeded(env);
   return initPromise;
+}
+
+async function applySchemaIfNeeded(env: Env): Promise<void> {
+  // Mini-tabla con UNA fila (key='current') que guarda la versión aplicada.
+  // CREATE IF NOT EXISTS — primera vez en la DB la crea, después es no-op.
+  try {
+    await tursoQuery(env, {
+      sql: `CREATE TABLE IF NOT EXISTS schema_meta (
+        key TEXT PRIMARY KEY,
+        version INTEGER NOT NULL,
+        applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+    });
+    const row = await tursoFirst(
+      env,
+      `SELECT version FROM schema_meta WHERE key = 'current'`,
+    );
+    if (row && Number(row.version) >= SCHEMA_VERSION) return;
+  } catch (e) {
+    // Si falla el check, caemos al applySchema completo — idempotente,
+    // no rompemos nada. Loggeamos para tail diagnóstico.
+    console.warn("[schema] version-check failed, falling back to full apply:", e);
+  }
+
+  await applySchema(env);
+
+  // Marcar versión aplicada. UPSERT con ON CONFLICT.
+  try {
+    await tursoQuery(env, {
+      sql: `INSERT INTO schema_meta (key, version, applied_at)
+              VALUES ('current', ?, datetime('now'))
+              ON CONFLICT(key) DO UPDATE SET
+                version = excluded.version,
+                applied_at = excluded.applied_at`,
+      args: [SCHEMA_VERSION],
+    });
+  } catch (e) {
+    console.warn("[schema] failed to persist schema_meta version:", e);
+  }
 }
 
 async function applySchema(env: Env): Promise<void> {

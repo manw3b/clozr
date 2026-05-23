@@ -2,8 +2,9 @@ import { dbSelect, dbExecute } from "./index";
 import { markStockItemSoldWithSale } from "./quickStock";
 import { useCloudAuthStore } from "../../store/cloudAuthStore";
 import {
-  fetchSales, createSaleCloud, updateSaleCloud,
+  fetchSales, fetchSale, createSaleCloud, updateSaleCloud,
   addSalePaymentCloud,
+  cashApi,
   type CloudSale,
 } from "../cloudAuth";
 import type {
@@ -89,7 +90,57 @@ export async function getRecent(workspaceId: string, limit = 5): Promise<Sale[]>
   );
 }
 
+/**
+ * getItems + getPayments: en cloud mode hacemos UNA sola request al
+ * endpoint compuesto GET /sales/:id que devuelve {sale, items, payments}.
+ * Para no duplicar la fetch entre getItems(saleId) y getPayments(saleId),
+ * cacheamos por saleId con TTL 1s — el drawer suele llamar ambos
+ * inmediatamente uno tras otro.
+ */
+const cloudSaleCache = new Map<string, { ts: number; items: SaleItem[]; payments: SalePayment[] }>();
+const CACHE_TTL_MS = 1000;
+
+async function fetchSaleCloudCached(jwt: string, wsId: string, saleId: string) {
+  const cached = cloudSaleCache.get(saleId);
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached;
+  const res = await fetchSale(jwt, wsId, saleId);
+  if (!res.ok) throw new Error(`No se pudo leer venta en la nube: ${res.error}`);
+  const items: SaleItem[] = res.data.items.map((i) => ({
+    id: i.id,
+    sale_id: i.sale_id,
+    catalog_item_id: i.catalog_item_id,
+    description: i.description,
+    quantity: i.quantity,
+    unit_price: i.unit_price,
+    base_price: i.base_price,
+    subtotal: i.subtotal,
+    imei: i.imei,
+    from_stock: i.from_stock,
+  }));
+  const payments: SalePayment[] = res.data.payments.map((p) => ({
+    id: p.id,
+    sale_id: p.sale_id,
+    method: p.method as SalePayment["method"],
+    currency: p.currency as SalePayment["currency"],
+    amount: p.amount,
+    is_deposit: p.is_deposit,
+  }));
+  const entry = { ts: Date.now(), items, payments };
+  cloudSaleCache.set(saleId, entry);
+  return entry;
+}
+
 export async function getItems(saleId: string): Promise<SaleItem[]> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    try {
+      const entry = await fetchSaleCloudCached(ctx.jwt, ctx.wsId, saleId);
+      return entry.items;
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("[salesDb.getItems] cloud falló, fallback local:", e);
+    }
+  }
   return dbSelect<SaleItem>(
     "SELECT * FROM sale_items WHERE sale_id = ?",
     [saleId],
@@ -97,6 +148,16 @@ export async function getItems(saleId: string): Promise<SaleItem[]> {
 }
 
 export async function getPayments(saleId: string): Promise<SalePayment[]> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    try {
+      const entry = await fetchSaleCloudCached(ctx.jwt, ctx.wsId, saleId);
+      return entry.payments;
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("[salesDb.getPayments] cloud falló, fallback local:", e);
+    }
+  }
   return dbSelect<SalePayment>(
     "SELECT * FROM sale_payments WHERE sale_id = ?",
     [saleId],
@@ -170,6 +231,50 @@ export async function createSale(
       })),
     });
     if (!res.ok) throw new Error(`No se pudo crear venta en la nube: ${res.error}`);
+
+    // ── Efectos secundarios post-venta ─────────────────────────────
+    //
+    // 1) Cash auto-movements por moneda (igual lógica que path local).
+    //    Genera ingresos de caja por cada moneda con $$ cobrados, salvo
+    //    cuenta-corriente que es deuda no caja.
+    //    Best-effort: si falla, la venta YA está creada — no rollback.
+    const cashByCurrency: Record<"ARS" | "USD", number> = { ARS: 0, USD: 0 };
+    for (const p of data.payments) {
+      if (p.method === "cuenta-corriente") continue;
+      const currency = ((p.currency ?? "ARS") === "USD" ? "USD" : "ARS") as "ARS" | "USD";
+      cashByCurrency[currency] += p.amount;
+    }
+    for (const [currency, amount] of Object.entries(cashByCurrency) as Array<["ARS" | "USD", number]>) {
+      if (amount <= 0) continue;
+      try {
+        await cashApi.create(cloudC.jwt, cloudC.wsId, {
+          id: crypto.randomUUID(),
+          kind: "income",
+          amount,
+          currency,
+          description: `Venta · ${data.customer_name ?? "cliente"}`,
+          category: "venta",
+          sale_id: id,
+          customer_name: data.customer_name ?? null,
+          payment_method: paymentMethod,
+          moved_at: now,
+        } as never);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn("[createSale cloud] cash_movement falló:", e);
+      }
+    }
+
+    // 2) Stock auto-decrement — TODO #88: requiere migrar stock_items
+    //    (tabla separada del catalog en SQLite local) al cloud. El schema
+    //    cloud de catalog_items hoy no tiene columna stock. Lo dejo
+    //    pendiente porque el riesgo de oversell con 3 PCs concurrentes
+    //    es bajo, y migrar stock completo es trabajo de otra sesión.
+    //
+    //    Mientras tanto: si Caro vende un equipo que no hay en stock,
+    //    la venta se registra (correcto) pero el inventario LOCAL del
+    //    owner no se descuenta. Workaround: el owner revisa stock
+    //    manualmente o hace ajustes desde Inventario.
 
     // Devolver Sale sintetizado — los callers esperan el shape completo.
     return {

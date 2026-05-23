@@ -37,14 +37,40 @@ const mutationCache = new MutationCache({
   },
 });
 
+/**
+ * Retry inteligente para queries cloud:
+ *   - 4xx (cliente): NO retry. Es nuestra culpa, retry no lo arregla.
+ *     401 lo maneja el interceptor de cloudAuth (auto-logout).
+ *   - 5xx / red / timeout: hasta 2 retries con backoff exponencial (1s, 3s).
+ *   - Otros (errores JS / undefined): 1 retry como antes.
+ *
+ * Distinguimos por la shape del error: nuestro authFetch lanza
+ * `new Error("HTTP 503: ...")` así que matcheamos por prefijo.
+ */
 const queryClient = new QueryClient({
   queryCache,
   mutationCache,
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5,
-      retry: 1,
+      retry: (failureCount, err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        // 4xx HTTP — no tiene sentido reintentar.
+        const status4xx = /HTTP\s+4\d\d/i.test(msg);
+        if (status4xx) return false;
+        // Retries para 5xx / red / timeout. Capeamos a 2.
+        const transient = /HTTP\s+5\d\d|timeout|fetch|network|abort/i.test(msg);
+        if (transient) return failureCount < 2;
+        return failureCount < 1;
+      },
+      retryDelay: (attempt) => Math.min(1000 * 3 ** attempt, 5000),
       refetchOnWindowFocus: false,
+    },
+    mutations: {
+      // Mutations NO retry por defecto — riesgo de doble side-effect
+      // (crear venta dos veces, mandar email dos veces). El caller que
+      // sepa que es idempotente puede overridear.
+      retry: false,
     },
   },
 });

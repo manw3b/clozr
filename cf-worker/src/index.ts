@@ -33,6 +33,7 @@ import { handleAuthRequest } from "./routes/request";
 import { handleAuthVerify } from "./routes/verify";
 import { handleAuthVerifyCode } from "./routes/verify-code";
 import { handleMe } from "./routes/me";
+import { ensureSchema } from "./schema";
 import {
   handleCreateWorkspace,
   handleListMembers,
@@ -73,6 +74,42 @@ export default {
 
     try {
       const route = `${req.method} ${url.pathname}`;
+
+      // ── Rate limit en endpoints sensibles ─────────────────────────
+      // /auth/request y /auth/verify-code son los únicos puntos donde
+      // un attacker no autenticado puede pegar libremente — el resto
+      // requiere JWT válido. Limit por IP (CF-Connecting-IP es trusted
+      // en Workers). Memoria del isolate: se reparte entre las pocas
+      // instancias que CF spinea para esta zona (~1-2 con nuestro tráfico),
+      // así que en la práctica es ~per-Worker.
+      if (route === "POST /auth/request") {
+        if (!checkRate(req, "request", 5, 10 * 60_000)) {
+          return cors(req, env, json({ error: "rate_limited" }, 429));
+        }
+      }
+      if (route === "POST /auth/verify-code") {
+        if (!checkRate(req, "verify-code", 10, 10 * 60_000)) {
+          return cors(req, env, json({ error: "rate_limited" }, 429));
+        }
+      }
+
+      // ── Admin: trigger migraciones explícitamente ──────────────────
+      // Útil después de un deploy con cambios de schema — antes había
+      // que esperar la primera request real para que `ensureSchema`
+      // (que es lazy) corriera. Ahora podemos pegarle desde wrangler
+      // tail o postman y confirmar. Protegido con header shared-secret
+      // (reusamos JWT_SECRET — no es perfecto pero es lo único que ya
+      // tenemos como secret arbitrario en el entorno).
+      if (route === "POST /admin/migrations") {
+        const provided = req.headers.get("x-admin-secret");
+        if (!provided || provided !== env.JWT_SECRET) {
+          return cors(req, env, json({ error: "unauthorized" }, 401));
+        }
+        // Reset del initPromise no se expone — pero sí podemos forzar
+        // re-correr llamando directo. ensureSchema es idempotente, OK.
+        await ensureSchema(env);
+        return cors(req, env, json({ ok: true, ranAt: new Date().toISOString() }));
+      }
 
       // ── Rutas con path dinámico (/workspaces/:id/...) ─────────────
       const wsAccessCodeMatch = url.pathname.match(
@@ -269,6 +306,39 @@ export default {
 };
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
+
+/**
+ * Rate limiter token-bucket simplificado. Estado en memoria del isolate
+ * (Map<key, {count, resetAt}>) — CF puede tener 1+ isolates simultáneos
+ * por región, así que el límite efectivo es N_isolates * limit. Para
+ * nuestro use-case (defensa contra abuse accidental + spam de retries)
+ * es suficiente. Si en el futuro necesitamos un cap más estricto,
+ * migramos a Durable Object o KV.
+ *
+ * Cleanup: si el Map crece sin límite, lo reseteamos cuando llega a
+ * 5000 entries. En la práctica nunca llega — la auth la usan ~5 personas.
+ */
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function checkRate(req: Request, key: string, limit: number, windowMs: number): boolean {
+  const ip = req.headers.get("cf-connecting-ip") ?? "unknown";
+  const bucketKey = `${key}:${ip}`;
+  const now = Date.now();
+  const bucket = rateBuckets.get(bucketKey);
+  if (!bucket || bucket.resetAt < now) {
+    rateBuckets.set(bucketKey, { count: 1, resetAt: now + windowMs });
+    if (rateBuckets.size > 5000) {
+      // GC paranoia — borramos los expirados de un saque.
+      for (const [k, v] of rateBuckets) {
+        if (v.resetAt < now) rateBuckets.delete(k);
+      }
+    }
+    return true;
+  }
+  if (bucket.count >= limit) return false;
+  bucket.count++;
+  return true;
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

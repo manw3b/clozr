@@ -6,6 +6,21 @@ import logoIsotipo from "../assets/logo-isotipo.svg";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
+  /**
+   * Cuando cambia, resetea el estado de error. Útil para boundaries por
+   * pantalla — si Pipeline crashea y el user navega a Mi Día, queremos
+   * que al volver a Pipeline reintente (no quede pegado en error eternamente).
+   * Pasar `activeScreen` o similar.
+   */
+  resetKey?: string | number;
+  /**
+   * `compact`: fallback de ~viewport-fit (no fullscreen) — para boundaries
+   * por pantalla, así el shell (sidebar/topbar) sigue funcionando y el user
+   * puede navegar a otra pantalla en vez de quedar atrapado.
+   */
+  compact?: boolean;
+  /** Nombre del scope para el log. */
+  scope?: string;
 }
 
 interface ErrorBoundaryState {
@@ -21,10 +36,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, info: { componentStack?: string | null }) {
     log.error("React error boundary caught", {
-      scope: "ErrorBoundary",
+      scope: this.props.scope ?? "ErrorBoundary",
       err: error,
       data: { componentStack: info.componentStack ?? null },
     });
+  }
+
+  componentDidUpdate(prev: ErrorBoundaryProps): void {
+    // Reset al cambiar la key (ej: el user navegó a otra pantalla).
+    if (this.state.error && prev.resetKey !== this.props.resetKey) {
+      this.setState({ error: null });
+    }
   }
 
   reset = () => this.setState({ error: null });
@@ -33,10 +55,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   render() {
     if (!this.state.error) return this.props.children;
 
+    const isCompact = this.props.compact === true;
     return (
       <div
         style={{
-          minHeight: "100vh",
+          minHeight: isCompact ? "60vh" : "100vh",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",

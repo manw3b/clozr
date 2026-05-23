@@ -64,6 +64,18 @@ interface PipelineResponse {
 export type Row = Record<string, string | number | null>;
 
 /**
+ * Timeout default para una request a Turso. CF Workers tiene su propio
+ * cap (~30s wall, ~50ms CPU/req en plan paid) pero queremos abortar antes
+ * para no quedarnos colgados si Turso tarda — un poll de cliente entonces
+ * vuelve con error y reintenta limpio, en vez de stackear requests
+ * colgadas que mantienen vivo el isolate.
+ *
+ * Si tenés un statement legítimamente largo (import bulk), podés overridear
+ * el timeout pasándolo por parámetro.
+ */
+const TURSO_TIMEOUT_MS = 15_000;
+
+/**
  * Ejecuta uno o varios statements en una sola request HTTP.
  * Devuelve un array con las filas (vacío si era INSERT/UPDATE/DELETE).
  *
@@ -90,14 +102,29 @@ export async function tursoQuery(
     ],
   };
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${env.TURSO_AUTH_TOKEN}`,
-    },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TURSO_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${env.TURSO_AUTH_TOKEN}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(`[turso] timeout after ${TURSO_TIMEOUT_MS}ms`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!res.ok) {
     const text = await res.text();

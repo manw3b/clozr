@@ -26,25 +26,30 @@
  */
 
 import { useCloudAuthStore } from "../store/cloudAuthStore";
+import { useUserActivity } from "./useUserActivity";
 
 type Feature =
   | "customers" | "pipeline" | "sales" | "tasks"
   | "cash" | "followups" | "catalog"
   | "paymentMethods" | "customerTypes" | "customerTags";
 
-/** Intervalo de polling — 5 seg cuando hay cloud activo. */
+/** Intervalo de polling — 5 seg cuando hay cloud activo Y el user está usando la app. */
 const POLL_INTERVAL_MS = 5_000;
-
-/** staleTime cuando hay cloud:
- *  - 4.5s — apenas menor que el polling. Así un cambio de pantalla DENTRO
- *    de la ventana de polling NO dispara un refetch redundante (TanStack
- *    sólo refetchea si el dato es "stale", y con el poll de 5s siempre
- *    hay un fetch reciente).
- *  - Antes era 0 (default TanStack) → cada navegación entre pantallas
- *    hacía un refetch redundante. Con polling 5s + staleTime 0 podíamos
- *    triplicar el tráfico real.
+/**
+ * Intervalo cuando el user está idle (2min sin tocar nada). Bajamos a 30s
+ * — sigue siendo "casi real time" para cuando vuelve, pero 6x menos carga.
+ * Cuando vuelva al uso activo, useUserActivity emite el cambio y TanStack
+ * Query reacciona automáticamente al nuevo refetchInterval.
  */
-const CLOUD_STALE_MS = 4_500;
+const POLL_INTERVAL_IDLE_MS = 30_000;
+
+/**
+ * staleTime se computa dinámicamente como `interval - 500ms` dentro del
+ * hook (ver useCloudQueryConfig). Idea: navegar entre pantallas NO debe
+ * disparar un refetch si el último poll fue reciente — el staleTime un
+ * pelín menor que el poll garantiza eso en ambos modos (activo: 4.5s,
+ * idle: 29.5s).
+ */
 
 /**
  * Hook que el caller pasa directamente a TanStack Query como
@@ -75,6 +80,7 @@ export function useCloudQueryConfig(feature: Feature): {
   const expiresAt = useCloudAuthStore((s) => s.expiresAt);
   const bootstrapStatus = useCloudAuthStore((s) => s.bootstrapStatus);
   const workspaces = useCloudAuthStore((s) => s.workspaces);
+  const userActive = useUserActivity();
 
   const isCloud = (() => {
     if (!jwt || !expiresAt || expiresAt * 1000 < Date.now()) return false;
@@ -85,7 +91,11 @@ export function useCloudQueryConfig(feature: Feature): {
     return status === "done" || status === "skip";
   })();
 
-  return isCloud
-    ? { refetchInterval: POLL_INTERVAL_MS, staleTime: CLOUD_STALE_MS }
-    : { refetchInterval: false, staleTime: Infinity };
+  if (!isCloud) return { refetchInterval: false, staleTime: Infinity };
+  const interval = userActive ? POLL_INTERVAL_MS : POLL_INTERVAL_IDLE_MS;
+  // Stale: usamos el mismo gap entre poll y stale (0.5s menos) — funciona
+  // para los dos modos. En idle quedamos con 29.5s staleTime → si navegás
+  // entre pantallas sigue sirviendo cache local en vez de pegarle de nuevo.
+  const staleTime = Math.max(0, interval - 500);
+  return { refetchInterval: interval, staleTime };
 }

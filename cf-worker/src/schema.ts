@@ -516,16 +516,39 @@ async function applySchema(env: Env): Promise<void> {
 
 /**
  * Ejecuta ALTER TABLE ADD COLUMN ignorando el error si la columna ya
- * existe ("duplicate column name"). Cualquier otro error sí throwa.
+ * existe. Cualquier otro error sí throwa.
+ *
+ * Validación de identifiers: SQLite no permite parametrizar nombres de
+ * tabla/columna, así que los interpolamos directo. Para que no podamos
+ * meter una inyección por accidente (callsite con typo), validamos con
+ * regex estricta — solo [a-zA-Z_][a-zA-Z0-9_]* en table/column. El type
+ * sí queda libre porque puede traer cláusulas ("INTEGER DEFAULT 0",
+ * "TEXT DEFAULT 'new'") y es siempre literal del código nuestro.
+ *
+ * Antes: matcheaba "duplicate column" en el mensaje en lowercase. Funciona
+ * pero swalloweaba sin loguear, complicando diagnóstico cuando una migra
+ * fallaba por otro motivo y la app seguía corriendo medio rota. Ahora
+ * logueamos siempre que se ignora, así queda rastro en tail.
  */
+const IDENTIFIER_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 async function safeAddColumn(env: Env, table: string, column: string, type: string): Promise<void> {
+  if (!IDENTIFIER_RE.test(table) || !IDENTIFIER_RE.test(column)) {
+    throw new Error(`[schema] invalid identifier: table=${table} column=${column}`);
+  }
   try {
     await tursoQuery(env, {
       sql: `ALTER TABLE ${table} ADD COLUMN ${column} ${type}`,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message.toLowerCase() : String(err);
-    if (msg.includes("duplicate column")) return;
+    const msg = err instanceof Error ? err.message : String(err);
+    // SQLite devuelve "duplicate column name: X". Validamos contra ese
+    // patrón específico (no contains) para no tragar mensajes que casualmente
+    // contengan el substring.
+    if (/duplicate column name:\s*\w+/i.test(msg)) {
+      console.warn(`[schema] safeAddColumn skip: ${table}.${column} already exists`);
+      return;
+    }
+    console.error(`[schema] safeAddColumn FAILED: ${table}.${column}`, msg);
     throw err;
   }
 }

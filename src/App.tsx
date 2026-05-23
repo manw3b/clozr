@@ -9,6 +9,7 @@ import { useExchangeRateStore } from "./store/exchangeRateStore";
 import { useSyncActiveDolarToExchangeRate } from "./store/useDolaresAr";
 import { UndoToastHost } from "./components/UndoToastHost";
 import { ConfirmHost } from "./components/ConfirmHost";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { confirmAsync } from "./lib/confirmAsync";
 import { WhatsNewModal } from "./components/WhatsNewModal";
 import { seedAppleCatalog, seedWatchAndMac, refreshIphoneCatalog, refreshIpadCatalog } from "./lib/db/quickStock";
@@ -342,9 +343,14 @@ export default function App() {
           }
         }}
       >
-        <Suspense fallback={<PageLoader />}>
-          {renderScreen(activeScreen)}
-        </Suspense>
+        {/* ErrorBoundary por-pantalla: si una pantalla crashea, el shell
+            (sidebar/topbar/topbanner) sigue vivo y el user puede navegar
+            a otra. resetKey=activeScreen → al navegar se reintenta limpio. */}
+        <ErrorBoundary resetKey={activeScreen} compact scope={`screen:${activeScreen}`}>
+          <Suspense fallback={<PageLoader />}>
+            {renderScreen(activeScreen)}
+          </Suspense>
+        </ErrorBoundary>
       </AppShell>
       <CommandPalette />
       <ShortcutsHelp />

@@ -253,6 +253,91 @@ export function revokeMember(jwt: string | null, workspaceId: string, membership
   });
 }
 
+/* ── /workspaces/:id/customers (F2-B R1) ─────────────────────────────── */
+
+/**
+ * Shape de un cliente como viene del worker (espejo del local pero con
+ * snake_case y sin total_sales/cloud_id propios).
+ */
+export interface CloudCustomer {
+  id: string;
+  workspace_id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  type: string | null;
+  status: string | null;
+  pricing_policy_json: string | null;
+  barrio: string | null;
+  address: string | null;
+  notes: string | null;
+  avatar_path: string | null;
+  instagram: string | null;
+  facebook: string | null;
+  tiktok: string | null;
+  twitter: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export function fetchCustomers(jwt: string | null, workspaceId: string) {
+  return authFetch<{ customers: CloudCustomer[] }>(jwt, `/workspaces/${workspaceId}/customers`);
+}
+
+/** Crea un cliente. Si `id` viene en el payload lo respetamos (útil
+ *  para mantener el id local sincronizado). Si no, el server genera UUID. */
+export function createCustomerCloud(
+  jwt: string | null,
+  workspaceId: string,
+  payload: Partial<CloudCustomer> & { name: string },
+) {
+  return authFetch<{ ok: true; id: string }>(jwt, `/workspaces/${workspaceId}/customers`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateCustomerCloud(
+  jwt: string | null,
+  workspaceId: string,
+  customerId: string,
+  payload: Partial<CloudCustomer>,
+) {
+  return authFetch<{ ok: true }>(jwt, `/workspaces/${workspaceId}/customers/${customerId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteCustomerCloud(jwt: string | null, workspaceId: string, customerId: string) {
+  return authFetch<{ ok: true }>(jwt, `/workspaces/${workspaceId}/customers/${customerId}`, {
+    method: "DELETE",
+  });
+}
+
+/**
+ * Sube todos los clientes locales al workspace cloud. Idempotente: si
+ * el id ya existe, lo skipea. Solo lo puede correr el owner.
+ *
+ * Devuelve { imported, skipped, errors[] }.
+ */
+export function importCustomersCloud(
+  jwt: string | null,
+  workspaceId: string,
+  customers: Array<Partial<CloudCustomer> & { id: string; name: string }>,
+) {
+  return authFetch<{
+    ok: true;
+    imported: number;
+    skipped: number;
+    errors: Array<{ id: string; error: string }>;
+  }>(jwt, `/workspaces/${workspaceId}/customers/import`, {
+    method: "POST",
+    body: JSON.stringify({ customers }),
+  });
+}
+
 /**
  * Genera un código de acceso para un miembro invited. Le permite al
  * owner/admin compartirlo directo con el miembro (por WhatsApp, etc)

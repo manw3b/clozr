@@ -18,6 +18,7 @@ import { AboutSection } from "./AboutSection";
 import { AssignedTasksSection } from "./AssignedTasksSection";
 import { CloudAccountSection } from "./CloudAccountSection";
 import { CloudTeamSection } from "./CloudTeamSection";
+import { CloudDataSection } from "./CloudDataSection";
 import { qk } from "../../lib/queryKeys";
 import type { PipelineStage, CustomerTypeRow } from "../../lib/db/types";
 // Paleta unificada — la misma que usa el kanban del pipeline para el
@@ -26,7 +27,7 @@ import { PALETTE_LIST as COLORS, colorCss } from "../../lib/colorPalette";
 
 // ── Shared ────────────────────────────────────────────────────────
 
-type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "wa-templates" | "dolares" | "assigned-tasks" | "cloud-account" | "cloud-team" | "data" | "about";
+type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "wa-templates" | "dolares" | "assigned-tasks" | "cloud-account" | "cloud-team" | "cloud-data" | "data" | "about";
 
 const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "general", label: "General" },
@@ -42,6 +43,7 @@ const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "assigned-tasks", label: "Tareas obligatorias" },
   { id: "cloud-account", label: "Cuenta en la nube" },
   { id: "cloud-team", label: "Equipo en la nube" },
+  { id: "cloud-data", label: "Datos en la nube" },
   { id: "data", label: "Datos y backup" },
   { id: "about", label: "Acerca de Clozr" },
 ];
@@ -1078,6 +1080,7 @@ export default function SettingsScreen() {
       case "assigned-tasks": return <AssignedTasksSection wid={wid} />;
       case "cloud-account": return <CloudAccountSection />;
       case "cloud-team": return <CloudTeamSection />;
+      case "cloud-data": return <CloudDataSection />;
       case "data": return <DataSection wid={wid} />;
       case "about": return <AboutSection />;
     }

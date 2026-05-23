@@ -138,6 +138,59 @@ async function applySchema(env: Env): Promise<void> {
             WHERE status != 'revoked'`,
     },
   );
+
+  // ── F2-B R1: Customers compartidos ────────────────────────────────
+  //
+  // Espejo del schema local de SQLite (src/lib/db/ensureSchema.ts).
+  // Decisiones:
+  //   - id: el MISMO UUID que el local. Bootstrap migration sube cada
+  //     customer con su id existente; si ya existe (re-run), INSERT OR
+  //     IGNORE no duplica. Esto evita un mapping table local↔cloud.
+  //   - workspace_id: FK a cloud_workspaces (el cloud workspace, no el
+  //     local SQLite workspace).
+  //   - created_by: cloud user_id (no el string "owner" del local).
+  //   - deleted_at: soft-delete. Las queries activas filtran IS NULL.
+  //   - NO incluímos total_sales — es computed sobre sales.
+  //   - Campos de redes sociales y avatar_path los traemos también.
+  await tursoQuery(
+    env,
+    {
+      sql: `CREATE TABLE IF NOT EXISTS customers (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+        name TEXT NOT NULL,
+        phone TEXT,
+        email TEXT,
+        type TEXT DEFAULT 'final',
+        status TEXT DEFAULT 'potencial',
+        pricing_policy_json TEXT,
+        barrio TEXT,
+        address TEXT,
+        notes TEXT,
+        avatar_path TEXT,
+        instagram TEXT,
+        facebook TEXT,
+        tiktok TEXT,
+        twitter TEXT,
+        created_by TEXT REFERENCES users(id),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
+      )`,
+    },
+    // Lookup principal: SELECT de customers activos del workspace.
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_customers_workspace
+            ON customers(workspace_id, deleted_at)`,
+    },
+    // Búsqueda por nombre (LIKE) en lista — un index sobre name nos
+    // ayuda con prefijos comunes; LIKE wildcard inicial no aprovecha
+    // pero al menos para "lookup por nombre exacto" funciona.
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_customers_workspace_name
+            ON customers(workspace_id, name)`,
+    },
+  );
 }
 
 /**

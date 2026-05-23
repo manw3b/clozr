@@ -41,6 +41,13 @@ import {
   handleRevokeMember,
   handleIssueAccessCode,
 } from "./routes/workspaces";
+import {
+  handleListCustomers,
+  handleCreateCustomer,
+  handleUpdateCustomer,
+  handleDeleteCustomer,
+  handleImportCustomers,
+} from "./routes/customers";
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -62,6 +69,32 @@ export default {
         /^\/workspaces\/([^/]+)\/members(?:\/([^/]+))?\/?$/,
       );
       const wsInviteMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/invite\/?$/);
+
+      // Customers paths (F2-B R1):
+      //   GET    /workspaces/:wid/customers
+      //   POST   /workspaces/:wid/customers
+      //   POST   /workspaces/:wid/customers/import
+      //   PATCH  /workspaces/:wid/customers/:cid
+      //   DELETE /workspaces/:wid/customers/:cid
+      const wsCustomersImportMatch = url.pathname.match(
+        /^\/workspaces\/([^/]+)\/customers\/import\/?$/,
+      );
+      const wsCustomerMatch = url.pathname.match(
+        /^\/workspaces\/([^/]+)\/customers(?:\/([^/]+))?\/?$/,
+      );
+
+      if (wsCustomersImportMatch && req.method === "POST") {
+        const wsId = wsCustomersImportMatch[1]!;
+        return cors(req, env, await handleImportCustomers(wsId, req, env));
+      }
+      if (wsCustomerMatch) {
+        const wsId = wsCustomerMatch[1]!;
+        const cId = wsCustomerMatch[2];
+        if (!cId && req.method === "GET")    return cors(req, env, await handleListCustomers(wsId, req, env));
+        if (!cId && req.method === "POST")   return cors(req, env, await handleCreateCustomer(wsId, req, env));
+        if (cId && req.method === "PATCH")   return cors(req, env, await handleUpdateCustomer(wsId, cId, req, env));
+        if (cId && req.method === "DELETE")  return cors(req, env, await handleDeleteCustomer(wsId, cId, req, env));
+      }
 
       // access-code va ANTES que /members/:mid porque su path es más
       // específico (/members/:mid/access-code matches both regex).
@@ -157,7 +190,7 @@ function cors(req: Request, env: Env, res: Response): Response {
   const origin = req.headers.get("origin");
   const headers = new Headers(res.headers);
   headers.set("access-control-allow-origin", origin ?? "*");
-  headers.set("access-control-allow-methods", "GET, POST, OPTIONS");
+  headers.set("access-control-allow-methods", "GET, POST, PATCH, DELETE, OPTIONS");
   headers.set("access-control-allow-headers", "content-type, authorization");
   headers.set("access-control-max-age", "86400");
   headers.set("vary", "origin");

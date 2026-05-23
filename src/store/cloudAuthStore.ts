@@ -41,11 +41,31 @@ interface CloudAuthState {
   /** ID del workspace cloud activo (persisted). */
   activeWorkspaceId: string | null;
 
+  /**
+   * Estado del bootstrap por feature. Cuando es 'done', las queries de
+   * esa feature (customersDb, pipelineDb, etc) ya saben pegar al cloud
+   * en vez de SQLite. Por feature porque vamos a ir migrando rounds:
+   *   customers (R1) → pipeline (R2) → sales (R3) → ...
+   *
+   * Keyed por workspaceId para que cada workspace tenga su propio
+   * estado de migración. Si tenés 2 workspaces y sólo migraste uno,
+   * la app respeta eso.
+   *
+   * Por defecto 'pending' — UI muestra prompt "subir tus clientes a la
+   * nube" cuando hay workspace activo. Una vez 'done', no se vuelve a
+   * mostrar (lo cambia el flow de import).
+   * 'skip' = el user decidió arrancar limpio sin subir los locales.
+   */
+  bootstrapStatus: Record<string, { customers?: "pending" | "done" | "skip" }>;
+
   setSession: (args: { jwt: string; email: string; userId: string; sessionId: string; expiresAt: number }) => void;
   setWorkspaces: (ws: CloudWorkspace[]) => void;
   setActiveWorkspace: (id: string | null) => void;
   /** Agrega o reemplaza un workspace en la lista. Útil después de crear. */
   upsertWorkspace: (ws: CloudWorkspace) => void;
+  setBootstrapStatus: (workspaceId: string, feature: "customers", status: "pending" | "done" | "skip") => void;
+  /** True si el workspace activo terminó el bootstrap de la feature. */
+  isCloudModeFor: (feature: "customers") => boolean;
   clearSession: () => void;
   /** True si tenemos JWT y NO está expirado. */
   isLoggedIn: () => boolean;
@@ -65,6 +85,7 @@ export const useCloudAuthStore = create<CloudAuthState>()(
       expiresAt: null,
       workspaces: [],
       activeWorkspaceId: null,
+      bootstrapStatus: {},
 
       setSession: ({ jwt, email, userId, sessionId, expiresAt }) =>
         set({ jwt, email, userId, sessionId, expiresAt }),
@@ -91,10 +112,29 @@ export const useCloudAuthStore = create<CloudAuthState>()(
           return { workspaces: next, activeWorkspaceId: activeId };
         }),
 
+      setBootstrapStatus: (workspaceId, feature, status) =>
+        set((state) => ({
+          bootstrapStatus: {
+            ...state.bootstrapStatus,
+            [workspaceId]: {
+              ...(state.bootstrapStatus[workspaceId] ?? {}),
+              [feature]: status,
+            },
+          },
+        })),
+
+      isCloudModeFor: (feature) => {
+        const { activeWorkspaceId, bootstrapStatus, isLoggedIn } = get();
+        if (!isLoggedIn()) return false;
+        if (!activeWorkspaceId) return false;
+        return bootstrapStatus[activeWorkspaceId]?.[feature] === "done";
+      },
+
       clearSession: () =>
         set({
           jwt: null, email: null, userId: null, sessionId: null, expiresAt: null,
           workspaces: [], activeWorkspaceId: null,
+          bootstrapStatus: {},
         }),
 
       isLoggedIn: () => {

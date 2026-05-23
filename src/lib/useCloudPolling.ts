@@ -32,9 +32,22 @@ type Feature =
   | "cash" | "followups" | "catalog"
   | "paymentMethods" | "customerTypes" | "customerTags";
 
-/** Intervalo default — 30 seg. Configurable acá si en el futuro queremos
- *  por feature (pipeline más rápido, catálogo más lento, etc). */
-const POLL_INTERVAL_MS = 30_000;
+/** Intervalo default — 5 seg.
+ *
+ * Por qué 5s:
+ *   - El equipo trabaja en paralelo, necesitan ver cambios casi al
+ *     instante (no esperar 30s para que aparezca la venta que cargó
+ *     el vendedor).
+ *   - TanStack Query NO hace polling cuando la ventana está en background
+ *     (`refetchIntervalInBackground: false` por default). Así que el
+ *     costo en CF Workers es proporcional a "tiempo activo viendo la
+ *     pantalla", no a "app abierta".
+ *   - Estimación de costo con 3 PCs trabajando 8h/día = ~40k req/día,
+ *     dentro del free tier de Cloudflare (100k/día).
+ *
+ * Si en el futuro vemos que 5s es muy rápido (latency molesta) o muy
+ * lento (drag de pipeline se siente desincronizado), ajustamos acá. */
+const POLL_INTERVAL_MS = 5_000;
 
 /**
  * Hook que el caller pasa directamente a TanStack Query como

@@ -44,6 +44,11 @@ const PAYMENT_EDITABLE = [
   "method", "currency", "amount", "is_deposit",
 ] as const;
 
+const CASH_MOVEMENT_EDITABLE = [
+  "kind", "amount", "currency", "description", "category",
+  "sale_id", "customer_name", "payment_method", "moved_at",
+] as const;
+
 function pick(input: Record<string, unknown>, allowed: readonly string[]): Record<string, TursoArg> {
   const out: Record<string, TursoArg> = {};
   for (const k of allowed) {
@@ -104,6 +109,15 @@ interface CreateSaleBody {
   id?: unknown;
   items?: Array<Record<string, unknown>>;
   payments?: Array<Record<string, unknown>>;
+  /**
+   * E1: cash_movements + stock_decrements opcionales — si vienen,
+   * los insertamos DENTRO de la misma transacción que la sale. Cierra
+   * el gap C2 (esos side-effects vivían en el cliente como best-effort).
+   * Si el caller no los manda, el endpoint se comporta igual que antes
+   * (back-compat).
+   */
+  cash_movements?: Array<Record<string, unknown>>;
+  stock_decrements?: Array<{ catalog_item_id?: unknown; quantity?: unknown }>;
   [k: string]: unknown;
 }
 
@@ -164,6 +178,46 @@ export async function handleCreateSale(workspaceId: string, req: Request, env: E
       stmts.push({
         sql: `INSERT INTO sale_payments (${pcols.join(", ")}) VALUES (${pcols.map(() => "?").join(", ")})`,
         args: pvals,
+      });
+    }
+  }
+
+  // E1: cash_movements DENTRO de la misma tx. Cada movimiento es un
+  // ingreso/egreso de caja auto-derivado de la venta (por cada moneda
+  // cobrada NO en cuenta-corriente). Si falla cualquier insert, el
+  // BEGIN/COMMIT/ROLLBACK garantiza que la venta tampoco se persista.
+  if (Array.isArray(body.cash_movements)) {
+    for (const m of body.cash_movements) {
+      if (!m || typeof m !== "object") continue;
+      const mId = typeof m.id === "string" && m.id ? m.id : crypto.randomUUID();
+      if (typeof m.kind !== "string" || typeof m.amount !== "number") {
+        return json({ error: "invalid_cash_movement", needed: ["kind", "amount"] }, 400);
+      }
+      const mfields = pick(m as Record<string, unknown>, CASH_MOVEMENT_EDITABLE);
+      const mcols = ["id", "workspace_id", "created_by", ...Object.keys(mfields)];
+      const mvals: TursoArg[] = [mId, workspaceId, auth.userId, ...Object.values(mfields)];
+      stmts.push({
+        sql: `INSERT INTO cash_movements (${mcols.join(", ")}) VALUES (${mcols.map(() => "?").join(", ")})`,
+        args: mvals,
+      });
+    }
+  }
+
+  // E1: decremento de stock DENTRO de la misma tx. Atómico via
+  // `stock = MAX(0, stock - ?)` (mismo SQL que C1, pero por dentro
+  // de la transacción). Sólo afecta filas con track_stock=1.
+  if (Array.isArray(body.stock_decrements)) {
+    for (const d of body.stock_decrements) {
+      if (!d || typeof d !== "object") continue;
+      const catalogItemId = typeof d.catalog_item_id === "string" ? d.catalog_item_id : null;
+      const qty = Number(d.quantity);
+      if (!catalogItemId || !Number.isFinite(qty) || qty <= 0) {
+        return json({ error: "invalid_stock_decrement", needed: ["catalog_item_id", "quantity>0"] }, 400);
+      }
+      stmts.push({
+        sql: `UPDATE catalog_items SET stock = MAX(0, stock - ?)
+                WHERE id = ? AND workspace_id = ? AND track_stock = 1`,
+        args: [qty, catalogItemId, workspaceId],
       });
     }
   }

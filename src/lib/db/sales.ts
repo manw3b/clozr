@@ -4,7 +4,6 @@ import { useCloudAuthStore } from "../../store/cloudAuthStore";
 import {
   fetchSales, fetchSale, createSaleCloud, updateSaleCloud,
   addSalePaymentCloud,
-  cashApi,
   type CloudSale,
 } from "../cloudAuth";
 import { log } from "../logger";
@@ -173,13 +172,10 @@ export async function createSale(
   const now = new Date().toISOString();
 
   // ── Cloud path ───────────────────────────────────────────────────
-  // Si estamos en cloud mode, creamos en Turso (sale + items + payments
-  // en una pipeline atómica). El frontend ve la misma Sale de retorno.
-  //
-  // IMPORTANTE: el cloud path NO maneja IMEI auto-FIFO, descuento de
-  // stock, ni cash_movements derivados. Esas operaciones siguen siendo
-  // LOCAL y se ejecutan abajo en el path SQLite. Cuando cloud mode
-  // tenga inventory + cash escribiendo cloud (futuro), unificamos.
+  // E1: TODO va en una sola transacción backend (sale + items + payments
+  // + cash_movements + stock decrements). Si CUALQUIER paso falla,
+  // ROLLBACK y nada queda persistido. Antes los cash y stock eran
+  // best-effort post-venta — podía quedar una venta sin ingreso de caja.
   const cloudC = cloudCtx();
   if (cloudC) {
     const subtotal = data.items.reduce(
@@ -197,6 +193,36 @@ export async function createSale(
       data.payments.find((p) => !p.is_deposit) ?? data.payments[0];
     const paymentMethod = primaryPayment?.method ?? null;
     const outOfStock = data.out_of_stock_sale ? 1 : 0;
+
+    // Pre-calc cash_movements: 1 por moneda con $$ cobrados, salvo
+    // cuenta-corriente (es deuda, no caja).
+    const cashByCurrency: Record<"ARS" | "USD", number> = { ARS: 0, USD: 0 };
+    for (const p of data.payments) {
+      if (p.method === "cuenta-corriente") continue;
+      const currency = ((p.currency ?? "ARS") === "USD" ? "USD" : "ARS") as "ARS" | "USD";
+      cashByCurrency[currency] += p.amount;
+    }
+    const cashMovements = (Object.entries(cashByCurrency) as Array<["ARS" | "USD", number]>)
+      .filter(([, amount]) => amount > 0)
+      .map(([currency, amount]) => ({
+        id: crypto.randomUUID(),
+        kind: "income" as const,
+        amount,
+        currency,
+        description: `Venta · ${data.customer_name ?? "cliente"}`,
+        category: "venta" as const,
+        sale_id: id,
+        customer_name: data.customer_name ?? null,
+        payment_method: paymentMethod,
+        moved_at: now,
+      }));
+
+    // Pre-calc stock decrements (solo items track_stock=1 + from_stock=true).
+    const stockDecrements = data.out_of_stock_sale
+      ? []
+      : data.items
+          .filter((it) => it.catalog_item_id && it.from_stock)
+          .map((it) => ({ catalog_item_id: it.catalog_item_id!, quantity: it.quantity }));
 
     const res = await createSaleCloud(cloudC.jwt, cloudC.wsId, {
       id,
@@ -227,59 +253,10 @@ export async function createSale(
         amount: p.amount,
         is_deposit: p.is_deposit ? 1 : 0,
       })),
+      cash_movements: cashMovements,
+      stock_decrements: stockDecrements,
     });
     if (!res.ok) throw new Error(`No se pudo crear venta en la nube: ${res.error}`);
-
-    // ── Efectos secundarios post-venta ─────────────────────────────
-    //
-    // 1) Cash auto-movements por moneda (igual lógica que path local).
-    //    Genera ingresos de caja por cada moneda con $$ cobrados, salvo
-    //    cuenta-corriente que es deuda no caja.
-    //    Best-effort: si falla, la venta YA está creada — no rollback.
-    const cashByCurrency: Record<"ARS" | "USD", number> = { ARS: 0, USD: 0 };
-    for (const p of data.payments) {
-      if (p.method === "cuenta-corriente") continue;
-      const currency = ((p.currency ?? "ARS") === "USD" ? "USD" : "ARS") as "ARS" | "USD";
-      cashByCurrency[currency] += p.amount;
-    }
-    for (const [currency, amount] of Object.entries(cashByCurrency) as Array<["ARS" | "USD", number]>) {
-      if (amount <= 0) continue;
-      try {
-        await cashApi.create(cloudC.jwt, cloudC.wsId, {
-          id: crypto.randomUUID(),
-          kind: "income",
-          amount,
-          currency,
-          description: `Venta · ${data.customer_name ?? "cliente"}`,
-          category: "venta",
-          sale_id: id,
-          customer_name: data.customer_name ?? null,
-          payment_method: paymentMethod,
-          moved_at: now,
-        } as never);
-      } catch (e) {
-        log.warn("createSale cash_movement side-effect falló", { scope: "salesDb", err: e });
-      }
-    }
-
-    // 2) Stock auto-decrement (resuelto). Para cada item del catálogo
-    //    con track_stock=1 y from_stock=true, descontamos quantity del
-    //    cloud catalog_items.stock. catalogDb.decrementStock ya tiene
-    //    el dispatcher cloud (race condition aceptable: read-modify-write
-    //    sin lock; con 3 PCs vendiendo el MISMO SKU simultáneamente puede
-    //    haber off-by-one, pero es escenario rarísimo).
-    if (!data.out_of_stock_sale) {
-      const { decrementStock } = await import("./catalog");
-      for (const item of data.items) {
-        if (!item.catalog_item_id) continue;
-        if (!item.from_stock) continue;
-        try {
-          await decrementStock(item.catalog_item_id, item.quantity);
-        } catch (e) {
-          log.warn("createSale decrement stock side-effect falló", { scope: "salesDb", err: e });
-        }
-      }
-    }
 
     // Devolver Sale sintetizado — los callers esperan el shape completo.
     return {

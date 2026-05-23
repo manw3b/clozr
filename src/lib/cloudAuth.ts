@@ -583,7 +583,27 @@ export function fetchSale(jwt: string | null, workspaceId: string, saleId: strin
 export function createSaleCloud(
   jwt: string | null,
   workspaceId: string,
-  payload: Partial<CloudSale> & { id?: string; items?: Partial<CloudSaleItem>[]; payments?: Partial<CloudSalePayment>[] },
+  payload: Partial<CloudSale> & {
+    id?: string;
+    items?: Partial<CloudSaleItem>[];
+    payments?: Partial<CloudSalePayment>[];
+    // E1: ambos opcionales — backend los procesa dentro de la misma
+    // transacción que la sale. Si vienen vacíos/undefined se comporta
+    // igual que antes.
+    cash_movements?: Array<{
+      id: string;
+      kind: "income" | "expense";
+      amount: number;
+      currency: string;
+      description: string;
+      category: string;
+      sale_id: string;
+      customer_name: string | null;
+      payment_method: string | null;
+      moved_at: string;
+    }>;
+    stock_decrements?: Array<{ catalog_item_id: string; quantity: number }>;
+  },
 ) {
   return authFetch<{ ok: true; id: string }>(jwt, `/workspaces/${workspaceId}/sales`, {
     method: "POST", body: JSON.stringify(payload),

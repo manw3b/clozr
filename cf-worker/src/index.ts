@@ -63,6 +63,7 @@ import {
 } from "./routes/_generic";
 import { SIMPLE_TABLE_SPECS } from "./routes/simpleTables";
 import { handleDecrementStock } from "./routes/catalog-stock";
+import { handleClientError } from "./routes/errors";
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -92,6 +93,16 @@ export default {
         if (!checkRate(req, "verify-code", 10, 10 * 60_000)) {
           return cors(req, env, json({ error: "rate_limited" }, 429));
         }
+      }
+      // E2: telemetría — endpoint para que el frontend nos avise de
+      // errores. Rate limit alto (20/min/IP) — un user con la app rota
+      // podría flood, pero queremos capturar bursts cuando un release
+      // sale roto en producción.
+      if (route === "POST /errors") {
+        if (!checkRate(req, "errors", 20, 60_000)) {
+          return cors(req, env, json({ error: "rate_limited" }, 429));
+        }
+        return cors(req, env, await handleClientError(req, env));
       }
 
       // ── Admin: trigger migraciones explícitamente ──────────────────

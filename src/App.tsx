@@ -77,18 +77,16 @@ function UpdateBanner() {
   const [version, setVersion] = useState<string | null>(null);
   const [status, setStatus] = useState<UpdateStatus>("idle");
 
-  // D6: throttle de chequeo a 1 vez cada 24h. Antes pegábamos al
-  // updater de GitHub Actions en cada arranque (incluso si el user
-  // abrió la app 10 veces hoy). Ahora persistimos lastUpdateCheck
-  // en localStorage y skipeamos si pasó <24h.
+  // Chequeo en cada arranque (3s después de boot). El throttle 24h
+  // que metimos en D6 retrasaba updates hasta 24h: si actualizabas a
+  // v1.3.54 y minutos después salía v1.3.55, el timestamp guardado
+  // bloqueaba el siguiente check. Costo de chequear cada arranque:
+  // ~200ms a GitHub Releases en background, despreciable. Saco el
+  // throttle — limpiamos el localStorage por si quedó tirado.
   useEffect(() => {
+    localStorage.removeItem("clozr:lastUpdateCheck");
     const t = setTimeout(() => {
-      const last = Number(localStorage.getItem("clozr:lastUpdateCheck") ?? 0);
-      const ageMs = Date.now() - last;
-      const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
-      if (ageMs < TWENTY_FOUR_HOURS) return;
       checkForUpdate().then((info) => {
-        localStorage.setItem("clozr:lastUpdateCheck", String(Date.now()));
         if (info) setVersion(info.version);
       });
     }, 3000);

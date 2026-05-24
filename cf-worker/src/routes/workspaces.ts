@@ -255,10 +255,13 @@ export async function handlePatchMember(
  * POST /auth/verify-code junto con su email — exact same endpoint
  * que el login normal.
  *
- * Permisos: owner|admin del workspace. Solo para memberships con
- * status='invited' (los activos ya pueden loguearse normal). El email
- * va atado a la membership — el código solo sirve para ese email
- * específico (porque verify-code busca por email + code juntos).
+ * Permisos: owner|admin del workspace. Funciona tanto para memberships
+ * status='invited' (primer login) como 'active' (re-login si perdió
+ * sesión, abre en otra PC, o Resend sandbox no le mandó el email).
+ * El email va atado a la membership — el código solo sirve para ese
+ * email específico (porque verify-code busca por email + code juntos).
+ *
+ * Bloqueamos solo 'revoked' (miembro expulsado no merece código nuevo).
  */
 export async function handleIssueAccessCode(
   workspaceId: string,
@@ -277,10 +280,10 @@ export async function handleIssueAccessCode(
   const target = await tursoFirst(
     env,
     `SELECT email, status FROM memberships
-       WHERE id = ? AND workspace_id = ? AND status = 'invited'`,
+       WHERE id = ? AND workspace_id = ? AND status IN ('invited', 'active')`,
     [membershipId, workspaceId],
   );
-  if (!target) return json({ error: "not_invited" }, 404);
+  if (!target) return json({ error: "member_not_found" }, 404);
 
   // Generar magic_link como en /auth/request (mismo formato).
   const token = randomHex(32);

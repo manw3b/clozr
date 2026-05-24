@@ -53,18 +53,12 @@ export function Equipo() {
   // F.navigation: si hay sesión cloud activa, usamos la gestión cloud
   // (antes vivía en Ajustes → Equipo en la nube). Local sigue como
   // fallback para users sin cloud.
+  // IMPORTANTE: todos los hooks se llaman ANTES del early return para
+  // respetar rules-of-hooks (el orden de hooks debe ser constante entre
+  // renders). El cloud check decide solo cuál UI renderear, no qué hooks
+  // se ejecutan.
   const cloudLoggedIn = useCloudAuthStore((s) => s.isLoggedIn());
   const cloudActiveWsId = useCloudAuthStore((s) => s.activeWorkspaceId);
-  if (cloudLoggedIn && cloudActiveWsId) {
-    return (
-      <div style={{ height: "100%", overflow: "auto", padding: "var(--space-6) var(--space-8)" }}>
-        <Suspense fallback={<div style={{ color: "var(--text-dim)" }}>Cargando equipo…</div>}>
-          <CloudTeamSection />
-        </Suspense>
-      </div>
-    );
-  }
-
   const { activeWorkspace } = useWorkspaceStore();
   const { showToast } = useUIStore();
   const wid = activeWorkspace?.id ?? "";
@@ -101,6 +95,19 @@ export function Equipo() {
       showToast("Rol actualizado", "success");
     },
   });
+
+  // F.navigation: early return cloud — DESPUÉS de declarar todos los hooks
+  // (rules-of-hooks: orden de hooks debe ser estable). El branch local
+  // solo se usa cuando no hay cloud activa.
+  if (cloudLoggedIn && cloudActiveWsId) {
+    return (
+      <div style={{ height: "100%", overflow: "auto", padding: "var(--space-6) var(--space-8)" }}>
+        <Suspense fallback={<div style={{ color: "var(--text-dim)" }}>Cargando equipo…</div>}>
+          <CloudTeamSection />
+        </Suspense>
+      </div>
+    );
+  }
 
   const columns: ColumnDef<WorkspaceMember>[] = [
     {

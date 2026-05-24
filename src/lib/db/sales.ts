@@ -224,12 +224,20 @@ export async function createSale(
           .filter((it) => it.catalog_item_id && it.from_stock)
           .map((it) => ({ catalog_item_id: it.catalog_item_id!, quantity: it.quantity }));
 
+    // A5: en cloud mode el seller_id debe ser el user_id de la sesión cloud
+    // (el ID del user en la tabla cloud `users`), NO el authStore local
+    // (que es el ID del member local — distinto en cada PC). Sin esto,
+    // los reportes "ventas por vendedor" salen rotos porque cada PC graba
+    // su propio seller_id local. El nombre lo mantenemos del input porque
+    // es lo que muestra la UI (mientras no traigamos el user_name del cloud).
+    const cloudUserId = useCloudAuthStore.getState().userId;
+    const cloudUserEmail = useCloudAuthStore.getState().email;
     const res = await createSaleCloud(cloudC.jwt, cloudC.wsId, {
       id,
       customer_id: data.customer_id ?? null,
       customer_name: data.customer_name ?? null,
-      seller_id: data.seller_id ?? null,
-      seller_name: data.seller_name ?? null,
+      seller_id: cloudUserId || data.seller_id || null,
+      seller_name: data.seller_name ?? cloudUserEmail ?? null,
       subtotal, total: subtotal, total_paid: totalPaid, balance, is_paid: isPaid,
       notes: data.notes ?? null,
       payment_method: paymentMethod,

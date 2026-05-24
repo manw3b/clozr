@@ -21,7 +21,7 @@
 import type { Env } from "../index";
 import { ensureSchema } from "../schema";
 import { requireAuth, type AuthClaims } from "../auth";
-import { tursoExec, tursoFirst, tursoQuery, type Row } from "../turso";
+import { tursoExec, tursoFirst, tursoQuery, type Row, type TursoArg } from "../turso";
 import { sendInviteEmail } from "../email";
 
 /* ── POST /workspaces ────────────────────────────────────────────────── */
@@ -55,6 +55,47 @@ export async function handleCreateWorkspace(req: Request, env: Env): Promise<Res
   );
 
   return json({ id: workspaceId, name, role: "owner", status: "active" }, 201);
+}
+
+/* ── PATCH /workspaces/:wid ───────────────────────────────────────────── */
+/**
+ * Editar el workspace activo. Solo owner/admin del workspace. Campos
+ * editables: name, industry, daily_goal, daily_goal_currency,
+ * daily_goal_count. (Otros campos del schema están fuera de scope —
+ * created_at no se edita, owner_user_id requiere flow separado).
+ */
+const WS_EDITABLE = ["name", "industry", "daily_goal", "daily_goal_currency", "daily_goal_count"] as const;
+
+export async function handleUpdateWorkspace(workspaceId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+
+  const me = await membership(env, workspaceId, auth.userId);
+  if (!me) return json({ error: "not_a_member" }, 403);
+  if (!canManageTeam(String(me.role))) return json({ error: "forbidden" }, 403);
+
+  let body: Record<string, unknown>;
+  try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
+
+  const fields: Record<string, TursoArg> = {};
+  for (const k of WS_EDITABLE) {
+    if (k in body) {
+      const v = body[k];
+      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+        fields[k] = v;
+      }
+    }
+  }
+  if (Object.keys(fields).length === 0) return json({ error: "no_fields" }, 400);
+
+  const setSql = Object.keys(fields).map((c) => `${c} = ?`).join(", ");
+  await tursoExec(
+    env,
+    `UPDATE cloud_workspaces SET ${setSql} WHERE id = ?`,
+    [...Object.values(fields), workspaceId],
+  );
+  return json({ ok: true });
 }
 
 /* ── helpers comunes ─────────────────────────────────────────────────── */

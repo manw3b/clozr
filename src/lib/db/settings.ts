@@ -1,6 +1,7 @@
 import { dbSelect, dbExecute, runWrite } from "./index";
 import type { PipelineStage, CustomerTypeRow, CatalogCategoryRow } from "./types";
 import { useCloudAuthStore } from "../../store/cloudAuthStore";
+import { updateWorkspaceCloud } from "../cloudAuth";
 import { log } from "../logger";
 import {
   fetchPipelineStages,
@@ -232,8 +233,40 @@ export async function saveCatalogCategories(workspaceId: string, categories: Cat
 
 export async function updateWorkspace(
   id: string,
-  data: { name?: string; emoji?: string; color?: string; logo_path?: string | null; daily_goal?: number; daily_goal_currency?: string },
+  data: { name?: string; emoji?: string; color?: string; logo_path?: string | null; daily_goal?: number; daily_goal_currency?: string; daily_goal_count?: number },
 ): Promise<void> {
+  // G/A4: si hay sesión cloud, el daily_goal va al cloud_workspaces
+  // (compartido con el equipo). El resto (emoji, logo, color) es per-PC
+  // — no tiene sentido sincronizar el emoji/logo entre miembros.
+  const s = useCloudAuthStore.getState();
+  if (s.isLoggedIn() && s.activeWorkspaceId) {
+    const cloudPatch: { name?: string; daily_goal?: number; daily_goal_currency?: string; daily_goal_count?: number } = {};
+    if (data.name !== undefined) cloudPatch.name = data.name;
+    if (data.daily_goal !== undefined) cloudPatch.daily_goal = data.daily_goal;
+    if (data.daily_goal_currency !== undefined) cloudPatch.daily_goal_currency = data.daily_goal_currency;
+    if (data.daily_goal_count !== undefined) cloudPatch.daily_goal_count = data.daily_goal_count;
+    if (Object.keys(cloudPatch).length > 0) {
+      const res = await updateWorkspaceCloud(s.jwt, s.activeWorkspaceId, cloudPatch);
+      if (!res.ok) {
+        log.warn("updateWorkspace cloud falló — sigo con local", { scope: "settingsDb", data: { error: res.error } });
+      } else {
+        // Sync el store local — para que `useIndustry` y otros consumidores
+        // vean el daily_goal nuevo sin esperar al próximo /me.
+        s.upsertWorkspace({
+          id: s.activeWorkspaceId,
+          name: data.name ?? s.workspaces.find((w) => w.id === s.activeWorkspaceId)?.name ?? "",
+          role: s.workspaces.find((w) => w.id === s.activeWorkspaceId)?.role ?? "owner",
+          status: s.workspaces.find((w) => w.id === s.activeWorkspaceId)?.status ?? "active",
+          daily_goal: data.daily_goal ?? s.workspaces.find((w) => w.id === s.activeWorkspaceId)?.daily_goal,
+          daily_goal_currency: data.daily_goal_currency ?? s.workspaces.find((w) => w.id === s.activeWorkspaceId)?.daily_goal_currency,
+          daily_goal_count: data.daily_goal_count ?? s.workspaces.find((w) => w.id === s.activeWorkspaceId)?.daily_goal_count,
+        });
+      }
+    }
+  }
+
+  // Local SIEMPRE corre — es el cache local + cubre el caso no-cloud.
+  // (Emoji/logo/color son local-only por design.)
   const mapped: Record<string, unknown> = {};
   if (data.name !== undefined) mapped.name = data.name;
   if (data.emoji !== undefined) mapped.emoji = data.emoji;

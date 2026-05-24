@@ -36,12 +36,21 @@ import { handleMe } from "./routes/me";
 import { ensureSchema } from "./schema";
 import {
   handleCreateWorkspace,
+  handleUpdateWorkspace,
   handleListMembers,
   handleInviteMember,
   handlePatchMember,
   handleRevokeMember,
   handleIssueAccessCode,
 } from "./routes/workspaces";
+import {
+  handleListAssignedTaskTemplates, handleCreateAssignedTaskTemplate,
+  handleUpdateAssignedTaskTemplate, handleDeleteAssignedTaskTemplate,
+} from "./routes/assigned-tasks";
+import {
+  handleListCustomerContacts, handleCreateCustomerContact,
+  handleLastContactByCustomer,
+} from "./routes/customer-contacts";
 import {
   handleListCustomers,
   handleCreateCustomer,
@@ -218,6 +227,36 @@ export default {
         if (sId && req.method === "GET")     return cors(req, env, await handleGetSale(wsId, sId, req, env));
         if (sId && req.method === "PATCH")   return cors(req, env, await handleUpdateSale(wsId, sId, req, env));
         if (sId && req.method === "DELETE")  return cors(req, env, await handleDeleteSale(wsId, sId, req, env));
+      }
+
+      // G/A4 — PATCH workspace (daily_goal, industry, name, etc).
+      // Match exacto sin /members ni /invite etc — esos van después.
+      const wsPatchMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/?$/);
+      if (wsPatchMatch && req.method === "PATCH") {
+        return cors(req, env, await handleUpdateWorkspace(wsPatchMatch[1]!, req, env));
+      }
+
+      // G/A1 — assigned_task_templates
+      const wsAtImportMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/assigned-task-templates\/?$/);
+      const wsAtIdMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/assigned-task-templates\/([^/]+)\/?$/);
+      if (wsAtImportMatch) {
+        if (req.method === "GET")  return cors(req, env, await handleListAssignedTaskTemplates(wsAtImportMatch[1]!, req, env));
+        if (req.method === "POST") return cors(req, env, await handleCreateAssignedTaskTemplate(wsAtImportMatch[1]!, req, env));
+      }
+      if (wsAtIdMatch) {
+        if (req.method === "PATCH")  return cors(req, env, await handleUpdateAssignedTaskTemplate(wsAtIdMatch[1]!, wsAtIdMatch[2]!, req, env));
+        if (req.method === "DELETE") return cors(req, env, await handleDeleteAssignedTaskTemplate(wsAtIdMatch[1]!, wsAtIdMatch[2]!, req, env));
+      }
+
+      // G/A2 — customer_contacts
+      const wsLastContactMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/customer-contacts\/last-by-customer\/?$/);
+      if (wsLastContactMatch && req.method === "GET") {
+        return cors(req, env, await handleLastContactByCustomer(wsLastContactMatch[1]!, req, env));
+      }
+      const wsCustomerContactsMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/customers\/([^/]+)\/contacts\/?$/);
+      if (wsCustomerContactsMatch) {
+        if (req.method === "GET")  return cors(req, env, await handleListCustomerContacts(wsCustomerContactsMatch[1]!, wsCustomerContactsMatch[2]!, req, env));
+        if (req.method === "POST") return cors(req, env, await handleCreateCustomerContact(wsCustomerContactsMatch[1]!, wsCustomerContactsMatch[2]!, req, env));
       }
 
       // Decrement stock atómico (C1) — DEBE ir antes del loop generic

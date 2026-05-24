@@ -28,6 +28,10 @@ export interface CloudWorkspace {
    * compat con sessions persistidas previas a F.
    */
   industry?: string;
+  /** G/A4: meta diaria del workspace — visible por todo el equipo. */
+  daily_goal?: number;
+  daily_goal_currency?: string;
+  daily_goal_count?: number;
 }
 
 interface CloudAuthState {

@@ -28,7 +28,7 @@ let initPromise: Promise<void> | null = null;
  *
  * Bump cuando agregues un CREATE TABLE / ALTER TABLE / safeAddColumn.
  */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 export function ensureSchema(env: Env): Promise<void> {
   if (!initPromise) initPromise = applySchemaIfNeeded(env);
@@ -149,6 +149,56 @@ async function applySchema(env: Env): Promise<void> {
   // así que serializamos. Lookup vía json_each() o split client-side.
   // Default '[]' string para evitar nulls confusos en el frontend.
   await safeAddColumn(env, "users", "owned_industries_json", "TEXT DEFAULT '[]'");
+
+  // 004 (G/A4) — daily goal del workspace en cloud. Antes vivía solo en
+  // local. Ahora cuando el owner setea "vender USD 5000/día", Caro lo
+  // ve en su Mi Día también.
+  await safeAddColumn(env, "cloud_workspaces", "daily_goal", "REAL DEFAULT 0");
+  await safeAddColumn(env, "cloud_workspaces", "daily_goal_currency", "TEXT DEFAULT 'USD'");
+  await safeAddColumn(env, "cloud_workspaces", "daily_goal_count", "INTEGER DEFAULT 0");
+
+  // 005 (G/A1) — assigned_task_templates en cloud. Tabla espejo del local.
+  await tursoQuery(env, {
+    sql: `CREATE TABLE IF NOT EXISTS assigned_task_templates (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+      title TEXT NOT NULL,
+      description TEXT,
+      frequency TEXT NOT NULL DEFAULT 'daily',
+      target_time TEXT,
+      target_count INTEGER,
+      assigned_to_user_id TEXT,
+      created_by TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at TEXT
+    )`,
+  });
+  await tursoQuery(env, {
+    sql: `CREATE INDEX IF NOT EXISTS idx_assigned_task_templates_ws
+      ON assigned_task_templates(workspace_id, deleted_at)`,
+  });
+
+  // 006 (G/A2) — customer_contacts en cloud. Tabla del log de interacciones
+  // con cada cliente (llamada, WhatsApp, visita, etc). Sin esto, "días sin
+  // contacto" diverge entre PCs y un cliente puede ser llamado 2 veces.
+  await tursoQuery(env, {
+    sql: `CREATE TABLE IF NOT EXISTS customer_contacts (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+      customer_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      notes TEXT,
+      contacted_by TEXT,
+      contacted_by_name TEXT,
+      contacted_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  });
+  await tursoQuery(env, {
+    sql: `CREATE INDEX IF NOT EXISTS idx_customer_contacts_ws_customer
+      ON customer_contacts(workspace_id, customer_id, contacted_at DESC)`,
+  });
 
   // ── F2.1: Workspaces multi-tenant + memberships ───────────────────
   //

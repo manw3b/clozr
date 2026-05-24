@@ -25,6 +25,10 @@ interface WorkspaceForUser {
   status: string;
   /** F: rubro asignado al workspace. Default "generic" si no se setea. */
   industry: string;
+  /** G/A4: meta diaria del workspace (compartida en equipo). */
+  daily_goal: number;
+  daily_goal_currency: string;
+  daily_goal_count: number;
 }
 
 interface MeResponse {
@@ -66,7 +70,7 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
       args: [auth.userId],
     },
     {
-      sql: `SELECT w.id, w.name, w.industry, m.role, m.status
+      sql: `SELECT w.id, w.name, w.industry, w.daily_goal, w.daily_goal_currency, w.daily_goal_count, m.role, m.status
               FROM memberships m
               INNER JOIN cloud_workspaces w ON w.id = m.workspace_id
               WHERE m.user_id = ? AND m.status = 'active'
@@ -102,6 +106,9 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
       role: String(r.role),
       status: String(r.status),
       industry: String(r.industry ?? "generic"),
+      daily_goal: Number(r.daily_goal ?? 0),
+      daily_goal_currency: String(r.daily_goal_currency ?? "USD"),
+      daily_goal_count: Number(r.daily_goal_count ?? 0),
     })),
   };
   return json(body);

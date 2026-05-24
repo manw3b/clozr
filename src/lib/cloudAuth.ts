@@ -211,6 +211,10 @@ export interface MeWorkspace {
   status: "active" | "invited" | "revoked";
   /** F: rubro del workspace. Optional para back-compat. */
   industry?: string;
+  /** G/A4: meta diaria del workspace compartida en equipo. */
+  daily_goal?: number;
+  daily_goal_currency?: string;
+  daily_goal_count?: number;
 }
 
 export interface MeResponse {
@@ -515,6 +519,74 @@ export interface CloudCatalogItem {
   [k: string]: unknown;
 }
 export const catalogApi = cloudTable<CloudCatalogItem>("catalog");
+
+/* ── Workspace update (G/A4) ─────────────────────────────────────────── */
+export interface UpdateWorkspaceBody {
+  name?: string;
+  industry?: string;
+  daily_goal?: number;
+  daily_goal_currency?: string;
+  daily_goal_count?: number;
+}
+export function updateWorkspaceCloud(jwt: string | null, workspaceId: string, body: UpdateWorkspaceBody) {
+  return authFetch<{ ok: true }>(jwt, `/workspaces/${workspaceId}`, {
+    method: "PATCH", body: JSON.stringify(body),
+  });
+}
+
+/* ── Assigned task templates (G/A1) ──────────────────────────────────── */
+export interface CloudAssignedTaskTemplate {
+  id: string;
+  workspace_id: string;
+  title: string;
+  description: string | null;
+  frequency: string;
+  target_time: string | null;
+  target_count: number | null;
+  assigned_to_user_id: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+export const assignedTaskTemplatesApi = {
+  list: (jwt: string | null, workspaceId: string) =>
+    authFetch<{ items: CloudAssignedTaskTemplate[] }>(jwt, `/workspaces/${workspaceId}/assigned-task-templates`),
+  create: (jwt: string | null, workspaceId: string, payload: Partial<CloudAssignedTaskTemplate>) =>
+    authFetch<{ ok: true; id: string }>(jwt, `/workspaces/${workspaceId}/assigned-task-templates`, {
+      method: "POST", body: JSON.stringify(payload),
+    }),
+  update: (jwt: string | null, workspaceId: string, id: string, payload: Partial<CloudAssignedTaskTemplate>) =>
+    authFetch<{ ok: true }>(jwt, `/workspaces/${workspaceId}/assigned-task-templates/${id}`, {
+      method: "PATCH", body: JSON.stringify(payload),
+    }),
+  remove: (jwt: string | null, workspaceId: string, id: string) =>
+    authFetch<{ ok: true }>(jwt, `/workspaces/${workspaceId}/assigned-task-templates/${id}`, {
+      method: "DELETE",
+    }),
+};
+
+/* ── Customer contacts (G/A2) ────────────────────────────────────────── */
+export interface CloudCustomerContact {
+  id: string;
+  workspace_id: string;
+  customer_id: string;
+  kind: string;
+  notes: string | null;
+  contacted_by: string | null;
+  contacted_by_name: string | null;
+  contacted_at: string;
+  created_at: string;
+}
+export const customerContactsApi = {
+  list: (jwt: string | null, workspaceId: string, customerId: string) =>
+    authFetch<{ items: CloudCustomerContact[] }>(jwt, `/workspaces/${workspaceId}/customers/${customerId}/contacts`),
+  create: (jwt: string | null, workspaceId: string, customerId: string, payload: Partial<CloudCustomerContact>) =>
+    authFetch<{ ok: true; id: string }>(jwt, `/workspaces/${workspaceId}/customers/${customerId}/contacts`, {
+      method: "POST", body: JSON.stringify(payload),
+    }),
+  lastByCustomer: (jwt: string | null, workspaceId: string) =>
+    authFetch<{ lastByCustomer: Record<string, string> }>(jwt, `/workspaces/${workspaceId}/customer-contacts/last-by-customer`),
+};
 
 /**
  * Decrement atómico de stock — backend hace `UPDATE ... stock = MAX(0, stock - ?)`

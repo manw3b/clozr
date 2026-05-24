@@ -17,11 +17,49 @@
  */
 
 import { dbSelect, dbExecute } from "./index";
+import { useCloudAuthStore } from "../../store/cloudAuthStore";
+import { assignedTaskTemplatesApi, tasksApi, type CloudAssignedTaskTemplate } from "../cloudAuth";
+import { log } from "../logger";
 import type { AssignedTaskTemplate, Task } from "./types";
+
+/**
+ * G/A1: dispatcher cloud↔local para assigned_task_templates. Si hay sesión
+ * cloud activa con workspace, las queries van al worker. El campo
+ * `is_active` no existe en cloud (no había razón funcional — se usa
+ * soft-delete via `deleted_at`); lo defaulteamos a 1 al mapear.
+ */
+function cloudCtx(): { jwt: string; wsId: string } | null {
+  const s = useCloudAuthStore.getState();
+  if (!s.isLoggedIn() || !s.activeWorkspaceId) return null;
+  return { jwt: s.jwt!, wsId: s.activeWorkspaceId };
+}
+
+function cloudToLocal(t: CloudAssignedTaskTemplate): AssignedTaskTemplate {
+  return {
+    id: t.id,
+    workspace_id: t.workspace_id,
+    title: t.title,
+    description: t.description,
+    frequency: t.frequency as "daily" | "weekly" | "monthly",
+    target_time: t.target_time,
+    target_count: t.target_count,
+    assigned_to_user_id: t.assigned_to_user_id,
+    is_active: 1,
+    created_by: t.created_by,
+    created_at: t.created_at,
+    updated_at: t.updated_at,
+  };
+}
 
 export async function getTemplates(
   workspaceId: string,
 ): Promise<AssignedTaskTemplate[]> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    const res = await assignedTaskTemplatesApi.list(ctx.jwt, ctx.wsId);
+    if (res.ok) return res.data.items.map(cloudToLocal);
+    log.warn("getTemplates cloud falló, fallback local", { scope: "assignedTasksDb", data: { error: res.error } });
+  }
   return dbSelect<AssignedTaskTemplate>(
     `SELECT * FROM assigned_task_templates
      WHERE workspace_id = ?
@@ -46,6 +84,35 @@ export async function createTemplate(
 ): Promise<AssignedTaskTemplate> {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
+
+  const ctx = cloudCtx();
+  if (ctx) {
+    const res = await assignedTaskTemplatesApi.create(ctx.jwt, ctx.wsId, {
+      id,
+      title: data.title,
+      description: data.description ?? null,
+      frequency: data.frequency,
+      target_time: data.target_time ?? null,
+      target_count: data.target_count ?? null,
+      assigned_to_user_id: data.assigned_to_user_id ?? null,
+    });
+    if (!res.ok) throw new Error(`No se pudo crear template en la nube: ${res.error}`);
+    return {
+      id,
+      workspace_id: workspaceId,
+      title: data.title,
+      description: data.description ?? null,
+      frequency: data.frequency,
+      target_time: data.target_time ?? null,
+      target_count: data.target_count ?? null,
+      assigned_to_user_id: data.assigned_to_user_id ?? null,
+      is_active: 1,
+      created_by: data.created_by ?? null,
+      created_at: now,
+      updated_at: now,
+    };
+  }
+
   await dbExecute(
     `INSERT INTO assigned_task_templates
      (id, workspace_id, title, description, frequency, target_time,
@@ -95,6 +162,19 @@ export async function updateTemplate(
   id: string,
   patch: UpdateTemplateInput,
 ): Promise<void> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    // is_active no existe en cloud — lo ignoramos. Si cliente pide is_active=0
+    // (soft-delete), tratamos como removeTemplate cloud.
+    const { is_active, ...rest } = patch;
+    if (is_active === 0) {
+      await assignedTaskTemplatesApi.remove(ctx.jwt, ctx.wsId, id);
+      return;
+    }
+    const res = await assignedTaskTemplatesApi.update(ctx.jwt, ctx.wsId, id, rest);
+    if (!res.ok) throw new Error(`No se pudo actualizar template en la nube: ${res.error}`);
+    return;
+  }
   const entries = Object.entries(patch).filter(([, v]) => v !== undefined);
   if (entries.length === 0) return;
   const now = new Date().toISOString();
@@ -107,6 +187,12 @@ export async function updateTemplate(
 }
 
 export async function removeTemplate(id: string): Promise<void> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    const res = await assignedTaskTemplatesApi.remove(ctx.jwt, ctx.wsId, id);
+    if (!res.ok) throw new Error(`No se pudo eliminar template en la nube: ${res.error}`);
+    return;
+  }
   await dbExecute(`DELETE FROM assigned_task_templates WHERE id = ?`, [id]);
   // Las tareas ya materializadas con este template_id quedan huérfanas
   // pero no se borran — son histórico válido (el vendedor las completó).
@@ -137,13 +223,33 @@ export async function materializeForToday(
   workspaceId: string,
   userId: string,
 ): Promise<number> {
-  const templates = await dbSelect<AssignedTaskTemplate>(
-    `SELECT * FROM assigned_task_templates
-     WHERE workspace_id = ?
-       AND is_active = 1
-       AND (assigned_to_user_id IS NULL OR assigned_to_user_id = ?)`,
-    [workspaceId, userId],
-  );
+  const ctx = cloudCtx();
+
+  // En cloud el assigned_to_user_id es el cloud user_id (que setea
+  // AssignedTasksSection cuando crea el template). El userId local que
+  // pasa el caller NO matchea — reemplazamos por el cloud userId.
+  const effectiveUserId = ctx
+    ? (useCloudAuthStore.getState().userId ?? userId)
+    : userId;
+
+  // Cargar templates: cloud si hay sesión, local si no.
+  const templates: AssignedTaskTemplate[] = ctx
+    ? await (async () => {
+        const res = await assignedTaskTemplatesApi.list(ctx.jwt, ctx.wsId);
+        if (!res.ok) return [];
+        // Filtramos por assigned_to_user_id (null = todos los vendedores
+        // O matchea el user actual).
+        return res.data.items
+          .filter((t) => !t.assigned_to_user_id || t.assigned_to_user_id === effectiveUserId)
+          .map(cloudToLocal);
+      })()
+    : await dbSelect<AssignedTaskTemplate>(
+        `SELECT * FROM assigned_task_templates
+         WHERE workspace_id = ?
+           AND is_active = 1
+           AND (assigned_to_user_id IS NULL OR assigned_to_user_id = ?)`,
+        [workspaceId, userId],
+      );
 
   if (templates.length === 0) return 0;
 
@@ -151,12 +257,44 @@ export async function materializeForToday(
   const todayISO = today.toISOString().slice(0, 10); // "2026-05-20"
   let created = 0;
 
+  if (ctx) {
+    // Cloud path: chequear tareas existentes con un solo list + filtro
+    // local (más barato que N round-trips de "exists" check).
+    const existingRes = await tasksApi.list(ctx.jwt, ctx.wsId);
+    const existingToday = existingRes.ok
+      ? new Set(
+          (existingRes.data.items as unknown as Array<Record<string, unknown>>)
+            .filter((t) =>
+              t.template_id &&
+              t.assigned_to === effectiveUserId &&
+              typeof t.created_at === "string" &&
+              t.created_at.slice(0, 10) === todayISO
+            )
+            .map((t) => String(t.template_id))
+        )
+      : new Set<string>();
+
+    for (const tpl of templates) {
+      if (existingToday.has(tpl.id)) continue;
+      const taskId = crypto.randomUUID();
+      const res = await tasksApi.create(ctx.jwt, ctx.wsId, {
+        id: taskId,
+        type: "rutina",
+        frequency: tpl.frequency === "daily" ? "diaria" : tpl.frequency === "weekly" ? "semanal" : "mensual",
+        title: tpl.title,
+        completed: 0,
+        assigned_to: effectiveUserId,
+        template_id: tpl.id,
+        target_count: tpl.target_count,
+        progress: 0,
+      } as never);
+      if (res.ok) created += 1;
+    }
+    return created;
+  }
+
+  // Local path original.
   for (const tpl of templates) {
-    // Para esta versión MVP tratamos daily/weekly/monthly igual:
-    // si NO existe una task con (template_id, assigned_to=userId,
-    // created hoy), la creamos. Esto cumple "diario" naturalmente.
-    // Para weekly/monthly conviene un check más fino — lo dejo TODO
-    // para cuando el caso aparezca (hoy todos los ejemplos son daily).
     const existing = await dbSelect<{ id: string }>(
       `SELECT id FROM tasks
        WHERE workspace_id = ?

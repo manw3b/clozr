@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { settingsDb } from "../../lib/db/settings";
 import { confirmAsync } from "../../lib/confirmAsync";
 import { useWorkspaceStore } from "../../store/workspaceStore";
+import { useDailyGoal } from "../../lib/useDailyGoal";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import Select from "../../components/ui/Select";
@@ -146,8 +147,11 @@ function GeneralSection({ wid }: { wid: string }) {
   const [emoji, setEmoji] = useState(activeWorkspace?.emoji ?? "🏪");
   const [color, setColor] = useState(activeWorkspace?.color ?? "#E8001D");
   const [logoPath, setLogoPath] = useState<string | null>(activeWorkspace?.logo_path ?? null);
-  const [dailyGoal, setDailyGoal] = useState(String(activeWorkspace?.daily_goal ?? ""));
-  const [dailyGoalCurrency, setDailyGoalCurrency] = useState(activeWorkspace?.daily_goal_currency ?? "USD");
+  // G/A4: leer daily_goal del cloud workspace si hay sesión cloud — eso es
+  // lo "compartido con equipo". El local activeWorkspace es cache.
+  const initialGoal = useDailyGoal();
+  const [dailyGoal, setDailyGoal] = useState(initialGoal.amount ? String(initialGoal.amount) : "");
+  const [dailyGoalCurrency, setDailyGoalCurrency] = useState(initialGoal.currency);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -156,10 +160,15 @@ function GeneralSection({ wid }: { wid: string }) {
       setEmoji(activeWorkspace.emoji);
       setColor(activeWorkspace.color);
       setLogoPath(activeWorkspace.logo_path ?? null);
-      setDailyGoal(activeWorkspace.daily_goal ? String(activeWorkspace.daily_goal) : "");
-      setDailyGoalCurrency(activeWorkspace.daily_goal_currency ?? "USD");
     }
   }, [activeWorkspace]);
+
+  // Sync inputs cuando el cloud workspace cambia (ej: otro miembro
+  // editó la meta y Caro recibió el push via /me refresh).
+  useEffect(() => {
+    setDailyGoal(initialGoal.amount ? String(initialGoal.amount) : "");
+    setDailyGoalCurrency(initialGoal.currency);
+  }, [initialGoal.amount, initialGoal.currency]);
 
   const handleSave = async () => {
     if (!name.trim()) return;

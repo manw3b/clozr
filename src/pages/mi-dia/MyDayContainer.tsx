@@ -24,6 +24,7 @@ import { useBusinessStore } from "../../store/businessStore";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore, type ScreenId } from "../../store/uiStore";
 import { tasksDb } from "../../lib/db/tasks";
+import { useTaskVisibilityFilter } from "../../lib/useTaskVisibilityFilter";
 import { followupsDb } from "../../lib/db/followups";
 import { salesDb } from "../../lib/db/sales";
 import { scoreDb } from "../../lib/db/score";
@@ -63,18 +64,29 @@ export function MyDayContainer() {
   const bid = activeBusiness?.id ?? "";
   const today = getTodayISO();
 
-  // Materializa templates obligatorios al abrir Mi Día. Idempotente —
-  // si el vendedor ya entró hoy, no duplica. Después invalida tasks.
+  // Materializa templates obligatorios al abrir Mi Día + cada 60s
+  // mientras esté montada (G+2). Idempotente. Cuando el owner crea un
+  // template nuevo, el vendedor que está mirando Mi Día lo recibe en el
+  // próximo tick sin tener que recargar la pantalla.
   useEffect(() => {
     if (!wid || !userId) return;
-    assignedTasksDb
-      .materializeForToday(wid, userId)
-      .then((n) => {
-        if (n > 0) qc.invalidateQueries({ queryKey: qk.tasks.all() });
-      })
-      .catch(() => {
-        /* best-effort */
-      });
+    let cancelled = false;
+    const run = () => {
+      assignedTasksDb
+        .materializeForToday(wid, userId)
+        .then((n) => {
+          if (!cancelled && n > 0) qc.invalidateQueries({ queryKey: qk.tasks.all() });
+        })
+        .catch(() => {
+          /* best-effort */
+        });
+    };
+    run();
+    const interval = setInterval(run, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [wid, userId, qc]);
 
   const tasksQ = useQuery({
@@ -162,8 +174,14 @@ export function MyDayContainer() {
     },
   });
 
+  // G+1: filtrar tareas por assigned_to según rol del user. Owner/admin
+  // ven todo; vendedor/viewer ven solo las suyas o sin asignar.
+  const shouldShowTask = useTaskVisibilityFilter();
+
   const data: MyDayData = useMemo(() => {
-    const tasks = (tasksQ.data ?? []).map(dbTaskToDomain);
+    const tasks = (tasksQ.data ?? [])
+      .filter(shouldShowTask)
+      .map(dbTaskToDomain);
     const followUps = (followupsQ.data ?? [])
       .filter((f) => f.completed === 0)
       .map(dbFollowupToDomain);
@@ -222,6 +240,7 @@ export function MyDayContainer() {
     activeWorkspace,
     activeBusiness,
     userName,
+    shouldShowTask,
   ]);
 
   return (

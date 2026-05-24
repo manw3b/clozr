@@ -16,6 +16,7 @@ import {
 } from "../../components/ContextMenu";
 import { tasksDb } from "../../lib/db/tasks";
 import { useCloudQueryConfig } from "../../lib/useCloudPolling";
+import { useTaskVisibilityFilter } from "../../lib/useTaskVisibilityFilter";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useUIStore } from "../../store/uiStore";
 import { useUndoableActions } from "../../store/useUndoableActions";
@@ -48,20 +49,32 @@ export function Tareas() {
     return () => window.removeEventListener("clozr:open-new-task", handler);
   }, []);
 
-  // Materializa templates obligatorios al abrir la pantalla. Es idempotente,
-  // así que si el user ya entró hoy no duplica. Después de materializar,
-  // invalida la query de tareas para que el render incluya las nuevas.
+  // Materializa templates obligatorios al abrir la pantalla + cada 60s
+  // mientras esté montada (G+2). Es idempotente: si el user ya tiene la
+  // tarea de hoy, no la duplica. Esto cierra el gap "vos creaste un
+  // template a las 10am, Caro estaba en otra pantalla, no se le materializó
+  // hasta que volvió a Tareas". Ahora si está en Tareas, se materializa
+  // automático en el próximo tick.
   const userId = useAuthStore((s) => s.userId);
   useEffect(() => {
     if (!wid || !userId) return;
-    assignedTasksDb
-      .materializeForToday(wid, userId)
-      .then((n) => {
-        if (n > 0) qc.invalidateQueries({ queryKey: qk.tasks.all() });
-      })
-      .catch(() => {
-        /* best-effort: no rompemos la pantalla por esto */
-      });
+    let cancelled = false;
+    const run = () => {
+      assignedTasksDb
+        .materializeForToday(wid, userId)
+        .then((n) => {
+          if (!cancelled && n > 0) qc.invalidateQueries({ queryKey: qk.tasks.all() });
+        })
+        .catch(() => {
+          /* best-effort: no rompemos la pantalla por esto */
+        });
+    };
+    run();
+    const interval = setInterval(run, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [wid, userId, qc]);
 
   const tasksCloudCfg = useCloudQueryConfig("tasks");
@@ -122,14 +135,19 @@ export function Tareas() {
     });
   }
 
+  // G+1: filtrar tareas por assigned_to según rol del user (owner/admin
+  // ven todo; vendedor solo lo suyo + sin asignar).
+  const shouldShowTask = useTaskVisibilityFilter();
+
   const filtered = useMemo(() => {
     return tasks.filter((t) => {
+      if (!shouldShowTask(t)) return false;
       if (statusFilter === "pendientes" && t.completed === 1) return false;
       if (statusFilter === "completadas" && t.completed === 0) return false;
       if (typeFilter !== "todos" && t.type !== typeFilter) return false;
       return true;
     });
-  }, [tasks, statusFilter, typeFilter]);
+  }, [tasks, statusFilter, typeFilter, shouldShowTask]);
 
   const columns: ColumnDef<DbTask>[] = [
     {

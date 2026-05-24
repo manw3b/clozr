@@ -26,7 +26,6 @@ const DolaresArSection = lazy(() => import("./DolaresArSection").then(m => ({ de
 const AboutSection = lazy(() => import("./AboutSection").then(m => ({ default: m.AboutSection })));
 const AssignedTasksSection = lazy(() => import("./AssignedTasksSection").then(m => ({ default: m.AssignedTasksSection })));
 const CloudAccountSection = lazy(() => import("./CloudAccountSection").then(m => ({ default: m.CloudAccountSection })));
-const CloudTeamSection = lazy(() => import("./CloudTeamSection").then(m => ({ default: m.CloudTeamSection })));
 const CloudDataSection = lazy(() => import("./CloudDataSection").then(m => ({ default: m.CloudDataSection })));
 import { qk } from "../../lib/queryKeys";
 import type { PipelineStage, CustomerTypeRow } from "../../lib/db/types";
@@ -36,25 +35,60 @@ import { PALETTE_LIST as COLORS, colorCss } from "../../lib/colorPalette";
 
 // ── Shared ────────────────────────────────────────────────────────
 
-type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "wa-templates" | "dolares" | "assigned-tasks" | "cloud-account" | "cloud-team" | "cloud-data" | "data" | "about";
+type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "wa-templates" | "dolares" | "assigned-tasks" | "cloud-account" | "cloud-data" | "data" | "about";
 
-const SECTIONS: Array<{ id: SectionId; label: string }> = [
-  { id: "general", label: "General" },
-  { id: "profile", label: "Tu perfil" },
-  { id: "pipeline", label: "Pipeline" },
-  { id: "customer-types", label: "Tipos de cliente" },
-  { id: "customer-tags", label: "Etiquetas de clientes" },
-  { id: "payment-methods", label: "Métodos de pago" },
-  { id: "catalog-pricing", label: "Precios del catálogo" },
-  { id: "catalog-featured", label: "Productos destacados" },
-  { id: "wa-templates", label: "Plantillas WhatsApp" },
-  { id: "dolares", label: "Cotizaciones del dólar" },
-  { id: "assigned-tasks", label: "Tareas obligatorias" },
-  { id: "cloud-account", label: "Cuenta en la nube" },
-  { id: "cloud-team", label: "Equipo en la nube" },
-  { id: "cloud-data", label: "Datos en la nube" },
-  { id: "data", label: "Datos y backup" },
-  { id: "about", label: "Acerca de Clozr" },
+// F.navigation: tabs agrupadas en 5 secciones. Antes era una lista plana de
+// 17 items que pedían scroll y eran difíciles de escanear. Ahora ojo
+// agrupa por dominio:
+//   - NEGOCIO: identidad del workspace + datos del user
+//   - CATÁLOGO: todo lo que define productos / precios / clientes
+//   - WORKFLOW: pipeline, comunicación, automatización
+//   - DATOS: dólar, cloud, backup
+//   - AYUDA: about
+//
+// "Equipo en la nube" se eliminó como tab — el usuario gestiona el equipo
+// desde el item "Equipo" del sidebar (sigue siendo el mismo destino).
+const SECTIONS: Array<{ group: string; items: Array<{ id: SectionId; label: string }> }> = [
+  {
+    group: "Negocio",
+    items: [
+      { id: "general", label: "General" },
+      { id: "profile", label: "Tu perfil" },
+    ],
+  },
+  {
+    group: "Catálogo",
+    items: [
+      { id: "catalog-pricing", label: "Precios del catálogo" },
+      { id: "catalog-featured", label: "Productos destacados" },
+      { id: "payment-methods", label: "Métodos de pago" },
+      { id: "customer-types", label: "Tipos de cliente" },
+      { id: "customer-tags", label: "Etiquetas de clientes" },
+    ],
+  },
+  {
+    group: "Workflow",
+    items: [
+      { id: "pipeline", label: "Pipeline" },
+      { id: "wa-templates", label: "Plantillas WhatsApp" },
+      { id: "assigned-tasks", label: "Tareas obligatorias" },
+    ],
+  },
+  {
+    group: "Datos",
+    items: [
+      { id: "dolares", label: "Cotizaciones del dólar" },
+      { id: "cloud-account", label: "Cuenta en la nube" },
+      { id: "cloud-data", label: "Datos en la nube" },
+      { id: "data", label: "Datos y backup" },
+    ],
+  },
+  {
+    group: "Ayuda",
+    items: [
+      { id: "about", label: "Acerca de Clozr" },
+    ],
+  },
 ];
 
 function SectionHeader({ title, description }: { title: string; description?: string }) {
@@ -1094,7 +1128,6 @@ export default function SettingsScreen() {
       case "dolares": return <DolaresArSection />;
       case "assigned-tasks": return <AssignedTasksSection wid={wid} />;
       case "cloud-account": return <CloudAccountSection />;
-      case "cloud-team": return <CloudTeamSection />;
       case "cloud-data": return <CloudDataSection />;
       case "data": return <DataSection wid={wid} />;
       case "about": return <AboutSection />;
@@ -1130,39 +1163,55 @@ export default function SettingsScreen() {
           display: "flex", flexDirection: "column", gap: 2,
           overflowY: "auto",
         }}>
-          {SECTIONS.map((s) => {
-            const active = activeSection === s.id;
-            return (
-              <button
-                key={s.id}
-                onClick={() => setActiveSection(s.id)}
+          {SECTIONS.map((group, gIdx) => (
+            <div key={group.group} style={{ marginTop: gIdx === 0 ? 0 : 12 }}>
+              <div
                 style={{
-                  width: "100%", textAlign: "left",
-                  padding: "var(--space-2) var(--space-3)",
-                  borderRadius: "var(--radius-md)",
-                  fontSize: "var(--text-sm)",
-                  fontWeight: active ? 600 : 500,
-                  color: active ? "var(--primary)" : "var(--text-muted)",
-                  background: active ? "var(--primary-bg)" : "transparent",
-                  transition: "background 100ms, color 100ms",
-                  position: "relative",
+                  padding: "6px 12px 4px",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: 0.8,
+                  textTransform: "uppercase",
+                  color: "var(--text-dim)",
                 }}
               >
-                {active && (
-                  <span style={{
-                    position: "absolute",
-                    left: -3,
-                    top: 6,
-                    bottom: 6,
-                    width: 3,
-                    background: "var(--primary)",
-                    borderRadius: "var(--radius-full)",
-                  }} />
-                )}
-                {s.label}
-              </button>
-            );
-          })}
+                {group.group}
+              </div>
+              {group.items.map((s) => {
+                const active = activeSection === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setActiveSection(s.id)}
+                    style={{
+                      width: "100%", textAlign: "left",
+                      padding: "var(--space-2) var(--space-3)",
+                      borderRadius: "var(--radius-md)",
+                      fontSize: "var(--text-sm)",
+                      fontWeight: active ? 600 : 500,
+                      color: active ? "var(--primary)" : "var(--text-muted)",
+                      background: active ? "var(--primary-bg)" : "transparent",
+                      transition: "background 100ms, color 100ms",
+                      position: "relative",
+                    }}
+                  >
+                    {active && (
+                      <span style={{
+                        position: "absolute",
+                        left: -3,
+                        top: 6,
+                        bottom: 6,
+                        width: 3,
+                        background: "var(--primary)",
+                        borderRadius: "var(--radius-full)",
+                      }} />
+                    )}
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* Right content */}

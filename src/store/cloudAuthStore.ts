@@ -22,6 +22,12 @@ export interface CloudWorkspace {
   name: string;
   role: CloudRole;
   status: "active" | "invited" | "revoked";
+  /**
+   * F: slug del rubro. Hoy todos "generic" hasta que lance el paywall y
+   * el user pueda comprar nichos individuales. Optional para mantener
+   * compat con sessions persistidas previas a F.
+   */
+  industry?: string;
 }
 
 interface CloudAuthState {

@@ -736,6 +736,13 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
       `CREATE INDEX IF NOT EXISTS idx_tasks_template_date ON tasks (template_id, assigned_to, created_at)`,
     ),
   );
+
+  // ════════════════════════════════════════════════════════════
+  // 035 (F) — schema silencioso multi-rubro + plan
+  // ════════════════════════════════════════════════════════════
+  // Ver docs/ROADMAP.md §3. Hoy son columnas vacías que defaultean a
+  // "generic" / "free" / "[]". Cuando lance el paywall, leeremos de acá.
+  await safe(() => dbExecute(`ALTER TABLE workspaces ADD COLUMN industry TEXT DEFAULT 'generic'`));
 }
 
 /**

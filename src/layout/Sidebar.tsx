@@ -25,6 +25,10 @@ export interface SidebarItem {
   badge?: number;
 }
 
+// F.navigation:
+//  - Reportes movido a Operaciones (la sección "Análisis" tenía 1 solo item)
+//  - Equipo se queda como item directo del sidebar (más visible). La tab
+//    "Equipo en la nube" de Ajustes se elimina para evitar redundancia.
 const SECTIONS: { title?: string; items: SidebarItem[] }[] = [
   {
     items: [
@@ -41,11 +45,6 @@ const SECTIONS: { title?: string; items: SidebarItem[] }[] = [
       { id: 'deudas', label: 'Deudas', icon: Receipt },
       { id: 'inventory', label: 'Inventario', icon: Package },
       { id: 'tasks', label: 'Tareas', icon: CheckSquare },
-    ],
-  },
-  {
-    title: 'Análisis',
-    items: [
       { id: 'reportes', label: 'Reportes', icon: BarChart3 },
     ],
   },

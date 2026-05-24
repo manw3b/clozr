@@ -23,6 +23,8 @@ interface WorkspaceForUser {
   name: string;
   role: string;
   status: string;
+  /** F: rubro asignado al workspace. Default "generic" si no se setea. */
+  industry: string;
 }
 
 interface MeResponse {
@@ -30,6 +32,10 @@ interface MeResponse {
     id: string;
     email: string;
     name: string | null;
+    /** F: plan de suscripción. Hoy todos "free" — sin paywall activo. */
+    plan: string;
+    /** F: nichos comprados como add-ons. Hoy todos []. */
+    owned_industries: string[];
   };
   workspaces: WorkspaceForUser[];
 }
@@ -56,11 +62,11 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
   const [userRows, wsRows] = await tursoQuery(
     env,
     {
-      sql: `SELECT id, email, name FROM users WHERE id = ?`,
+      sql: `SELECT id, email, name, plan, owned_industries_json FROM users WHERE id = ?`,
       args: [auth.userId],
     },
     {
-      sql: `SELECT w.id, w.name, m.role, m.status
+      sql: `SELECT w.id, w.name, w.industry, m.role, m.status
               FROM memberships m
               INNER JOIN cloud_workspaces w ON w.id = m.workspace_id
               WHERE m.user_id = ? AND m.status = 'active'
@@ -72,17 +78,30 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
   const userRow = userRows?.[0];
   if (!userRow) return json({ error: "user_not_found" }, 404);
 
+  // owned_industries_json es un string JSON. Default '[]' del schema.
+  // Defensa: si por algún motivo está malformado, devolvemos [] vacío.
+  let ownedIndustries: string[] = [];
+  try {
+    const parsed = JSON.parse(String(userRow.owned_industries_json ?? "[]"));
+    if (Array.isArray(parsed)) ownedIndustries = parsed.filter((x) => typeof x === "string");
+  } catch {
+    // malformed JSON → tratamos como vacío
+  }
+
   const body: MeResponse = {
     user: {
       id: String(userRow.id),
       email: String(userRow.email),
       name: userRow.name === null ? null : String(userRow.name),
+      plan: String(userRow.plan ?? "free"),
+      owned_industries: ownedIndustries,
     },
     workspaces: (wsRows ?? []).map((r) => ({
       id: String(r.id),
       name: String(r.name),
       role: String(r.role),
       status: String(r.status),
+      industry: String(r.industry ?? "generic"),
     })),
   };
   return json(body);

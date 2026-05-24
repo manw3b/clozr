@@ -28,7 +28,7 @@ let initPromise: Promise<void> | null = null;
  *
  * Bump cuando agregues un CREATE TABLE / ALTER TABLE / safeAddColumn.
  */
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 export function ensureSchema(env: Env): Promise<void> {
   if (!initPromise) initPromise = applySchemaIfNeeded(env);
@@ -138,6 +138,17 @@ async function applySchema(env: Env): Promise<void> {
   await tursoQuery(env, {
     sql: `CREATE INDEX IF NOT EXISTS idx_magic_links_email_code ON magic_links(email, code)`,
   });
+
+  // 003 (F) — schema silencioso de monetización + multi-rubro.
+  // Ver docs/ROADMAP.md para el modelo completo. Hoy son columnas vacías
+  // — el paywall todavía no está activo. Pre-cableamos para que cuando
+  // lance Stripe el migrate sea instantáneo.
+  await safeAddColumn(env, "cloud_workspaces", "industry", "TEXT DEFAULT 'generic'");
+  await safeAddColumn(env, "users", "plan", "TEXT DEFAULT 'free'");
+  // owned_industries: array de slugs en JSON. SQLite no tiene array nativo
+  // así que serializamos. Lookup vía json_each() o split client-side.
+  // Default '[]' string para evitar nulls confusos en el frontend.
+  await safeAddColumn(env, "users", "owned_industries_json", "TEXT DEFAULT '[]'");
 
   // ── F2.1: Workspaces multi-tenant + memberships ───────────────────
   //

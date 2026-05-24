@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { confirmAsync } from "../../lib/confirmAsync";
 import { Plus, Trash2, Mail, Phone } from "lucide-react";
@@ -21,10 +21,19 @@ import { Input, Select } from "../../components/Input";
 import { teamDb } from "../../lib/db/team";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { useAuthStore, assertCan } from "../../store/authStore";
+import { useCloudAuthStore } from "../../store/cloudAuthStore";
 import { useUIStore } from "../../store/uiStore";
 import { color, space, text, weight } from "../../tokens";
 import { qk } from "../../lib/queryKeys";
 import type { WorkspaceMember, MemberRole } from "../../lib/db/types";
+
+// F.navigation: cuando hay sesión cloud activa con workspace seleccionado,
+// el page de Equipo renderea la gestión cloud (mismo contenido que ANTES
+// vivía en Ajustes → Equipo en la nube). Eliminamos esa tab de Ajustes
+// para no duplicar.
+const CloudTeamSection = lazy(() =>
+  import("../../features/settings/CloudTeamSection").then((m) => ({ default: m.CloudTeamSection })),
+);
 
 const ROLE_LABEL: Record<MemberRole, string> = {
   owner: "Dueño",
@@ -41,6 +50,21 @@ const ROLE_TONE: Record<MemberRole, "primary" | "info" | "neutral"> = {
 };
 
 export function Equipo() {
+  // F.navigation: si hay sesión cloud activa, usamos la gestión cloud
+  // (antes vivía en Ajustes → Equipo en la nube). Local sigue como
+  // fallback para users sin cloud.
+  const cloudLoggedIn = useCloudAuthStore((s) => s.isLoggedIn());
+  const cloudActiveWsId = useCloudAuthStore((s) => s.activeWorkspaceId);
+  if (cloudLoggedIn && cloudActiveWsId) {
+    return (
+      <div style={{ height: "100%", overflow: "auto", padding: "var(--space-6) var(--space-8)" }}>
+        <Suspense fallback={<div style={{ color: "var(--text-dim)" }}>Cargando equipo…</div>}>
+          <CloudTeamSection />
+        </Suspense>
+      </div>
+    );
+  }
+
   const { activeWorkspace } = useWorkspaceStore();
   const { showToast } = useUIStore();
   const wid = activeWorkspace?.id ?? "";

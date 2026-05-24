@@ -197,6 +197,11 @@ export interface MeUser {
   id: string;
   email: string;
   name: string | null;
+  /** F: "free" | "pro" | "enterprise". Optional para back-compat con
+   *  versiones del worker pre-F que no devuelven el campo. */
+  plan?: string;
+  /** F: nichos comprados. Optional por la misma razón. */
+  owned_industries?: string[];
 }
 
 export interface MeWorkspace {
@@ -204,6 +209,8 @@ export interface MeWorkspace {
   name: string;
   role: "owner" | "admin" | "vendedor" | "viewer";
   status: "active" | "invited" | "revoked";
+  /** F: rubro del workspace. Optional para back-compat. */
+  industry?: string;
 }
 
 export interface MeResponse {

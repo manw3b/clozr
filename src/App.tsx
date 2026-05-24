@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useState, useMemo, lazy, Suspense } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { resolveImageUrl } from "./lib/images";
 import { useWorkspaceStore } from "./store/workspaceStore";
@@ -31,15 +31,29 @@ import { MyDayContainer } from "./pages/mi-dia/MyDayContainer";
 
 // Resto: lazy-loaded por pantalla. Cada uno hace su propio chunk de Vite —
 // arranca más rápido y solo descarga lo que el usuario navega.
-const Clientes = lazy(() => import("./pages/clientes/Clientes").then((m) => ({ default: m.Clientes })));
-const Pipeline = lazy(() => import("./pages/pipeline/Pipeline").then((m) => ({ default: m.Pipeline })));
-const Ventas = lazy(() => import("./pages/ventas/Ventas").then((m) => ({ default: m.Ventas })));
+//
+// F.preload: las top-5 pantallas (Pipeline/Clientes/Ventas/Inventario/Tareas)
+// están separadas en imports nombrados (importPipeline, etc) para que el
+// splash pueda pre-bajarlas en background ANTES de que el user navegue.
+// Cuando navega: el chunk ya está en cache del browser → Suspense ni
+// parpadea. Las menos-frecuentes (Caja, Deudas, Reportes, Equipo,
+// Settings, Onboarding, Login) siguen lazy puro.
+const importPipeline = () => import("./pages/pipeline/Pipeline");
+const importClientes = () => import("./pages/clientes/Clientes");
+const importVentas = () => import("./pages/ventas/Ventas");
+const importInventario = () => import("./pages/inventario/Inventario");
+const importTareas = () => import("./pages/tareas/Tareas");
+
+const Pipeline = lazy(() => importPipeline().then((m) => ({ default: m.Pipeline })));
+const Clientes = lazy(() => importClientes().then((m) => ({ default: m.Clientes })));
+const Ventas = lazy(() => importVentas().then((m) => ({ default: m.Ventas })));
+const Inventario = lazy(() => importInventario().then((m) => ({ default: m.Inventario })));
+const Tareas = lazy(() => importTareas().then((m) => ({ default: m.Tareas })));
+
 const Caja = lazy(() => import("./pages/caja/Caja").then((m) => ({ default: m.Caja })));
-const Tareas = lazy(() => import("./pages/tareas/Tareas").then((m) => ({ default: m.Tareas })));
 const Equipo = lazy(() => import("./pages/equipo/Equipo").then((m) => ({ default: m.Equipo })));
 const Deudas = lazy(() => import("./pages/deudas/Deudas").then((m) => ({ default: m.Deudas })));
 const Reportes = lazy(() => import("./pages/reportes/Reportes").then((m) => ({ default: m.Reportes })));
-const Inventario = lazy(() => import("./pages/inventario/Inventario").then((m) => ({ default: m.Inventario })));
 const OnboardingScreen = lazy(() => import("./features/onboarding/OnboardingScreen"));
 const SettingsScreen = lazy(() => import("./features/settings/SettingsScreen"));
 const LoginScreen = lazy(() => import("./features/auth/LoginScreen"));
@@ -49,7 +63,12 @@ import { CommandPalette } from "./components/CommandPalette";
 import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { useGlobalShortcuts } from "./lib/useGlobalShortcuts";
 import { checkForUpdate, downloadAndInstall, type UpdateStatus } from "./lib/updater";
-import { SplashScreen } from "./components/SplashScreen";
+import { SplashScreen, type SplashTask } from "./components/SplashScreen";
+import { qk } from "./lib/queryKeys";
+import { customersDb } from "./lib/db/customers";
+import { salesDb } from "./lib/db/sales";
+import { tasksDb } from "./lib/db/tasks";
+import { pipelineDb } from "./lib/db/pipeline";
 import logoIsotipo from "./assets/logo-isotipo.svg";
 
 // ─── Update banner ────────────────────────────────────────────────
@@ -254,11 +273,79 @@ export default function App() {
     return () => window.removeEventListener("clozr:invalidate", handler);
   }, [queryClient]);
 
+  // F.splash + F.preload — tasks que el splash espera. Cada una se muestra
+  // en el splash con su label + check al terminar. Pre-cargar chunks
+  // de pantallas top-5 + pre-fetch queries del workspace activo para que
+  // al llegar a Mi Día / navegar entre pantallas todo esté cacheado.
+  //
+  // Las tareas se construyen UNA vez al mount (useMemo con array vacío)
+  // para evitar que el splash las reciba como "nuevas" en cada render
+  // del workspace cambiando — la primera carga es lo que importa.
+  const splashTasks = useMemo<SplashTask[]>(() => {
+    const wid = activeWorkspace?.id;
+    const tasks: SplashTask[] = [
+      // Chunks de pantallas — el browser cachea el chunk, después la
+      // navegación a esa pantalla es instantánea (sin spinner de Suspense).
+      { id: "chunk-pipeline", label: "Pipeline", promise: importPipeline() },
+      { id: "chunk-clientes", label: "Clientes", promise: importClientes() },
+      { id: "chunk-ventas", label: "Ventas", promise: importVentas() },
+      { id: "chunk-inventario", label: "Inventario", promise: importInventario() },
+      { id: "chunk-tareas", label: "Tareas", promise: importTareas() },
+    ];
+    if (wid) {
+      // Pre-fetch de DB. Estos tasks calientan SQLite (open + schema +
+      // first reads) y dejan los queryClient caches con keys canónicas
+      // para que algunos hooks (useClientsList con qk.clientes.list)
+      // den cache-hit directo. Los hooks con queryFn compuesto (ej
+      // Promise.all) van a re-ejecutar igual — pero el SQLite ya está
+      // hot, así que el segundo fetch es ~ms en vez de ~10ms.
+      tasks.push(
+        {
+          id: "prefetch-clientes",
+          label: "Clientes",
+          promise: queryClient.prefetchQuery({
+            queryKey: qk.clientes.list(wid),
+            queryFn: () => customersDb.getAll(wid),
+          }),
+        },
+        {
+          id: "prefetch-ventas",
+          label: "Ventas",
+          promise: salesDb.getAll(wid),
+        },
+        {
+          id: "prefetch-pipeline",
+          label: "Pipeline",
+          promise: queryClient.prefetchQuery({
+            queryKey: qk.pipeline.leads(wid),
+            queryFn: () => pipelineDb.getAll(wid),
+          }),
+        },
+        {
+          id: "prefetch-tareas",
+          label: "Tareas",
+          promise: queryClient.prefetchQuery({
+            queryKey: qk.tasks.list(wid),
+            queryFn: () => tasksDb.getAll(wid),
+          }),
+        },
+      );
+    }
+    return tasks;
+    // Solo se computa una vez al mount — si workspace tarda en cargar,
+    // el splash mostrará la lista sin los prefetches (que arrancarán
+    // cuando workspace esté listo en el siguiente render pero el splash
+    // ya capturó la lista original). Trade-off: si el workspace tarda
+    // >4s el splash termina sin pre-fetch, lo cual es OK porque el user
+    // verá MyDay arrancar las queries normalmente.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // El splash se renderea como overlay (position fixed, z-index 9999) en
   // CUALQUIER caso debajo, así no parpadea si la app cambia de pantalla
   // mientras se desvanece. Lo extraigo como nodo reutilizable.
   const splashOverlay = !splashDone ? (
-    <SplashScreen ready={!isLoading} onDone={() => setSplashDone(true)} />
+    <SplashScreen tasks={splashTasks} onDone={() => setSplashDone(true)} />
   ) : null;
 
   if (isLoading) {

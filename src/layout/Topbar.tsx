@@ -27,6 +27,7 @@ import { useWorkspaceStore } from '../store/workspaceStore';
 import { useUIStore } from '../store/uiStore';
 import { businessesDb } from '../lib/db/businesses';
 import { useAuthStore, assertCan } from '../store/authStore';
+import { useIndustry } from '../lib/useIndustry';
 
 export type NewAction = 'cliente' | 'venta' | 'lead' | 'tarea' | 'movimiento';
 export type NotifNavigate = 'tasks' | 'cash' | 'pipeline';
@@ -359,6 +360,15 @@ function BusinessSwitcher() {
   const [createOpen, setCreateOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
+  // F.industry: el cuadrado del topbar muestra el ícono del RUBRO (industry)
+  // del workspace activo en vez del emoji del business. Razón: el rubro
+  // comunica "qué tipo de negocio es esto" — más útil que un emoji
+  // arbitrario que el user no eligió a propósito.
+  // Hoy todos los workspaces son "generic" (📦) hasta que se vendan los
+  // add-ons de nichos (F.I). Cuando un user compre "electronics" y lo
+  // asigne a su workspace, el ícono cambia a 📱 automáticamente.
+  const industry = useIndustry();
+
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
@@ -407,7 +417,7 @@ function BusinessSwitcher() {
               flexShrink: 0,
             }}
           >
-            {display.emoji || '🏪'}
+            {industry.icon}
           </span>
           <span
             style={{

@@ -1,40 +1,85 @@
 import { useEffect, useMemo, useState } from "react";
 import logoIsotipo from "../assets/logo-isotipo.svg";
-import { pickRandomTip } from "../lib/clozrTips";
+import { pickRandomTip, type ClozrTip } from "../lib/clozrTips";
 import { getCurrentVersion } from "../lib/updater";
 
+/**
+ * Una "task" del splash es algo que se está cargando en background y
+ * cuyo progreso queremos mostrar al user. Pueden ser:
+ *  - Pre-carga de chunks de Vite (Pipeline, Clientes, etc)
+ *  - Pre-fetch de queries TanStack (clientes locales, ventas, etc)
+ *  - Bootstrap de schema, etc.
+ *
+ * El caller (App.tsx) registra tasks; cada una declara su label y un
+ * Promise. Cuando todas resuelven (o fallan — best-effort), el splash
+ * queda "ready". Pero respetamos minDisplayMs igual: aunque cargue
+ * todo en 200ms, mostramos splash full duración para que el user vea
+ * los tips y se sienta deliberado.
+ */
+export interface SplashTask {
+  id: string;
+  label: string;
+  promise: Promise<unknown>;
+}
+
 interface Props {
-  /** True cuando la app terminó de cargar la data crítica.
-   *  El splash espera ambos: este flag + minDisplayMs antes de hacer fade. */
-  ready: boolean;
-  /** Tiempo mínimo que el splash queda visible aunque la app cargue rápido.
-   *  Sin esto, en máquinas rápidas el splash parpadea 50ms y queda raro. */
+  /**
+   * Tasks que el splash va a "esperar". Cada una se muestra en una
+   * fila con su label y check cuando termina. Si está vacío, splash
+   * se comporta como antes (timer puro).
+   */
+  tasks?: SplashTask[];
+  /**
+   * Tiempo mínimo visible aunque las tasks resuelvan rápido. Default 4s
+   * — el sweet spot que validamos en conversación: lo suficiente para
+   * leer un tip, no tan largo como para sentirse lento.
+   */
   minDisplayMs?: number;
   /** Llamado cuando el fade out terminó — el caller monta la app real. */
   onDone: () => void;
 }
 
 /**
- * Splash de bienvenida: logo + versión + tip random + fade out.
+ * Splash de bienvenida: logo + versión + tip + progreso real.
  *
- * Objetivos:
- *  - Que el arranque "se sienta" deliberado, no como una pantalla en blanco.
- *  - Mostrar la versión sin obligar al usuario a ir a Ajustes.
- *  - Enseñar algo (1 tip rotado del pool) en cada arranque.
- *  - Si la data tarda en cargar (workspaces grandes), tener algo para ver.
+ * Diseño (sweet spot validado en conversación con el founder):
+ *  - 4s mínimo visible → da tiempo a leer un tip + ver el progress
+ *  - Progreso REAL — no spinner ofuscado. Mostramos qué se está cargando
+ *    ("Catálogo ✓", "Clientes ✓", "Ventas...") para que la espera se
+ *    sienta deliberada y no como "la app es lenta".
+ *  - Tips rotando cada 2s mientras dure el splash.
+ *  - Fade out 400ms al terminar.
  *
- * Timing:
- *  - minDisplayMs (default 1400ms) — el splash queda visible al menos esto.
- *  - Cuando `ready=true` Y minDisplayMs pasó → arranca fade out (400ms).
- *  - Al terminar el fade, llama onDone() — el caller monta la app real.
+ * NO debe romper la app si una task falla — best-effort. El user puede
+ * llegar a Mi Día con una query no pre-cacheada y eso solo significa
+ * que esa pantalla va a hacer su fetch al abrirse (lo que sería el
+ * comportamiento sin pre-carga). El splash captura los errores y los
+ * marca como "fallido" en la UI pero igual avanza.
  */
-export function SplashScreen({ ready, minDisplayMs = 1400, onDone }: Props) {
-  const tip = useMemo(() => pickRandomTip(), []);
+export function SplashScreen({ tasks = [], minDisplayMs = 4000, onDone }: Props) {
   const [version, setVersion] = useState<string | null>(null);
   const [minElapsed, setMinElapsed] = useState(false);
   const [fadingOut, setFadingOut] = useState(false);
 
-  // Cargar versión (es una await rápida — Tauri la tiene en memoria).
+  // Estado de cada task: pending | done | failed.
+  const [taskStatus, setTaskStatus] = useState<Record<string, "pending" | "done" | "failed">>(
+    () => Object.fromEntries(tasks.map((t) => [t.id, "pending"])),
+  );
+
+  // Tip rotating — cambia cada 2s mientras dure el splash.
+  const initialTip = useMemo(() => pickRandomTip(), []);
+  const [tip, setTip] = useState<ClozrTip>(initialTip);
+  const [tipKey, setTipKey] = useState(0); // re-trigger animation
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTip(pickRandomTip());
+      setTipKey((k) => k + 1);
+    }, 2200);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Cargar versión (Tauri la tiene en memoria, es rápido).
   useEffect(() => {
     getCurrentVersion().then(setVersion);
   }, []);
@@ -45,13 +90,34 @@ export function SplashScreen({ ready, minDisplayMs = 1400, onDone }: Props) {
     return () => clearTimeout(t);
   }, [minDisplayMs]);
 
-  // Cuando estamos listos (data + tiempo mínimo), arrancar fade out.
+  // Atachar handlers a cada task para trackear su progreso.
+  useEffect(() => {
+    for (const t of tasks) {
+      t.promise
+        .then(() => setTaskStatus((s) => ({ ...s, [t.id]: "done" })))
+        .catch(() => setTaskStatus((s) => ({ ...s, [t.id]: "failed" })));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // solo al mount — las tasks vienen del primer render
+
+  const allTasksSettled = useMemo(
+    () => tasks.every((t) => taskStatus[t.id] === "done" || taskStatus[t.id] === "failed"),
+    [tasks, taskStatus],
+  );
+
+  // Ready = todas las tasks resolvieron (o no había ninguna) Y pasó el
+  // tiempo mínimo. Después arrancar fade out.
+  const ready = allTasksSettled || tasks.length === 0;
+
   useEffect(() => {
     if (!ready || !minElapsed || fadingOut) return;
     setFadingOut(true);
-    const t = setTimeout(onDone, 400); // duración del fade
+    const t = setTimeout(onDone, 400);
     return () => clearTimeout(t);
   }, [ready, minElapsed, fadingOut, onDone]);
+
+  const completedCount = tasks.filter((t) => taskStatus[t.id] === "done" || taskStatus[t.id] === "failed").length;
+  const progressPct = tasks.length === 0 ? 0 : (completedCount / tasks.length) * 100;
 
   return (
     <div
@@ -65,11 +131,10 @@ export function SplashScreen({ ready, minDisplayMs = 1400, onDone }: Props) {
         justifyContent: "center",
         background:
           "radial-gradient(circle at 50% 40%, rgba(232,0,29,0.08), transparent 60%), var(--bg)",
-        gap: 24,
+        gap: 22,
         opacity: fadingOut ? 0 : 1,
         transition: "opacity 400ms cubic-bezier(0.22, 1, 0.36, 1)",
         pointerEvents: fadingOut ? "none" : "auto",
-        // Asegurar que esté arriba de cualquier overlay/modal residual.
         overflow: "hidden",
       }}
     >
@@ -90,7 +155,7 @@ export function SplashScreen({ ready, minDisplayMs = 1400, onDone }: Props) {
         }}
       />
 
-      {/* Logo con animación de entrada */}
+      {/* Logo */}
       <img
         src={logoIsotipo}
         alt="Clozr"
@@ -98,8 +163,7 @@ export function SplashScreen({ ready, minDisplayMs = 1400, onDone }: Props) {
           height: 72,
           width: "auto",
           objectFit: "contain",
-          animation:
-            "clozr-splash-pop 600ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
+          animation: "clozr-splash-pop 600ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
           filter: "drop-shadow(0 8px 32px rgba(232,0,29,0.25))",
         }}
       />
@@ -139,11 +203,13 @@ export function SplashScreen({ ready, minDisplayMs = 1400, onDone }: Props) {
         </div>
       </div>
 
-      {/* Tip "did you know" */}
+      {/* Tip rotativo */}
       <div
+        key={tipKey}
         style={{
-          marginTop: 16,
+          marginTop: 8,
           maxWidth: 460,
+          minHeight: 56,
           padding: "12px 18px",
           background: "rgba(255,255,255,0.025)",
           border: "1px solid var(--border)",
@@ -151,26 +217,106 @@ export function SplashScreen({ ready, minDisplayMs = 1400, onDone }: Props) {
           display: "flex",
           alignItems: "flex-start",
           gap: 10,
-          animation: "clozr-splash-fade-up 500ms 400ms both",
+          animation: "clozr-splash-fade-up 400ms both",
           backdropFilter: "blur(8px)",
         }}
       >
         <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>
           {tip.emoji}
         </span>
-        <span
-          style={{
-            fontSize: 13,
-            color: "var(--text-muted)",
-            lineHeight: 1.5,
-          }}
-        >
+        <span style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5 }}>
           {tip.text}
         </span>
       </div>
 
-      {/* Spinner sutil — sólo si la espera se va estirando */}
-      <SpinnerBar />
+      {/* Progress real — solo si hay tasks */}
+      {tasks.length > 0 && (
+        <div
+          style={{
+            width: 460,
+            maxWidth: "calc(100% - 32px)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            animation: "clozr-splash-fade-up 500ms 600ms both",
+          }}
+        >
+          {/* Barra de progreso */}
+          <div
+            style={{
+              width: "100%",
+              height: 3,
+              background: "rgba(255,255,255,0.06)",
+              borderRadius: 2,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: `${progressPct}%`,
+                height: "100%",
+                background: "linear-gradient(90deg, var(--primary), #ff4757)",
+                borderRadius: 2,
+                transition: "width 300ms cubic-bezier(0.22, 1, 0.36, 1)",
+              }}
+            />
+          </div>
+
+          {/* Lista de tasks con estado */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "4px 18px",
+              fontSize: 11,
+              color: "var(--text-dim)",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {tasks.map((t) => {
+              const status = taskStatus[t.id] ?? "pending";
+              return (
+                <div
+                  key={t.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    opacity: status === "pending" ? 0.55 : 1,
+                    transition: "opacity 200ms",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background:
+                        status === "done"
+                          ? "var(--primary)"
+                          : status === "failed"
+                            ? "var(--text-dim)"
+                            : "rgba(255,255,255,0.15)",
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span
+                    style={{
+                      color: status === "done" ? "var(--text-muted)" : undefined,
+                      textDecoration: status === "failed" ? "line-through" : undefined,
+                    }}
+                  >
+                    {t.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Fallback spinner si NO hay tasks (no debería pasar en prod pero por seguridad) */}
+      {tasks.length === 0 && <SpinnerBar />}
 
       <style>{`
         @keyframes clozr-splash-pop {
@@ -201,15 +347,13 @@ function SpinnerBar() {
         background: "rgba(255,255,255,0.06)",
         borderRadius: 1,
         overflow: "hidden",
-        animation: "clozr-splash-fade-up 500ms 600ms both",
       }}
     >
       <div
         style={{
           width: "40%",
           height: "100%",
-          background:
-            "linear-gradient(90deg, transparent, var(--primary), transparent)",
+          background: "linear-gradient(90deg, transparent, var(--primary), transparent)",
           animation: "clozr-splash-bar 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         }}
       />

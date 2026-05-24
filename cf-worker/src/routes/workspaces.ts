@@ -88,7 +88,7 @@ export async function handleListMembers(workspaceId: string, req: Request, env: 
   if (!me) return json({ error: "not_a_member" }, 403);
 
   const [rows] = await tursoQuery(env, {
-    sql: `SELECT m.id, m.email, m.role, m.status, m.invited_at, m.accepted_at,
+    sql: `SELECT m.id, m.user_id, m.email, m.role, m.status, m.invited_at, m.accepted_at,
                  u.name AS user_name
             FROM memberships m
             LEFT JOIN users u ON u.id = m.user_id

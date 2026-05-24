@@ -242,6 +242,9 @@ export function createWorkspace(jwt: string | null, name: string) {
 
 export interface MemberRow {
   id: string;
+  /** ID del user vinculado. Null si la membership está pendiente
+   *  (invited, sin login todavía). */
+  user_id: string | null;
   email: string;
   role: "owner" | "admin" | "vendedor" | "viewer";
   status: "active" | "invited" | "revoked";

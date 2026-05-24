@@ -8,6 +8,8 @@ import { EmptyState } from "../../components/EmptyState";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import { assignedTasksDb, type CreateTemplateInput } from "../../lib/db/assignedTasks";
 import { teamDb } from "../../lib/db/team";
+import { listMembers } from "../../lib/cloudAuth";
+import { useCloudAuthStore } from "../../store/cloudAuthStore";
 import { useAuthStore, can, assertCan } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import { qk } from "../../lib/queryKeys";
@@ -43,9 +45,34 @@ export function AssignedTasksSection({ wid }: { wid: string }) {
     enabled: !!wid && allowed,
   });
 
+  // Fuente del equipo: si hay sesión cloud activa, listamos members del
+  // workspace cloud (donde están las invitaciones a Caro, Gonza, etc).
+  // Si no, fallback a la tabla local `teamDb` (equipo single-PC pre-cloud).
+  // Mapeamos el shape cloud → { user_id, name } que esta section espera.
+  // Filtramos active+invited; los invited tienen user_id=null y los skippeamos
+  // — no se puede asignar tarea a alguien que todavía no logueó (sin user_id
+  // FK, las tasks materializadas no quedarían asignadas a nadie).
+  const cloudJwt = useCloudAuthStore((s) => s.jwt);
+  const cloudWsId = useCloudAuthStore((s) => s.activeWorkspaceId);
+  const cloudLoggedIn = useCloudAuthStore((s) => s.isLoggedIn());
   const membersQ = useQuery({
-    queryKey: qk.team.list(wid),
-    queryFn: () => teamDb.getMembers(wid),
+    queryKey: cloudLoggedIn && cloudWsId
+      ? ["team", "cloud", cloudWsId]
+      : qk.team.list(wid),
+    queryFn: async () => {
+      if (cloudLoggedIn && cloudWsId) {
+        const res = await listMembers(cloudJwt, cloudWsId);
+        if (!res.ok) return [];
+        return res.data.members
+          .filter((m) => m.user_id && m.status === "active")
+          .map((m) => ({
+            user_id: m.user_id as string,
+            name: m.user_name ?? m.email,
+            role: m.role,
+          }));
+      }
+      return teamDb.getMembers(wid);
+    },
     enabled: !!wid && allowed,
   });
 

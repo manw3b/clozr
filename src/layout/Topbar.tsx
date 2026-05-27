@@ -458,14 +458,81 @@ function BusinessSwitcher() {
               zIndex: 50,
             }}
           >
+            {/* I/extra: header del dropdown con logo grande + rubro del
+                workspace activo. Más "presente" que el simple label
+                "NEGOCIOS" que había. */}
             <div
               style={{
-                fontSize: text.xs,
+                display: 'flex',
+                alignItems: 'center',
+                gap: space[3],
+                padding: `${space[3]} ${space[3]} ${space[2]}`,
+                background: 'linear-gradient(135deg, var(--surface-2) 0%, transparent 100%)',
+                borderRadius: `${radius.sm} ${radius.sm} 0 0`,
+                marginBottom: space[1],
+              }}
+            >
+              <span
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: radius.md,
+                  overflow: 'hidden',
+                  background: color.surface2,
+                  border: `1px solid ${color.border}`,
+                  flexShrink: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 22,
+                }}
+              >
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt={activeWorkspace?.name ?? 'logo'}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  industry.icon
+                )}
+              </span>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div
+                  style={{
+                    fontSize: text.sm,
+                    fontWeight: weight.bold,
+                    color: color.text,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {activeWorkspace?.name ?? 'Sin negocio'}
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: color.textDim,
+                    marginTop: 2,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    fontWeight: weight.semibold,
+                  }}
+                >
+                  {industry.label}
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                fontSize: 10,
                 fontWeight: weight.semibold,
                 color: color.textDim,
                 textTransform: 'uppercase',
-                letterSpacing: '0.6px',
-                padding: `${space[2]} ${space[3]}`,
+                letterSpacing: '0.8px',
+                padding: `${space[2]} ${space[3]} 4px`,
               }}
             >
               Negocios
@@ -478,11 +545,15 @@ function BusinessSwitcher() {
             ) : (
               businesses.map((b) => {
                 const isActive = activeBusiness?.id === b.id;
+                // Si el row es el activo Y tenemos logo del workspace cloud,
+                // priorizamos el logo. Sino, emoji del business como antes.
+                const rowLogo = isActive ? logoUrl : null;
                 return (
                   <BusinessRow
                     key={b.id}
                     name={b.name}
                     emoji={b.emoji ?? '🏪'}
+                    logoUrl={rowLogo}
                     active={isActive}
                     onClick={() => {
                       setActiveBusiness(b);
@@ -539,11 +610,13 @@ function BusinessSwitcher() {
 function BusinessRow({
   name,
   emoji,
+  logoUrl,
   active,
   onClick,
 }: {
   name: string;
   emoji: string;
+  logoUrl?: string | null;
   active: boolean;
   onClick: () => void;
 }) {
@@ -554,17 +627,70 @@ function BusinessRow({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: space[2],
+        gap: space[3],
         width: '100%',
         padding: `${space[2]} ${space[3]}`,
         borderRadius: radius.sm,
         color: color.text,
         fontSize: text.sm,
         textAlign: 'left',
+        position: 'relative',
+        background: active ? `${color.primary}10` : undefined,
       }}
     >
-      <span style={{ fontSize: 16, width: 22, textAlign: 'center' }}>{emoji}</span>
-      <span style={{ flex: 1, fontWeight: active ? weight.semibold : weight.medium }}>{name}</span>
+      {/* Indicador izquierdo de "activo" — banda roja sutil. Más visible
+          que el check chiquito que había antes. */}
+      {active && (
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            left: 2,
+            top: 6,
+            bottom: 6,
+            width: 3,
+            background: color.primary,
+            borderRadius: radius.full,
+          }}
+        />
+      )}
+      <span
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: radius.sm,
+          overflow: 'hidden',
+          background: color.surface2,
+          border: `1px solid ${color.border}`,
+          flexShrink: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 16,
+        }}
+      >
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          emoji
+        )}
+      </span>
+      <span
+        style={{
+          flex: 1,
+          fontWeight: active ? weight.semibold : weight.medium,
+          color: active ? color.text : color.textMuted,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {name}
+      </span>
       {active && <Check size={14} color={color.primary} strokeWidth={2.4} />}
     </button>
   );

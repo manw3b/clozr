@@ -222,9 +222,14 @@ function GeneralSection({ wid }: { wid: string }) {
             size="lg"
             shape="square"
             placeholder={emoji || "🏪"}
+            recommendedWidth={512}
+            recommendedHeight={512}
           />
-          <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 6, maxWidth: 240, lineHeight: 1.4 }}>
-            Cuadrado, máx 2MB. PNG / JPG / WEBP. En equipo cloud lo ven todos los miembros.
+          <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 6, maxWidth: 280, lineHeight: 1.5 }}>
+            <strong style={{ color: "var(--text-muted)" }}>Recomendado:</strong> 512 × 512 px (cuadrado),
+            PNG con fondo transparente. Máx 2 MB. PNG / JPG / WEBP.
+            <br />
+            En equipo cloud lo ven todos los miembros.
           </div>
         </div>
 
@@ -238,10 +243,15 @@ function GeneralSection({ wid }: { wid: string }) {
               size="lg"
               shape="square"
               placeholder={<span style={{ color: "var(--text-dim)", fontSize: 12 }}>Subir banner</span>}
+              recommendedWidth={1600}
+              recommendedHeight={400}
             />
           </div>
-          <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 6, maxWidth: 320, lineHeight: 1.4 }}>
-            Apaisado (4:1 recomendado), máx 2MB. Aparece como fondo decorativo en Mi Día.
+          <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 6, maxWidth: 360, lineHeight: 1.5 }}>
+            <strong style={{ color: "var(--text-muted)" }}>Recomendado:</strong> 1600 × 400 px
+            (ratio 4 : 1, apaisado). Máx 2 MB. PNG / JPG / WEBP.
+            <br />
+            Aparece como fondo decorativo en Mi Día — el lado derecho es lo que más se ve.
           </div>
         </div>
 

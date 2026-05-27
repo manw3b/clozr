@@ -22,6 +22,29 @@ import { selectAndSaveImage } from "../../lib/images";
 
 const SIZE_MAP = { sm: 48, md: 80, lg: 120 };
 
+/**
+ * Lee las dimensiones reales (width × height) de un Blob de imagen.
+ * Usa URL.createObjectURL + Image() — funciona en WebView2 sin permisos
+ * extra. Si falla (formato exótico), devuelve null y el warning no se
+ * muestra (failure open).
+ */
+function readImageDimensions(blob: Blob): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const dims = { width: img.naturalWidth, height: img.naturalHeight };
+      URL.revokeObjectURL(url);
+      resolve(dims);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
+    img.src = url;
+  });
+}
+
 interface Props {
   kind: "logo" | "banner";
   /** Solo se usa en local mode (sin cloud). En cloud el wid sale del store. */
@@ -33,6 +56,12 @@ interface Props {
   placeholder?: string | React.ReactNode;
   /** Local-only fallback path setter (mantiene compat con Settings). */
   onLocalPathChange?: (path: string | null) => void;
+  /**
+   * Resolución recomendada. Si la imagen subida es menor a ~70% de esta
+   * resolución, se muestra un warning soft (no bloqueante) al user.
+   */
+  recommendedWidth?: number;
+  recommendedHeight?: number;
 }
 
 export default function WorkspaceAssetUpload({
@@ -43,7 +72,12 @@ export default function WorkspaceAssetUpload({
   shape = "square",
   placeholder,
   onLocalPathChange,
+  recommendedWidth,
+  recommendedHeight,
 }: Props) {
+  // Warning soft cuando la imagen subida es muy chica. Se setea en la
+  // pasada del upload — se borra al subir una imagen de buen tamaño.
+  const [lowResWarning, setLowResWarning] = useState<string | null>(null);
   const cloudJwt = useCloudAuthStore((s) => s.jwt);
   const cloudWsId = useCloudAuthStore((s) => s.activeWorkspaceId);
   const isCloud = useCloudAuthStore((s) => s.isLoggedIn() && !!s.activeWorkspaceId);
@@ -89,6 +123,20 @@ export default function WorkspaceAssetUpload({
           ext === "webp" ? "image/webp" :
           "image/jpeg";
         const blob = new Blob([bytes as BlobPart], { type: mime });
+
+        // Chequear resolución contra el recomendado. Warning soft —
+        // dejamos subir igual porque el user puede preferir su logo
+        // 80×80 aunque no sea ideal.
+        if (recommendedWidth && recommendedHeight) {
+          const dims = await readImageDimensions(blob);
+          if (dims && (dims.width < recommendedWidth * 0.7 || dims.height < recommendedHeight * 0.7)) {
+            setLowResWarning(
+              `Imagen de ${dims.width}×${dims.height}. Para verse nítida en pantallas grandes, recomendamos ${recommendedWidth}×${recommendedHeight}.`,
+            );
+          } else {
+            setLowResWarning(null);
+          }
+        }
 
         // Mostrar optimistic local mientras sube.
         const tempUrl = URL.createObjectURL(blob);
@@ -156,6 +204,7 @@ export default function WorkspaceAssetUpload({
         onLocalPathChange?.(null);
         onChange?.();
       }
+      setLowResWarning(null);
     } finally {
       setLoading(false);
     }
@@ -233,6 +282,31 @@ export default function WorkspaceAssetUpload({
         >
           <X size={10} color="var(--text-secondary)" />
         </button>
+      )}
+
+      {/* Warning soft de baja resolución — no bloqueante, solo informa
+          al user que la imagen puede verse pixelada. */}
+      {lowResWarning && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: 0,
+            right: kind === "banner" ? 0 : undefined,
+            minWidth: kind === "banner" ? undefined : 220,
+            maxWidth: 320,
+            padding: "6px 10px",
+            background: "var(--warning-bg, rgba(251, 191, 36, 0.08))",
+            border: "1px solid rgba(251, 191, 36, 0.3)",
+            borderRadius: 6,
+            fontSize: 11,
+            lineHeight: 1.4,
+            color: "var(--warning, #f59e0b)",
+            zIndex: 2,
+          }}
+        >
+          ⚠️ {lowResWarning}
+        </div>
       )}
     </div>
   );

@@ -3,7 +3,7 @@ import { Plus, Pencil, Check, X, Target } from 'lucide-react';
 import { Button } from '../../../components/Button';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney, formatDateLong, greetText, plural } from '../../../lib/format';
-import { useWorkspaceLogo } from '../../../lib/useWorkspaceLogo';
+import { useWorkspaceLogo, useWorkspaceBanner } from '../../../lib/useWorkspaceLogo';
 import type { DailyGoal } from '../../../types/domain';
 
 interface MyDayHeroProps {
@@ -56,6 +56,7 @@ export function MyDayHero({
   // tiene precedencia (lee del store directo).
   void workspaceLogoPath;
   const logoUrl = useWorkspaceLogo();
+  const bannerUrl = useWorkspaceBanner();
 
   return (
     <div
@@ -72,20 +73,52 @@ export function MyDayHero({
         overflow: 'hidden',
       }}
     >
-      {/* Decoración de fondo: sutil gradiente rojo en la esquina */}
-      <div
-        style={{
-          position: 'absolute',
-          top: -120,
-          right: -120,
-          width: 320,
-          height: 320,
-          borderRadius: '50%',
-          background: `radial-gradient(circle, ${color.primary} 0%, transparent 70%)`,
-          opacity: 0.15,
-          pointerEvents: 'none',
-        }}
-      />
+      {/* Banner del negocio como fondo decorativo (I). Aparece de fondo
+          con opacity baja + dark overlay para que el texto encima
+          quede legible. Si no hay banner, fallback al gradient rojo. */}
+      {bannerUrl ? (
+        <>
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `url(${bannerUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              opacity: 0.35,
+              pointerEvents: 'none',
+            }}
+          />
+          {/* Overlay degradado: el banner se ve más a la derecha, se
+              desvanece hacia la izquierda donde está el texto. Mejora
+              legibilidad sin tapar la imagen. */}
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: `linear-gradient(90deg, ${color.surface} 0%, ${color.surface}cc 35%, transparent 75%)`,
+              pointerEvents: 'none',
+            }}
+          />
+        </>
+      ) : (
+        /* Sin banner: decoración default — círculo rojo difuminado a la derecha */
+        <div
+          style={{
+            position: 'absolute',
+            top: -120,
+            right: -120,
+            width: 320,
+            height: 320,
+            borderRadius: '50%',
+            background: `radial-gradient(circle, ${color.primary} 0%, transparent 70%)`,
+            opacity: 0.15,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
 
       {/* IZQUIERDA — saludo + objetivo */}
       <div style={{ position: 'relative', zIndex: 1, minWidth: 0 }}>

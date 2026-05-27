@@ -1,4 +1,5 @@
 import { CSSProperties, forwardRef, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core';
 import {
   Phone,
@@ -13,6 +14,7 @@ import {
   Clock3,
   StickyNote,
   Check,
+  ChevronRight,
   X as XIcon,
 } from 'lucide-react';
 import { WaQuickPicker } from '../../../components/WaQuickPicker';
@@ -583,46 +585,45 @@ function QuickActionsMenu({
           ) : (
             <>
               {/* Quick actions */}
-              {(onAddNote || onSnooze) && (
-                <>
-                  {onAddNote && (
-                    <MenuItem onClick={() => setNoteInput('')}>
-                      <StickyNote size={12} />
-                      Agregar nota
-                    </MenuItem>
-                  )}
-                  {onSnooze && (
-                    <>
-                      <MenuLabel>Posponer</MenuLabel>
-                      <MenuItem onClick={() => snooze(1)}>
-                        <Clock3 size={12} color={color.textDim} />
-                        +1 día
-                      </MenuItem>
-                      <MenuItem onClick={() => snooze(3)}>
-                        <Clock3 size={12} color={color.textDim} />
-                        +3 días
-                      </MenuItem>
-                      <MenuItem onClick={() => snooze(7)}>
-                        <Clock3 size={12} color={color.textDim} />
-                        +1 semana
-                      </MenuItem>
-                    </>
-                  )}
-                </>
+              {onAddNote && (
+                <MenuItem onClick={() => setNoteInput('')}>
+                  <StickyNote size={12} />
+                  Agregar nota
+                </MenuItem>
+              )}
+              {onSnooze && (
+                <MenuSub
+                  label="Posponer"
+                  icon={<Clock3 size={12} color={color.textDim} />}
+                >
+                  <MenuItem onClick={() => snooze(1)}>
+                    <Clock3 size={12} color={color.textDim} />
+                    +1 día
+                  </MenuItem>
+                  <MenuItem onClick={() => snooze(3)}>
+                    <Clock3 size={12} color={color.textDim} />
+                    +3 días
+                  </MenuItem>
+                  <MenuItem onClick={() => snooze(7)}>
+                    <Clock3 size={12} color={color.textDim} />
+                    +1 semana
+                  </MenuItem>
+                </MenuSub>
               )}
 
-              {/* Mover a */}
+              {/* Mover a — submenu */}
               {onChangeStage && moveOptions.length > 0 && (
-                <>
-                  <Divider />
-                  <MenuLabel>Mover a</MenuLabel>
+                <MenuSub
+                  label="Mover a"
+                  icon={<ArrowRight size={12} color={color.textDim} />}
+                >
                   {moveOptions.map((s) => (
                     <MenuItem key={s.id} onClick={() => moveTo(s.id)}>
                       <ArrowRight size={12} color={color.textDim} />
                       {s.label}
                     </MenuItem>
                   ))}
-                </>
+                </MenuSub>
               )}
 
               {/* Marcar como ganado/perdido */}
@@ -651,22 +652,118 @@ function QuickActionsMenu({
   );
 }
 
-function MenuLabel({ children }: { children: React.ReactNode }) {
+/**
+ * MenuSub — item con submenu que aparece a la derecha al hover (H).
+ * Comportamiento similar al ContextMenuSub global, adaptado al estilo
+ * de este popover (que es DOM relativo, no portal). El sub se renderea
+ * `position: fixed` por encima de todo.
+ */
+function MenuSub({
+  label,
+  icon,
+  children,
+  tone,
+}: {
+  label: React.ReactNode;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  tone?: 'success' | 'danger';
+}) {
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const subRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const c = tone === 'success' ? color.success : tone === 'danger' ? color.danger : color.text;
+
+  function computePos() {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const margin = 8;
+    const SUB_W = 180;
+    let left = rect.right - 2;
+    if (left + SUB_W > window.innerWidth - margin) left = rect.left - SUB_W + 2;
+    setPos({ top: rect.top, left });
+  }
+
+  function handleOpen() {
+    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
+    computePos();
+    setOpen(true);
+  }
+  function handleClose() {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setOpen(false), 150);
+  }
+
+  useEffect(() => {
+    if (!open || !subRef.current || !triggerRef.current) return;
+    const r = triggerRef.current.getBoundingClientRect();
+    const s = subRef.current.getBoundingClientRect();
+    const margin = 8;
+    let left = r.right - 2;
+    if (left + s.width > window.innerWidth - margin) left = r.left - s.width + 2;
+    let top = r.top;
+    if (top + s.height > window.innerHeight - margin) top = window.innerHeight - s.height - margin;
+    setPos({ top, left });
+  }, [open]);
+
   return (
-    <div
-      style={{
-        fontSize: 10,
-        fontWeight: weight.semibold,
-        color: color.textDim,
-        textTransform: 'uppercase',
-        letterSpacing: '0.6px',
-        padding: `${space[2]} ${space[3]} 4px`,
-      }}
-    >
-      {children}
+    <div ref={triggerRef} onMouseEnter={handleOpen} onMouseLeave={handleClose}>
+      <div
+        className="row-hover"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: space[2],
+          padding: `7px ${space[3]}`,
+          color: c,
+          fontSize: text.sm,
+          fontWeight: weight.medium,
+          textAlign: 'left',
+          borderRadius: radius.sm,
+          cursor: 'pointer',
+          background: open ? color.surface2 : undefined,
+        }}
+      >
+        {icon}
+        <span style={{ flex: 1 }}>{label}</span>
+        <ChevronRight size={12} color={color.textDim} />
+      </div>
+      {open && pos &&
+        createPortal(
+          <div
+            ref={subRef}
+            onMouseEnter={handleOpen}
+            onMouseLeave={handleClose}
+            style={{
+              position: 'fixed',
+              top: pos.top,
+              left: pos.left,
+              zIndex: 1101,
+              minWidth: 180,
+              background: color.surface,
+              border: `1px solid ${color.borderStrong}`,
+              borderRadius: radius.md,
+              boxShadow: 'var(--shadow-lg)',
+              padding: 4,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 1,
+            }}
+          >
+            {children}
+          </div>,
+          document.body,
+        )
+      }
     </div>
   );
 }
+
+// MenuLabel eliminado tras migrar "Posponer"/"Mover a" a MenuSub —
+// los sub triggers reemplazan los headers UPPERCASE.
 
 function MenuItem({
   children,

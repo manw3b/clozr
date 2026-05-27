@@ -246,6 +246,22 @@ export async function updateStage(
   );
 }
 
+/**
+ * Eliminar un lead. En cloud es soft-delete (deleted_at) via el endpoint
+ * existente. En local hacemos DELETE definitivo. Owner-only — la check
+ * de permission vive en el callsite (UI).
+ */
+export async function removeLead(id: string): Promise<void> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    const { deletePipelineItemCloud } = await import("../cloudAuth");
+    const res = await deletePipelineItemCloud(ctx.jwt, ctx.wsId, id);
+    if (!res.ok) throw new Error(`No se pudo eliminar lead en la nube: ${res.error}`);
+    return;
+  }
+  await dbExecute("DELETE FROM pipeline_items WHERE id = ?", [id]);
+}
+
 export async function closeItem(id: string, status: "won" | "lost"): Promise<void> {
   const ctx = cloudCtx();
   if (ctx) {
@@ -413,6 +429,7 @@ export const pipelineDb = {
   create,
   updateStage,
   closeItem,
+  removeLead,
   snooze,
   scheduleVisit,
   addActivity,

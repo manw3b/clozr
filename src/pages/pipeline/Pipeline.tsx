@@ -52,9 +52,18 @@ import {
   ContextMenuItem,
   ContextMenuDivider,
   ContextMenuLabel,
+  ContextMenuSub,
   useContextMenu,
 } from '../../components/ContextMenu';
-import { ArrowRight, Trophy, XCircle, Clock3, ShoppingCart, Phone, CalendarPlus } from 'lucide-react';
+import {
+  ArrowRight, Trophy, XCircle, Clock3, ShoppingCart, Phone, CalendarPlus,
+  Eye, Trash2, UserCheck, MessageSquare, History,
+} from 'lucide-react';
+import { can } from '../../lib/permissions';
+import { useUndoableActions } from '../../store/useUndoableActions';
+import { useCloudAuthStore } from '../../store/cloudAuthStore';
+import { listMembers, updatePipelineItemCloud } from '../../lib/cloudAuth';
+import { pipelineDb } from '../../lib/db/pipeline';
 import { WhatsAppIcon } from '../../components/icons/WhatsAppIcon';
 import { space } from '../../tokens';
 import type { Lead, LeadStage, StageConfig } from '../../types/domain';
@@ -125,9 +134,35 @@ export function Pipeline() {
   const { setActiveScreen, showToast } = useUIStore();
   const { activeBusiness } = useBusinessStore();
   const { activeWorkspace } = useWorkspaceStore();
-  const { userId } = useAuthStore();
+  const { userId, userRole } = useAuthStore();
   const businessName = activeBusiness?.name ?? activeWorkspace?.name ?? null;
   const recordContactMut = useRecordContact();
+  const registerUndo = useUndoableActions((s) => s.register);
+
+  // H/G: para "Asignar a..." traemos los miembros del workspace cloud
+  // cuando hay sesión activa. Solo owner/admin pueden reasignar.
+  const canAssign = can(userRole, "assignLead");
+  const canDeleteLead = can(userRole, "deleteLead");
+  const cloudJwt = useCloudAuthStore((s) => s.jwt);
+  const cloudWsId = useCloudAuthStore((s) => s.activeWorkspaceId);
+  const cloudLoggedIn = useCloudAuthStore((s) => s.isLoggedIn());
+  const [teamMembers, setTeamMembers] = useState<Array<{ user_id: string; name: string }>>([]);
+  useEffect(() => {
+    if (!canAssign || !cloudLoggedIn || !cloudWsId) {
+      setTeamMembers([]);
+      return;
+    }
+    let cancelled = false;
+    listMembers(cloudJwt, cloudWsId).then((res) => {
+      if (cancelled || !res.ok) return;
+      setTeamMembers(
+        res.data.members
+          .filter((m) => m.user_id && m.status === "active")
+          .map((m) => ({ user_id: m.user_id as string, name: m.user_name ?? m.email })),
+      );
+    });
+    return () => { cancelled = true; };
+  }, [canAssign, cloudLoggedIn, cloudWsId, cloudJwt]);
   const { data: allClients = [] } = useClientsList();
   const { usdToArs } = useExchangeRateStore();
   const createSaleMut = useCreateSale();
@@ -943,30 +978,129 @@ export function Pipeline() {
         />
       )}
 
-      {/* Context menu — click derecho sobre una card */}
+      {/* Context menu — click derecho sobre una card (H: refactor completo) */}
       {ctxMenu.open && ctxLead && (() => {
         const lead = ctxLead;
         const phone = allClients.find((c) => c.id === lead.clientId)?.phone ?? null;
         const close = () => ctxMenu.close();
         const moveTo = (stage: typeof lead.stage) => {
           const target = STAGES.find((s) => s.id === stage);
-          // Antes había window.confirm para target.isLost — bloqueado en
-          // Tauri 2 (mismo issue que handleDragEnd). Sacamos el confirm.
           moveLeadMut.mutate({ leadId: lead.id, newStage: stage });
           if (target?.isWon) showToast(`${lead.clientName} marcado como ganado 🎯`, 'success');
           else if (target?.isLost) showToast(`${lead.clientName} marcado como perdido`);
           close();
         };
+
+        // Última actividad — texto chico arriba del menu para contexto.
+        // Si hay un short_note (la nota del lead), lo mostramos. Si no,
+        // mostramos cuándo fue su última visita o el next_action.
+        const lastActivityHint = lead.shortNote
+          || (lead.nextActionLabel ? `Próximo: ${lead.nextActionLabel}` : null);
+
+        // Registrar contacto rápido — sin abrir modal, log directo via
+        // customerContactsDb (G/A2 cloud). Toast feedback.
+        const recordQuick = (kind: "whatsapp" | "call" | "visit" | "note") => {
+          recordContactMut.mutate(
+            { customerId: lead.clientId, kind },
+            {
+              onSuccess: () => showToast("Contacto registrado", "success"),
+              onError: (e) => showToast(e instanceof Error ? e.message : "No se pudo registrar", "error"),
+            },
+          );
+          close();
+        };
+
+        // Reasignar lead a otro miembro. Solo cloud (en local no hay
+        // concepto de "otro miembro" del workspace).
+        const assignTo = (member: { user_id: string; name: string }) => {
+          if (!cloudLoggedIn || !cloudWsId) {
+            showToast("Asignación solo disponible con sesión cloud", "error");
+            close();
+            return;
+          }
+          updatePipelineItemCloud(cloudJwt, cloudWsId, lead.id, {
+            owner_id: member.user_id,
+            owner_name: member.name,
+          } as never).then((res) => {
+            if (res.ok) {
+              showToast(`Asignado a ${member.name}`, "success");
+              qcGlobal.invalidateQueries({ queryKey: qk.pipeline.all() });
+            } else {
+              showToast(`No se pudo asignar: ${res.error}`, "error");
+            }
+          });
+          close();
+        };
+
+        // Undoable delete. Si el user confirma (no clickea undo), se borra
+        // del cloud. Si clickea undo, restauramos el lead local optimista.
+        const deleteUndoable = () => {
+          const queryKey = qk.pipeline.leads(activeWorkspace?.id ?? "");
+          const snapshot = qcGlobal.getQueryData(queryKey);
+          // Optimistic remove
+          qcGlobal.setQueryData(queryKey, (prev: unknown) => {
+            if (!Array.isArray(prev)) return prev;
+            return prev.filter((l: { id: string }) => l.id !== lead.id);
+          });
+          registerUndo({
+            label: `Lead eliminado: ${lead.clientName}`,
+            sublabel: lead.product ? `Producto: ${lead.product}` : undefined,
+            onUndo: () => {
+              if (snapshot !== undefined) qcGlobal.setQueryData(queryKey, snapshot);
+            },
+            commit: async () => {
+              try {
+                await pipelineDb.removeLead(lead.id);
+                qcGlobal.invalidateQueries({ queryKey: qk.pipeline.all() });
+              } catch (e) {
+                if (snapshot !== undefined) qcGlobal.setQueryData(queryKey, snapshot);
+                showToast(e instanceof Error ? e.message : "No se pudo eliminar", "error");
+              }
+            },
+          });
+          close();
+        };
+
         return (
-          <ContextMenu position={ctxMenu.position} onClose={close}>
+          <ContextMenu position={ctxMenu.position} onClose={close} minWidth={220}>
             <ContextMenuLabel>{lead.clientName}</ContextMenuLabel>
+            {lastActivityHint && (
+              <div
+                style={{
+                  padding: `2px 12px 6px`,
+                  fontSize: 11,
+                  color: 'var(--text-dim)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <History size={11} />
+                <span style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  maxWidth: 200,
+                }}>{lastActivityHint}</span>
+              </div>
+            )}
+
+            <ContextMenuDivider />
+
+            {/* ── ACCIONES ── */}
+            <ContextMenuItem
+              icon={<Eye size={14} />}
+              onClick={() => {
+                setOpenClientId(lead.clientId);
+                close();
+              }}
+            >
+              Abrir detalle
+            </ContextMenuItem>
             {phone && (
               <ContextMenuItem
                 icon={<WhatsAppIcon size={13} color="var(--success)" />}
-                onClick={() => {
-                  whatsappCustomer(phone, lead.clientId);
-                  close();
-                }}
+                onClick={() => { whatsappCustomer(phone, lead.clientId); close(); }}
               >
                 WhatsApp
               </ContextMenuItem>
@@ -974,45 +1108,58 @@ export function Pipeline() {
             {phone && (
               <ContextMenuItem
                 icon={<Phone size={14} />}
-                onClick={() => {
-                  callCustomer(phone, lead.clientId);
-                  close();
-                }}
+                onClick={() => { callCustomer(phone, lead.clientId); close(); }}
               >
                 Llamar
               </ContextMenuItem>
             )}
+            <ContextMenuSub label="Registrar contacto" icon={<MessageSquare size={14} />}>
+              <ContextMenuItem icon={<WhatsAppIcon size={13} color="var(--success)" />} onClick={() => recordQuick("whatsapp")}>WhatsApp</ContextMenuItem>
+              <ContextMenuItem icon={<Phone size={13} />} onClick={() => recordQuick("call")}>Llamada</ContextMenuItem>
+              <ContextMenuItem icon={<CalendarPlus size={13} />} onClick={() => recordQuick("visit")}>Visita</ContextMenuItem>
+              <ContextMenuItem icon={<MessageSquare size={13} />} onClick={() => recordQuick("note")}>Nota / Otro</ContextMenuItem>
+            </ContextMenuSub>
             <ContextMenuItem
               icon={<CalendarPlus size={14} />}
-              onClick={() => {
-                setScheduleLead(lead);
-                close();
-              }}
+              onClick={() => { setScheduleLead(lead); close(); }}
             >
               Agendar visita
             </ContextMenuItem>
             <ContextMenuItem
               icon={<ShoppingCart size={14} />}
-              onClick={() => {
-                startConvertToSale(lead);
-                close();
-              }}
+              onClick={() => { startConvertToSale(lead); close(); }}
             >
               Convertir a venta
             </ContextMenuItem>
+
             <ContextMenuDivider />
-            <ContextMenuLabel>Posponer</ContextMenuLabel>
-            <ContextMenuItem icon={<Clock3 size={14} />} onClick={() => { snoozeLeadMut.mutate({ leadId: lead.id, days: 1 }); showToast('Pospuesto mañana', 'success'); close(); }}>+1 día</ContextMenuItem>
-            <ContextMenuItem icon={<Clock3 size={14} />} onClick={() => { snoozeLeadMut.mutate({ leadId: lead.id, days: 3 }); showToast('Pospuesto en 3 días', 'success'); close(); }}>+3 días</ContextMenuItem>
-            <ContextMenuItem icon={<Clock3 size={14} />} onClick={() => { snoozeLeadMut.mutate({ leadId: lead.id, days: 7 }); showToast('Pospuesto en 1 semana', 'success'); close(); }}>+1 semana</ContextMenuItem>
+
+            {/* ── ESTADO ── */}
+            <ContextMenuSub label="Mover a" icon={<ArrowRight size={14} />}>
+              {STAGES.filter((s) => !s.terminal && s.id !== lead.stage).map((s) => (
+                <ContextMenuItem key={s.id} icon={<ArrowRight size={12} />} onClick={() => moveTo(s.id)}>
+                  {s.label}
+                </ContextMenuItem>
+              ))}
+            </ContextMenuSub>
+            <ContextMenuSub label="Posponer" icon={<Clock3 size={14} />}>
+              <ContextMenuItem icon={<Clock3 size={13} />} onClick={() => { snoozeLeadMut.mutate({ leadId: lead.id, days: 1 }); showToast('Pospuesto mañana', 'success'); close(); }}>+1 día</ContextMenuItem>
+              <ContextMenuItem icon={<Clock3 size={13} />} onClick={() => { snoozeLeadMut.mutate({ leadId: lead.id, days: 3 }); showToast('Pospuesto en 3 días', 'success'); close(); }}>+3 días</ContextMenuItem>
+              <ContextMenuItem icon={<Clock3 size={13} />} onClick={() => { snoozeLeadMut.mutate({ leadId: lead.id, days: 7 }); showToast('Pospuesto en 1 semana', 'success'); close(); }}>+1 semana</ContextMenuItem>
+            </ContextMenuSub>
+            {canAssign && teamMembers.length > 0 && (
+              <ContextMenuSub label="Asignar a" icon={<UserCheck size={14} />}>
+                {teamMembers.map((m) => (
+                  <ContextMenuItem key={m.user_id} icon={<UserCheck size={12} />} onClick={() => assignTo(m)}>
+                    {m.name}
+                  </ContextMenuItem>
+                ))}
+              </ContextMenuSub>
+            )}
+
             <ContextMenuDivider />
-            <ContextMenuLabel>Mover a</ContextMenuLabel>
-            {STAGES.filter((s) => !s.terminal && s.id !== lead.stage).map((s) => (
-              <ContextMenuItem key={s.id} icon={<ArrowRight size={12} />} onClick={() => moveTo(s.id)}>
-                {s.label}
-              </ContextMenuItem>
-            ))}
-            <ContextMenuDivider />
+
+            {/* ── CIERRE ── */}
             {wonStage && lead.stage !== wonStage.id && (
               <ContextMenuItem icon={<Trophy size={14} />} onClick={() => moveTo(wonStage.id)}>
                 Marcar como ganado
@@ -1022,6 +1169,16 @@ export function Pipeline() {
               <ContextMenuItem tone="danger" icon={<XCircle size={14} />} onClick={() => moveTo(lostStage.id)}>
                 Marcar como perdido
               </ContextMenuItem>
+            )}
+
+            {/* ── PELIGRO (owner-only) ── */}
+            {canDeleteLead && (
+              <>
+                <ContextMenuDivider />
+                <ContextMenuItem tone="danger" icon={<Trash2 size={14} />} onClick={deleteUndoable}>
+                  Eliminar lead
+                </ContextMenuItem>
+              </>
             )}
           </ContextMenu>
         );

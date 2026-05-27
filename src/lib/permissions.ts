@@ -53,6 +53,11 @@ export const PERMISSIONS = {
   deleteClient: ["owner", "admin"],
   createLead: ["owner", "admin", "vendedor"],
   editLead: ["owner", "admin", "vendedor"],
+  /** Eliminar un lead del pipeline. Owner-only — borra historia que el
+   *  resto del equipo puede necesitar para auditoría / reportes. */
+  deleteLead: ["owner"],
+  /** Reasignar lead a otro vendedor (owner/admin distribuyen carga). */
+  assignLead: ["owner", "admin"],
 
   // Configuración
   managePaymentMethods: ["owner", "admin"],

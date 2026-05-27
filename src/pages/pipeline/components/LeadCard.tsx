@@ -91,6 +91,12 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
   const isHot = lead.priority === 'hot';
   const overdue =
     lead.nextActionAt && new Date(lead.nextActionAt).getTime() < Date.now();
+  // H/A: urgente = vencida > 3 días. Borde izquierdo rojo más fuerte
+  // que el warning amarillo del isStuck. Hot tiene prioridad visual.
+  const overdueDays = lead.nextActionAt
+    ? Math.floor((Date.now() - new Date(lead.nextActionAt).getTime()) / 86_400_000)
+    : 0;
+  const isUrgent = !isHot && overdue && overdueDays >= 3;
 
   return (
     <div
@@ -110,15 +116,21 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
       style={{
         background: selected ? color.primaryBg : color.surface,
         border: `1px solid ${selected ? color.primary : isHot ? color.primary : color.border}`,
-        // Indicador stuck: borde izquierdo grueso warning para que llame
-        // la atención sin romper la grid de la card
+        // Indicador izquierdo: prioridad cromática
+        //  - URGENTE (vencida > 3d): borde rojo grueso (H/A)
+        //  - STUCK (>7d sin moverse): borde warning amarillo
+        //  - normal: borde estándar
+        // Hot ya tiene su propio indicador (left bar) y borde primary; no
+        // sobrecargamos.
         borderLeft:
-          isStuck && !isHot && !selected
+          isUrgent && !selected
+            ? `3px solid ${color.danger}`
+            : isStuck && !isHot && !selected
             ? `3px solid ${color.warning}`
             : `1px solid ${selected ? color.primary : color.border}`,
         borderRadius: radius.md,
         padding: space[3],
-        paddingLeft: isStuck && !isHot && !selected ? `calc(${space[3]} - 2px)` : space[3],
+        paddingLeft: (isUrgent || (isStuck && !isHot)) && !selected ? `calc(${space[3]} - 2px)` : space[3],
         display: 'flex',
         flexDirection: 'column',
         gap: space[2],
@@ -131,12 +143,12 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
         ...style,
       }}
       onMouseEnter={(e) => {
-        if (!isHot && !isDragging && !isOverlay && !selected) {
+        if (!isHot && !isUrgent && !isDragging && !isOverlay && !selected) {
           e.currentTarget.style.borderColor = color.borderStrong;
         }
       }}
       onMouseLeave={(e) => {
-        if (!isHot && !isDragging && !isOverlay && !selected) {
+        if (!isHot && !isUrgent && !isDragging && !isOverlay && !selected) {
           e.currentTarget.style.borderColor = color.border;
         }
       }}
@@ -227,7 +239,16 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
               {lead.product}
             </div>
           ) : (
-            <div
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                // H/B: abre el detalle del lead para que el user complete
+                // el producto. Antes era texto pelado, ahora invita a acción.
+                onClick?.(lead);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              title="Click para agregar producto"
               style={{
                 fontSize: text.xs,
                 color: color.textDim,
@@ -236,10 +257,19 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 marginTop: 1,
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                textAlign: 'left',
+                cursor: 'pointer',
+                width: '100%',
+                textDecoration: 'underline dotted',
+                textUnderlineOffset: 2,
+                textDecorationColor: color.borderStrong,
               }}
             >
               Sin producto definido
-            </div>
+            </button>
           )}
         </div>
 
@@ -289,18 +319,23 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
         </div>
       )}
 
-      {/* Nota corta */}
+      {/* Nota corta — H/C: diferenciada visualmente del resto del texto
+          con fondo sutil + padding, así no se confunde con el nombre del
+          cliente / monto / nextAction (todos texto pelado). */}
       {lead.shortNote && (
         <div
           style={{
             fontSize: text.xs,
-            color: color.textDim,
-            fontStyle: 'italic',
+            color: color.textMuted,
             lineHeight: 1.4,
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
+            background: 'rgba(255,255,255,0.03)',
+            border: `1px solid ${color.border}`,
+            padding: '4px 8px',
+            borderRadius: radius.sm,
           }}
         >
           {lead.shortNote}
@@ -318,10 +353,16 @@ export const LeadCard = forwardRef<HTMLDivElement, LeadCardProps>(function LeadC
         }}
       >
         <span
+          title={
+            stuckDays === 0
+              ? 'Lead movido a esta etapa hoy'
+              : `Lleva ${stuckDays} ${stuckDays === 1 ? 'día' : 'días'} sin cambiar de etapa`
+          }
           style={{
             fontSize: text.xs,
             color: isStuck ? color.warning : color.textDim,
             fontWeight: isStuck ? weight.semibold : weight.medium,
+            cursor: 'help',
           }}
         >
           {stuckDays === 0 ? 'hoy' : `${stuckDays}d en etapa`}

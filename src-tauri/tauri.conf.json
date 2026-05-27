@@ -24,7 +24,14 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPDATA/clozr/images/**",
+          "$APPDATA/com.clozr.app/clozr/images/**"
+        ]
+      }
     }
   },
   "plugins": {

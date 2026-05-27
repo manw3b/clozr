@@ -28,6 +28,7 @@ import { useUIStore } from '../store/uiStore';
 import { businessesDb } from '../lib/db/businesses';
 import { useAuthStore, assertCan } from '../store/authStore';
 import { useIndustry } from '../lib/useIndustry';
+import { resolveImageUrl } from '../lib/images';
 
 export type NewAction = 'cliente' | 'venta' | 'lead' | 'tarea' | 'movimiento';
 export type NotifNavigate = 'tasks' | 'cash' | 'pipeline';
@@ -361,13 +362,17 @@ function BusinessSwitcher() {
   const wrapRef = useRef<HTMLDivElement>(null);
 
   // F.industry: el cuadrado del topbar muestra el ícono del RUBRO (industry)
-  // del workspace activo en vez del emoji del business. Razón: el rubro
-  // comunica "qué tipo de negocio es esto" — más útil que un emoji
-  // arbitrario que el user no eligió a propósito.
-  // Hoy todos los workspaces son "generic" (📦) hasta que se vendan los
-  // add-ons de nichos (F.I). Cuando un user compre "electronics" y lo
-  // asigne a su workspace, el ícono cambia a 📱 automáticamente.
+  // del workspace activo en vez del emoji del business.
+  // I/B: si el negocio tiene logo subido, lo PRIORIZAMOS sobre el ícono
+  // del rubro — el branding propio gana sobre el genérico. Fallback chain:
+  //   logo → industry.icon → emoji
   const industry = useIndustry();
+  const logoPath = activeWorkspace?.logo_path ?? null;
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!logoPath) { setLogoUrl(null); return; }
+    resolveImageUrl(logoPath).then(setLogoUrl).catch(() => setLogoUrl(null));
+  }, [logoPath]);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -415,9 +420,18 @@ function BusinessSwitcher() {
               justifyContent: 'center',
               fontSize: 15,
               flexShrink: 0,
+              overflow: 'hidden',
             }}
           >
-            {industry.icon}
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={activeWorkspace?.name ?? 'logo'}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              industry.icon
+            )}
           </span>
           <span
             style={{

@@ -4,6 +4,7 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-set-title",
     "sql:allow-execute",
     "sql:allow-select",
     "sql:allow-load",

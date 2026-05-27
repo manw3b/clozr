@@ -3,6 +3,7 @@ import { Plus, Pencil, Check, X, Target } from 'lucide-react';
 import { Button } from '../../../components/Button';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney, formatDateLong, greetText, plural } from '../../../lib/format';
+import { resolveImageUrl } from '../../../lib/images';
 import type { DailyGoal } from '../../../types/domain';
 
 interface MyDayHeroProps {
@@ -10,6 +11,10 @@ interface MyDayHeroProps {
   userName: string;
   date: string;
   workspaceName: string;
+  /** Path relativo (images/workspaces/{wid}.{ext}) o null. Si está, se
+   *  prioriza sobre cualquier ícono genérico — branding del negocio
+   *  visible al arrancar el día (I/D). */
+  workspaceLogoPath?: string | null;
   goal: DailyGoal;
   score: number;
   onNewSale: () => void;
@@ -31,6 +36,7 @@ export function MyDayHero({
   userName,
   date,
   workspaceName,
+  workspaceLogoPath,
   goal,
   score,
   onNewSale,
@@ -42,6 +48,15 @@ export function MyDayHero({
   const hasGoal = goal.amount > 0;
   const canEdit = !!onSetGoal;
   const canEditSalesGoal = !!onSetSalesGoal;
+
+  // I/D: resolver el path local del logo a una asset:// URL que el WebView
+  // pueda cargar. Si falla (archivo borrado, asset protocol mal configurado),
+  // logoUrl queda null y el header muestra solo el texto sin logo.
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!workspaceLogoPath) { setLogoUrl(null); return; }
+    resolveImageUrl(workspaceLogoPath).then(setLogoUrl).catch(() => setLogoUrl(null));
+  }, [workspaceLogoPath]);
 
   return (
     <div
@@ -79,21 +94,59 @@ export function MyDayHero({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: space[2],
-            marginBottom: space[1],
+            gap: space[3],
+            marginBottom: space[2],
           }}
         >
-          <span
-            style={{
-              fontSize: text.xs,
-              fontWeight: weight.semibold,
-              color: color.textMuted,
-              textTransform: 'uppercase',
-              letterSpacing: '1px',
-            }}
-          >
-            {workspaceName} · {formatDateLong(date)}
-          </span>
+          {logoUrl && (
+            <span
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: radius.md,
+                overflow: 'hidden',
+                background: color.surface2,
+                border: `1px solid ${color.border}`,
+                flexShrink: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <img
+                src={logoUrl}
+                alt={workspaceName}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </span>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <span
+              style={{
+                fontSize: text.sm,
+                fontWeight: weight.bold,
+                color: color.text,
+                lineHeight: 1.1,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {workspaceName}
+            </span>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: weight.semibold,
+                color: color.textDim,
+                textTransform: 'uppercase',
+                letterSpacing: '0.8px',
+                marginTop: 2,
+              }}
+            >
+              {formatDateLong(date)}
+            </span>
+          </div>
         </div>
 
         <h1

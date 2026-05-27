@@ -73,6 +73,7 @@ export function MyDay({
         userName={data.user.name}
         date={data.date}
         workspaceName={data.workspace.name}
+        workspaceLogoPath={data.workspace.logoPath ?? null}
         goal={data.goal}
         score={data.score}
         onNewSale={onNewSale}

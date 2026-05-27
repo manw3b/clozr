@@ -19,6 +19,7 @@ import { ensurePricingSchema } from "./lib/db/ensureSchema";
 import { autoBackupIfDue } from "./lib/backup";
 import { log } from "./lib/logger";
 import { useCloudAuthListener } from "./lib/useCloudAuthListener";
+import { useWindowTitle } from "./lib/useWindowTitle";
 import { useSyncCloudRole } from "./lib/useSyncCloudRole";
 import { onAuthExpired } from "./lib/cloudAuth";
 import { useCloudAuthStore } from "./store/cloudAuthStore";
@@ -180,6 +181,10 @@ export default function App() {
   // de cotización — toda la app que lee `usdToArs` recibe el valor
   // del API automáticamente sin tener que tocar cada caller.
   useSyncActiveDolarToExchangeRate();
+
+  // I/C: window title con el nombre del negocio activo. Útil cuando el
+  // user tiene varias ventanas Clozr abiertas (multi-workspace).
+  useWindowTitle(activeBusiness?.name ?? activeWorkspace?.name ?? null);
 
   // Escucha el deep link clozr://auth-complete?jwt=... que dispara Rust
   // cuando el SO le pasa un magic link a la app. Llena cloudAuthStore.

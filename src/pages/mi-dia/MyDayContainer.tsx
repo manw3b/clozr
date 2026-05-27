@@ -215,7 +215,10 @@ export function MyDayContainer() {
     return {
       greeting: greetingForHour(new Date().getHours()),
       user: { name: userName ?? "" },
-      workspace: { name: activeBusiness?.name ?? activeWorkspace?.name ?? "" },
+      workspace: {
+        name: activeBusiness?.name ?? activeWorkspace?.name ?? "",
+        logoPath: activeWorkspace?.logo_path ?? null,
+      },
       date: new Date().toISOString(),
       goal: {
         amount: goalAmount,

@@ -352,7 +352,7 @@ export interface DailyGoal {
 export interface MyDayData {
   greeting: 'morning' | 'afternoon' | 'evening' | 'night';
   user: { name: string };
-  workspace: { name: string };
+  workspace: { name: string; logoPath?: string | null };
   date: string;
   goal: DailyGoal;
   tasks: Task[];

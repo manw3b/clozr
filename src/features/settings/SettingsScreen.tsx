@@ -154,6 +154,13 @@ function GeneralSection({ wid }: { wid: string }) {
   const [dailyGoalCurrency, setDailyGoalCurrency] = useState(initialGoal.currency);
   const [saving, setSaving] = useState(false);
 
+  // Sync inputs SOLO cuando cambia el workspace activo (no cada vez que
+  // algún campo cambia). Antes el useEffect tenía `activeWorkspace`
+  // entero como dep, por lo que cualquier update del store (ej. mi propio
+  // save sincronizando con cloud) re-disparaba esto y reseteaba el
+  // logoPath con el valor pre-save → logo "se borraba" visualmente al
+  // guardar.
+  const activeWsId = activeWorkspace?.id;
   useEffect(() => {
     if (activeWorkspace) {
       setName(activeWorkspace.name);
@@ -161,7 +168,8 @@ function GeneralSection({ wid }: { wid: string }) {
       setColor(activeWorkspace.color);
       setLogoPath(activeWorkspace.logo_path ?? null);
     }
-  }, [activeWorkspace]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWsId]);
 
   // Sync inputs cuando el cloud workspace cambia (ej: otro miembro
   // editó la meta y Caro recibió el push via /me refresh).

@@ -28,7 +28,7 @@ import { useUIStore } from '../store/uiStore';
 import { businessesDb } from '../lib/db/businesses';
 import { useAuthStore, assertCan } from '../store/authStore';
 import { useIndustry } from '../lib/useIndustry';
-import { resolveImageUrl } from '../lib/images';
+import { useWorkspaceLogo } from '../lib/useWorkspaceLogo';
 
 export type NewAction = 'cliente' | 'venta' | 'lead' | 'tarea' | 'movimiento';
 export type NotifNavigate = 'tasks' | 'cash' | 'pipeline';
@@ -363,16 +363,10 @@ function BusinessSwitcher() {
 
   // F.industry: el cuadrado del topbar muestra el ícono del RUBRO (industry)
   // del workspace activo en vez del emoji del business.
-  // I/B: si el negocio tiene logo subido, lo PRIORIZAMOS sobre el ícono
-  // del rubro — el branding propio gana sobre el genérico. Fallback chain:
-  //   logo → industry.icon → emoji
+  // I/B: si el negocio tiene logo, lo priorizamos. Fallback chain:
+  //   logo (cloud R2 > local FS) → industry.icon
   const industry = useIndustry();
-  const logoPath = activeWorkspace?.logo_path ?? null;
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!logoPath) { setLogoUrl(null); return; }
-    resolveImageUrl(logoPath).then(setLogoUrl).catch(() => setLogoUrl(null));
-  }, [logoPath]);
+  const logoUrl = useWorkspaceLogo();
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {

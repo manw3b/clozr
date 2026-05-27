@@ -27,6 +27,8 @@ export interface Env {
   SESSION_TTL_DAYS: string;
   DEEP_LINK_SCHEME: string;
   ALLOWED_ORIGINS: string;
+  // R2 bucket binding (I) — para logos/banners del workspace.
+  ASSETS: R2Bucket;
 }
 
 import { handleAuthRequest } from "./routes/request";
@@ -51,6 +53,11 @@ import {
   handleListCustomerContacts, handleCreateCustomerContact,
   handleLastContactByCustomer,
 } from "./routes/customer-contacts";
+import {
+  handleUploadLogo, handleDeleteLogo,
+  handleUploadBanner, handleDeleteBanner,
+  handleAssetProxy,
+} from "./routes/workspace-assets";
 import {
   handleListCustomers,
   handleCreateCustomer,
@@ -234,6 +241,24 @@ export default {
       const wsPatchMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/?$/);
       if (wsPatchMatch && req.method === "PATCH") {
         return cors(req, env, await handleUpdateWorkspace(wsPatchMatch[1]!, req, env));
+      }
+
+      // I — workspace assets (logo + banner) en R2.
+      // GET /assets/{key+} es el proxy público; va PRIMERO porque su path
+      // empieza distinto.
+      if (url.pathname.startsWith("/assets/") && req.method === "GET") {
+        const key = decodeURIComponent(url.pathname.slice("/assets/".length));
+        return cors(req, env, await handleAssetProxy(key, env));
+      }
+      const wsLogoMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/logo\/?$/);
+      const wsBannerMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/banner\/?$/);
+      if (wsLogoMatch) {
+        if (req.method === "POST")   return cors(req, env, await handleUploadLogo(wsLogoMatch[1]!, req, env));
+        if (req.method === "DELETE") return cors(req, env, await handleDeleteLogo(wsLogoMatch[1]!, req, env));
+      }
+      if (wsBannerMatch) {
+        if (req.method === "POST")   return cors(req, env, await handleUploadBanner(wsBannerMatch[1]!, req, env));
+        if (req.method === "DELETE") return cors(req, env, await handleDeleteBanner(wsBannerMatch[1]!, req, env));
       }
 
       // G/A1 — assigned_task_templates

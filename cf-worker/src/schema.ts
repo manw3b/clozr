@@ -28,7 +28,7 @@ let initPromise: Promise<void> | null = null;
  *
  * Bump cuando agregues un CREATE TABLE / ALTER TABLE / safeAddColumn.
  */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 export function ensureSchema(env: Env): Promise<void> {
   if (!initPromise) initPromise = applySchemaIfNeeded(env);
@@ -199,6 +199,13 @@ async function applySchema(env: Env): Promise<void> {
     sql: `CREATE INDEX IF NOT EXISTS idx_customer_contacts_ws_customer
       ON customer_contacts(workspace_id, customer_id, contacted_at DESC)`,
   });
+
+  // 007 (I) — logo y banner del workspace en cloud. Apuntan a objects R2:
+  // formato del valor = "workspaces/{wid}/logo.{ext}" o "workspaces/{wid}/banner.{ext}".
+  // El worker sirve el archivo via GET /assets/{key} (proxy desde el R2
+  // bucket, con cache-control). Compartido entre todo el equipo.
+  await safeAddColumn(env, "cloud_workspaces", "logo_key", "TEXT");
+  await safeAddColumn(env, "cloud_workspaces", "banner_key", "TEXT");
 
   // ── F2.1: Workspaces multi-tenant + memberships ───────────────────
   //

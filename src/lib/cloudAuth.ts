@@ -215,6 +215,9 @@ export interface MeWorkspace {
   daily_goal?: number;
   daily_goal_currency?: string;
   daily_goal_count?: number;
+  /** I: keys de R2 — el cliente arma `{AUTH_BASE}/assets/{key}`. */
+  logo_key?: string | null;
+  banner_key?: string | null;
 }
 
 export interface MeResponse {
@@ -519,6 +522,55 @@ export interface CloudCatalogItem {
   [k: string]: unknown;
 }
 export const catalogApi = cloudTable<CloudCatalogItem>("catalog");
+
+/* ── Workspace assets (I) ────────────────────────────────────────────── */
+
+/**
+ * Sube un archivo binario al endpoint del worker. El worker lo guarda en
+ * R2 + actualiza cloud_workspaces.logo_key (o banner_key). Devuelve la
+ * key persistida.
+ *
+ * Importante: el body es el ArrayBuffer DIRECTO (no multipart). El
+ * worker lee req.arrayBuffer().
+ */
+export async function uploadWorkspaceAsset(
+  jwt: string | null,
+  workspaceId: string,
+  kind: "logo" | "banner",
+  file: Blob,
+) {
+  if (!jwt) return { ok: false as const, error: "no_jwt" };
+  try {
+    const res = await fetch(`${AUTH_BASE}/workspaces/${workspaceId}/${kind}`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${jwt}`,
+        "content-type": file.type || "image/jpeg",
+      },
+      body: file,
+    });
+    const data = (await res.json()) as { ok?: boolean; key?: string; error?: string };
+    if (!res.ok) return { ok: false as const, error: data.error ?? `http_${res.status}` };
+    return { ok: true as const, key: data.key ?? "" };
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : "network_error" };
+  }
+}
+
+export async function deleteWorkspaceAsset(
+  jwt: string | null,
+  workspaceId: string,
+  kind: "logo" | "banner",
+) {
+  return authFetch<{ ok: true }>(jwt, `/workspaces/${workspaceId}/${kind}`, { method: "DELETE" });
+}
+
+/** Devuelve la URL pública del asset (proxy del worker con cache 1 año). */
+export function workspaceAssetUrl(key: string | null | undefined): string | null {
+  if (!key) return null;
+  // El worker sirve /assets/{key} con cache-control inmutable.
+  return `${AUTH_BASE}/assets/${key}`;
+}
 
 /* ── Workspace update (G/A4) ─────────────────────────────────────────── */
 export interface UpdateWorkspaceBody {

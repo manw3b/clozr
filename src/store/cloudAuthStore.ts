@@ -32,6 +32,9 @@ export interface CloudWorkspace {
   daily_goal?: number;
   daily_goal_currency?: string;
   daily_goal_count?: number;
+  /** I: keys de R2 para logo/banner del workspace. */
+  logo_key?: string | null;
+  banner_key?: string | null;
 }
 
 interface CloudAuthState {

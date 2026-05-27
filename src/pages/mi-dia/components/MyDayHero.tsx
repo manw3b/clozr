@@ -3,7 +3,7 @@ import { Plus, Pencil, Check, X, Target } from 'lucide-react';
 import { Button } from '../../../components/Button';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney, formatDateLong, greetText, plural } from '../../../lib/format';
-import { resolveImageUrl } from '../../../lib/images';
+import { useWorkspaceLogo } from '../../../lib/useWorkspaceLogo';
 import type { DailyGoal } from '../../../types/domain';
 
 interface MyDayHeroProps {
@@ -49,14 +49,13 @@ export function MyDayHero({
   const canEdit = !!onSetGoal;
   const canEditSalesGoal = !!onSetSalesGoal;
 
-  // I/D: resolver el path local del logo a una asset:// URL que el WebView
-  // pueda cargar. Si falla (archivo borrado, asset protocol mal configurado),
-  // logoUrl queda null y el header muestra solo el texto sin logo.
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!workspaceLogoPath) { setLogoUrl(null); return; }
-    resolveImageUrl(workspaceLogoPath).then(setLogoUrl).catch(() => setLogoUrl(null));
-  }, [workspaceLogoPath]);
+  // I/D: hook unificado cloud-first → local-fallback. Si hay logo cloud
+  // (compartido con equipo via R2), gana. Sino, logo local. Sino, null
+  // y el header muestra solo el texto.
+  // workspaceLogoPath prop sigue siendo aceptado por compat pero el hook
+  // tiene precedencia (lee del store directo).
+  void workspaceLogoPath;
+  const logoUrl = useWorkspaceLogo();
 
   return (
     <div

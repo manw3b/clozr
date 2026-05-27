@@ -19,6 +19,19 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+# R2 bucket para logos/banners de los workspaces (I).
+# El worker accede como `env.ASSETS` (Object storage API binding).
+# Pre-requisitos antes del primer deploy con este binding:
+#   1. dash.cloudflare.com → R2 → Habilitar (acepta términos, 10GB free,
+#      después $0.015/GB/mes — irrelevante a escala chica).
+#   2. `npx wrangler r2 bucket create clozr-assets`
+#   3. Re-deploy del worker.
+# Si activás R2 después de deployar, el binding tira error de schema —
+# basta con re-deploy y se resuelve.
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "clozr-assets"
+
 # Sender + asunto del email magic-link. No son secretos.
 [vars]
 # Sandbox: Resend solo deja mandar emails al owner de la cuenta

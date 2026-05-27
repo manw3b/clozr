@@ -28,6 +28,7 @@
     "fs:allow-remove",
     "fs:allow-stat",
     "fs:allow-read-dir",
+    "fs:allow-read-file",
     "fs:scope-home-recursive",
     "fs:scope-appdata-recursive",
     "dialog:allow-open",

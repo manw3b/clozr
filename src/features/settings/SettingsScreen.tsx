@@ -8,7 +8,7 @@ import { useDailyGoal } from "../../lib/useDailyGoal";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import Select from "../../components/ui/Select";
-import ImageUpload from "../../components/ui/ImageUpload";
+import WorkspaceAssetUpload from "../../components/ui/WorkspaceAssetUpload";
 import { ExchangeRateChip } from "../../components/ExchangeRateChip";
 
 // Cada sección externa se lazy-loadea: el bundle inicial de Settings tenía
@@ -212,19 +212,37 @@ function GeneralSection({ wid }: { wid: string }) {
     <div>
       <SectionHeader title="General" description="Personalización del negocio" />
       <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 480 }}>
-        {/* Logo */}
+        {/* Logo — cloud-first (compartido equipo), fallback local */}
         <div>
           <label style={labelStyle}>Logo del negocio</label>
-          <ImageUpload
-            category="workspaces"
-            entityId={wid}
-            currentPath={logoPath}
-            onImageSelected={setLogoPath}
-            onImageRemoved={() => setLogoPath(null)}
+          <WorkspaceAssetUpload
+            kind="logo"
+            localEntityId={wid}
+            onLocalPathChange={setLogoPath}
             size="lg"
             shape="square"
             placeholder={emoji || "🏪"}
           />
+          <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 6, maxWidth: 240, lineHeight: 1.4 }}>
+            Cuadrado, máx 2MB. PNG / JPG / WEBP. En equipo cloud lo ven todos los miembros.
+          </div>
+        </div>
+
+        {/* Banner — solo cloud */}
+        <div>
+          <label style={labelStyle}>Banner del negocio <span style={{ color: "var(--text-dim)", fontWeight: 400 }}>(opcional)</span></label>
+          <div style={{ maxWidth: 480, aspectRatio: "4 / 1", height: "auto" }}>
+            <WorkspaceAssetUpload
+              kind="banner"
+              localEntityId={wid}
+              size="lg"
+              shape="square"
+              placeholder={<span style={{ color: "var(--text-dim)", fontSize: 12 }}>Subir banner</span>}
+            />
+          </div>
+          <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 6, maxWidth: 320, lineHeight: 1.4 }}>
+            Apaisado (4:1 recomendado), máx 2MB. Aparece como fondo decorativo en Mi Día.
+          </div>
         </div>
 
         <div>

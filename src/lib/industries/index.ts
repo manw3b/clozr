@@ -14,6 +14,11 @@
  */
 
 import { genericIndustry } from "./generic";
+import { electronicsIndustry } from "./electronics";
+import { automotiveIndustry } from "./automotive";
+import { fashionIndustry } from "./fashion";
+import { foodIndustry } from "./food";
+import { servicesIndustry } from "./services";
 
 export interface IndustryConfig {
   /** Slug interno (en inglés). Lo que vive en `workspace.industry`. */
@@ -31,6 +36,30 @@ export interface IndustryConfig {
    * `isPaid` + `user.owned_industries[]`.
    */
   isPaid: boolean;
+  /**
+   * Precio tentativo en USD (one-time según ROADMAP). Solo se muestra
+   * como referencia en el selector — no es real hasta que Stripe se
+   * active. Null para rubros free (generic).
+   */
+  priceUsd: number | null;
+  /**
+   * Status del rubro hoy:
+   *  - "ready": templates armados, listo para vender
+   *  - "preview": rubro disponible para seleccionar pero seeds genéricos
+   *    (el user puede configurar manual; cuando madure mueve a ready)
+   *  - "coming-soon": no listo, solo signaling de interés
+   */
+  status: "ready" | "preview" | "coming-soon";
+  /**
+   * 3-4 bullets de qué incluye el nicho cuando se compra. Usado en el
+   * selector como "preview de valor". Idioma rioplatense.
+   */
+  highlights: readonly string[];
+  /**
+   * Label override para el item "Inventario" del sidebar. Si null, se
+   * usa "Inventario" default. Permite "Vehículos" para autos, etc.
+   */
+  inventoryLabel?: string;
 }
 
 /**
@@ -42,7 +71,22 @@ export interface IndustryConfig {
  */
 export const INDUSTRIES = {
   generic: genericIndustry,
+  electronics: electronicsIndustry,
+  automotive: automotiveIndustry,
+  fashion: fashionIndustry,
+  food: foodIndustry,
+  services: servicesIndustry,
 } as const satisfies Record<string, IndustryConfig>;
+
+/** Lista en orden de presentación (selector). */
+export const INDUSTRY_LIST: IndustryConfig[] = [
+  genericIndustry,
+  electronicsIndustry,
+  automotiveIndustry,
+  fashionIndustry,
+  foodIndustry,
+  servicesIndustry,
+];
 
 export type IndustrySlug = keyof typeof INDUSTRIES;
 

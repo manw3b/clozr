@@ -28,6 +28,7 @@ const AboutSection = lazy(() => import("./AboutSection").then(m => ({ default: m
 const AssignedTasksSection = lazy(() => import("./AssignedTasksSection").then(m => ({ default: m.AssignedTasksSection })));
 const CloudAccountSection = lazy(() => import("./CloudAccountSection").then(m => ({ default: m.CloudAccountSection })));
 const CloudDataSection = lazy(() => import("./CloudDataSection").then(m => ({ default: m.CloudDataSection })));
+const IndustrySection = lazy(() => import("./IndustrySection").then(m => ({ default: m.IndustrySection })));
 import { qk } from "../../lib/queryKeys";
 import type { PipelineStage, CustomerTypeRow } from "../../lib/db/types";
 // Paleta unificada — la misma que usa el kanban del pipeline para el
@@ -36,7 +37,7 @@ import { PALETTE_LIST as COLORS, colorCss } from "../../lib/colorPalette";
 
 // ── Shared ────────────────────────────────────────────────────────
 
-type SectionId = "general" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "wa-templates" | "dolares" | "assigned-tasks" | "cloud-account" | "cloud-data" | "data" | "about";
+type SectionId = "general" | "industry" | "profile" | "pipeline" | "customer-types" | "customer-tags" | "payment-methods" | "catalog-pricing" | "catalog-featured" | "wa-templates" | "dolares" | "assigned-tasks" | "cloud-account" | "cloud-data" | "data" | "about";
 
 // F.navigation: tabs agrupadas en 5 secciones. Antes era una lista plana de
 // 17 items que pedían scroll y eran difíciles de escanear. Ahora ojo
@@ -54,6 +55,7 @@ const SECTIONS: Array<{ group: string; items: Array<{ id: SectionId; label: stri
     group: "Negocio",
     items: [
       { id: "general", label: "General" },
+      { id: "industry", label: "Rubro" },
       { id: "profile", label: "Tu perfil" },
     ],
   },
@@ -1162,6 +1164,7 @@ export default function SettingsScreen() {
   const renderSection = () => {
     switch (activeSection) {
       case "general": return <GeneralSection wid={wid} />;
+      case "industry": return <IndustrySection wid={wid} />;
       case "profile": return <ProfileSection />;
       case "pipeline": return <PipelineSection wid={wid} />;
       case "customer-types": return <CustomerTypesSection wid={wid} />;

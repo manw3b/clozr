@@ -15,6 +15,14 @@ export const genericIndustry: IndustryConfig = {
   slug: "generic",
   label: "Genérico",
   icon: "📦",
-  description: "CRM básico: clientes, ventas, pipeline simple. Sin templates pre-armadas.",
+  description: "CRM básico para cualquier tipo de negocio. Vos armás todo a mano: catálogo, pipeline, plantillas. Ideal si tu rubro no encaja con los preset, o querés empezar limpio.",
   isPaid: false,
+  priceUsd: null,
+  status: "ready",
+  highlights: [
+    "Catálogo libre — agregás tus productos a mano",
+    "Pipeline 4 etapas genérico (Prospecto → Vendido)",
+    "Plantillas de WhatsApp básicas",
+    "Sin tareas obligatorias preconfiguradas",
+  ],
 };

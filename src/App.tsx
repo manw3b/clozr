@@ -12,6 +12,7 @@ import { ConfirmHost } from "./components/ConfirmHost";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { confirmAsync } from "./lib/confirmAsync";
 import { WhatsNewModal } from "./components/WhatsNewModal";
+import { TipsModal } from "./components/TipsModal";
 import { seedAppleCatalog, seedWatchAndMac, refreshIphoneCatalog, refreshIpadCatalog } from "./lib/db/quickStock";
 import { paymentMethodsDb } from "./lib/db/paymentMethods";
 import { followupsDb } from "./lib/db/followups";
@@ -406,6 +407,7 @@ export default function App() {
       <UpdateBanner />
       <UndoToastHost />
       <WhatsNewModal />
+      <TipsModal enabled={splashDone && !!userId} />
       <AppShell
         active={activeScreen}
         onNavigate={(id) => setActiveScreen(id as ScreenId)}

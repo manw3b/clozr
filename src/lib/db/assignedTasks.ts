@@ -338,6 +338,38 @@ export async function incrementProgress(
   taskId: string,
   delta: number = 1,
 ): Promise<Task | null> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    // Cloud path: traer la task del cloud, calcular next + completed,
+    // PATCH al endpoint de tasks. Antes esta función era 100% local
+    // → para Caro (vendedora cloud) NO encontraba la task y el +1
+    // silenciosamente no hacía nada.
+    const listRes = await tasksApi.list(ctx.jwt, ctx.wsId);
+    if (!listRes.ok) return null;
+    const t = (listRes.data.items as unknown as Array<Record<string, unknown>>)
+      .find((x) => x.id === taskId);
+    if (!t) return null;
+    const max = Number(t.target_count ?? 1);
+    const current = Number(t.progress ?? 0);
+    const next = Math.max(0, Math.min(max, current + delta));
+    const completed = next >= max ? 1 : 0;
+    const completedAt = completed === 1 && Number(t.completed ?? 0) === 0
+      ? new Date().toISOString()
+      : (t.completed_at as string | null);
+    const updRes = await tasksApi.update(ctx.jwt, ctx.wsId, taskId, {
+      progress: next,
+      completed,
+      completed_at: completedAt,
+    } as never);
+    if (!updRes.ok) throw new Error(`No se pudo actualizar progreso: ${updRes.error}`);
+    return {
+      ...(t as unknown as Task),
+      progress: next,
+      completed,
+      completed_at: completedAt,
+    };
+  }
+
   const rows = await dbSelect<Task>("SELECT * FROM tasks WHERE id = ?", [taskId]);
   const task = rows[0];
   if (!task) return null;

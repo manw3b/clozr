@@ -276,17 +276,29 @@ export function MyDayContainer() {
       }}
       onWhatsApp={(clientId, opts) => {
         const customer = customersQ.data?.find((c) => c.id === clientId);
-        if (customer?.phone) {
-          openWhatsApp(customer.phone, opts?.message);
-          recordContactMut.mutate({ customerId: clientId, kind: "whatsapp" });
+        if (!customer) {
+          showToast("No se encontró el cliente", "error");
+          return;
         }
+        if (!customer.phone) {
+          showToast(`${customer.name} no tiene teléfono cargado`, "error");
+          return;
+        }
+        openWhatsApp(customer.phone, opts?.message);
+        recordContactMut.mutate({ customerId: clientId, kind: "whatsapp" });
       }}
       onCall={(clientId) => {
         const customer = customersQ.data?.find((c) => c.id === clientId);
-        if (customer?.phone) {
-          openTel(customer.phone);
-          recordContactMut.mutate({ customerId: clientId, kind: "call" });
+        if (!customer) {
+          showToast("No se encontró el cliente", "error");
+          return;
         }
+        if (!customer.phone) {
+          showToast(`${customer.name} no tiene teléfono cargado`, "error");
+          return;
+        }
+        openTel(customer.phone);
+        recordContactMut.mutate({ customerId: clientId, kind: "call" });
       }}
       onNavigate={(page) => {
         const map: Record<string, ScreenId> = {

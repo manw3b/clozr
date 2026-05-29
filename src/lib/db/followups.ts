@@ -1,6 +1,6 @@
 import { dbSelect, dbExecute } from "./index";
 import { useCloudAuthStore } from "../../store/cloudAuthStore";
-import { followupsApi } from "../cloudAuth";
+import { followupsApi, type CloudFollowup } from "../cloudAuth";
 import type { Followup, CreateFollowupInput } from "./types";
 
 function fuCloudCtx(): { jwt: string; wsId: string } | null {
@@ -79,21 +79,50 @@ export async function create(
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const kind = data.kind ?? "manual";
-  await dbExecute(
-    `INSERT INTO followups (id, workspace_id, business_id, customer_id, customer_name, text, due_date, completed, created_at, kind)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
-    [id, workspaceId, businessId, data.customer_id ?? null, data.customer_name ?? null, data.text, data.due_date, now, kind],
-  );
-  return {
+  const out: Followup = {
     id, workspace_id: workspaceId, business_id: businessId,
     customer_id: data.customer_id ?? null, customer_name: data.customer_name ?? null,
     text: data.text, due_date: data.due_date,
     completed: 0, completed_at: null, created_at: now, kind,
   };
+
+  const ctx = fuCloudCtx();
+  if (ctx) {
+    // El worker exige customer_id (NOT NULL). Followups manuales sin
+    // cliente solo se soportan en modo local — en cloud los skipeamos
+    // silenciosamente para no romper el flujo del vendedor.
+    if (!data.customer_id) return out;
+    const res = await followupsApi.create(ctx.jwt, ctx.wsId, {
+      id,
+      customer_id: data.customer_id,
+      customer_name: data.customer_name ?? null,
+      text: data.text,
+      due_at: data.due_date,
+    } as unknown as Partial<CloudFollowup> & { id?: string });
+    if (!res.ok) throw new Error(`No se pudo crear el recordatorio en la nube: ${res.error}`);
+    return out;
+  }
+
+  await dbExecute(
+    `INSERT INTO followups (id, workspace_id, business_id, customer_id, customer_name, text, due_date, completed, created_at, kind)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+    [id, workspaceId, businessId, data.customer_id ?? null, data.customer_name ?? null, data.text, data.due_date, now, kind],
+  );
+  return out;
 }
 
 export async function toggleComplete(id: string, completed: boolean): Promise<void> {
   const now = new Date().toISOString();
+  const ctx = fuCloudCtx();
+  if (ctx) {
+    // El estado completed en cloud se deriva de completed_at (no hay
+    // columna `completed` separada — ver cloudFollowupToLocal).
+    const res = await followupsApi.update(ctx.jwt, ctx.wsId, id, {
+      completed_at: completed ? now : null,
+    } as unknown as Partial<CloudFollowup>);
+    if (!res.ok) throw new Error(`No se pudo actualizar el recordatorio en la nube: ${res.error}`);
+    return;
+  }
   await dbExecute(
     "UPDATE followups SET completed = ?, completed_at = ? WHERE id = ?",
     [completed ? 1 : 0, completed ? now : null, id],
@@ -101,6 +130,12 @@ export async function toggleComplete(id: string, completed: boolean): Promise<vo
 }
 
 export async function remove(id: string): Promise<void> {
+  const ctx = fuCloudCtx();
+  if (ctx) {
+    const res = await followupsApi.remove(ctx.jwt, ctx.wsId, id);
+    if (!res.ok) throw new Error(`No se pudo borrar el recordatorio en la nube: ${res.error}`);
+    return;
+  }
   await dbExecute("DELETE FROM followups WHERE id = ?", [id]);
 }
 

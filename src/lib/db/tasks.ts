@@ -124,6 +124,28 @@ export async function remove(id: string): Promise<void> {
 }
 
 export async function resetRoutines(workspaceId: string): Promise<void> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    // No hay endpoint bulk en el worker — listamos y reseteamos las
+    // rutinas completadas una por una. Best-effort: si una falla, seguimos
+    // con las demás (no abortamos el reset entero por un error puntual).
+    const res = await tasksApi.list(ctx.jwt, ctx.wsId);
+    if (!res.ok) {
+      log.warn("resetRoutines cloud list falló", { scope: "tasksDb", data: { error: res.error } });
+      return;
+    }
+    const toReset = res.data.items.filter(
+      (t) => String((t as unknown as Record<string, unknown>).type ?? "") === "rutina" && t.completed === 1,
+    );
+    await Promise.all(
+      toReset.map((t) =>
+        tasksApi
+          .update(ctx.jwt, ctx.wsId, t.id, { completed: 0, completed_at: null } as Partial<CloudTask>)
+          .catch(() => undefined),
+      ),
+    );
+    return;
+  }
   await dbExecute(
     "UPDATE tasks SET completed = 0, completed_at = NULL WHERE workspace_id = ? AND type = 'rutina'",
     [workspaceId],

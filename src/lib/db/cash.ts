@@ -66,6 +66,15 @@ export async function getSummary(
   businessId: string,
   opts: { from?: string; to?: string } = {},
 ): Promise<CashSummary> {
+  const ctx = cashCloudCtx();
+  if (ctx) {
+    // Reusar getMovements (ya mapea cloud→local y filtra fechas) y
+    // agregar en JS. Evita duplicar el mapping kind/direction.
+    const movs = await getMovements(workspaceId, businessId, opts);
+    const ingresos = movs.filter((m) => m.direction === "in").reduce((s, m) => s + m.amount, 0);
+    const egresos = movs.filter((m) => m.direction === "out").reduce((s, m) => s + m.amount, 0);
+    return { ingresos, egresos, balance: ingresos - egresos };
+  }
   let sql = `
     SELECT
       COALESCE(SUM(CASE WHEN direction = 'in' THEN amount ELSE 0 END), 0) AS ingresos,
@@ -85,6 +94,18 @@ export async function getSummaryByCurrency(
   businessId: string,
   opts: { from?: string; to?: string } = {},
 ): Promise<{ ars: CashSummary; usd: CashSummary }> {
+  const ctx = cashCloudCtx();
+  if (ctx) {
+    const movs = await getMovements(workspaceId, businessId, opts);
+    const sum = (cur: string, dir: CashDirection) =>
+      movs.filter((m) => m.currency === cur && m.direction === dir).reduce((s, m) => s + m.amount, 0);
+    const arsIn = sum("ARS", "in"), arsOut = sum("ARS", "out");
+    const usdIn = sum("USD", "in"), usdOut = sum("USD", "out");
+    return {
+      ars: { ingresos: arsIn, egresos: arsOut, balance: arsIn - arsOut },
+      usd: { ingresos: usdIn, egresos: usdOut, balance: usdIn - usdOut },
+    };
+  }
   let sql = `
     SELECT currency, direction, COALESCE(SUM(amount), 0) as total
     FROM cash_movements
@@ -216,6 +237,12 @@ export async function createMovementFromSale(
  * queda bien.
  */
 export async function remove(id: string): Promise<void> {
+  const ctx = cashCloudCtx();
+  if (ctx) {
+    const res = await cashApi.remove(ctx.jwt, ctx.wsId, id);
+    if (!res.ok) throw new Error(`No se pudo borrar el movimiento en la nube: ${res.error}`);
+    return;
+  }
   await dbExecute("DELETE FROM cash_movements WHERE id = ?", [id]);
 }
 

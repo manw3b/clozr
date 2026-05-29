@@ -63,6 +63,23 @@ export function formatDateLong(iso: string): string {
   });
 }
 
+/**
+ * Fecha completa con año, tolerante a ISO inválido:
+ *   short → "2 may 2026"  ·  long → "2 de mayo de 2026"
+ * Usada por changelog / About / "Novedades".
+ */
+export function formatDateFull(iso: string, opts: { month?: 'short' | 'long' } = {}): string {
+  try {
+    return new Date(iso).toLocaleDateString('es-AR', {
+      day: 'numeric',
+      month: opts.month ?? 'short',
+      year: 'numeric',
+    });
+  } catch {
+    return iso;
+  }
+}
+
 /** "14:30" */
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('es-AR', {

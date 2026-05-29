@@ -7,6 +7,7 @@ import {
   type CheckResult,
 } from "../../lib/updater";
 import { fetchRecentReleases, parseChangeBullets, type ReleaseInfo } from "../../lib/releaseNotes";
+import { formatDateFull } from "../../lib/format";
 import { useUIStore } from "../../store/uiStore";
 
 /**
@@ -264,7 +265,7 @@ function ReleaseCard({ release, isCurrent }: { release: ReleaseInfo; isCurrent: 
           </span>
         )}
         <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
-          {formatDate(release.publishedAt)}
+          {formatDateFull(release.publishedAt)}
         </span>
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
@@ -325,16 +326,4 @@ function ReleaseCard({ release, isCurrent }: { release: ReleaseInfo; isCurrent: 
       )}
     </div>
   );
-}
-
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("es-AR", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return iso;
-  }
 }

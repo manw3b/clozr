@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo, lazy, Suspense } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { resolveImageUrl } from "./lib/images";
 import { useWorkspaceStore } from "./store/workspaceStore";
 import { useBusinessStore } from "./store/businessStore";
 import { useUIStore, type ScreenId } from "./store/uiStore";
@@ -153,18 +152,6 @@ function PageLoader() {
       />
     </div>
   );
-}
-
-// ─── Workspace logo helper (for sidebar header in some legacy screens) ───
-
-export function WorkspaceLogo({ logoPath, emoji, name }: { logoPath: string | null; emoji: string; name: string }) {
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!logoPath) { setLogoUrl(null); return; }
-    resolveImageUrl(logoPath).then(setLogoUrl).catch(() => setLogoUrl(null));
-  }, [logoPath]);
-  if (logoUrl) return <img src={logoUrl} alt={name} style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover", flexShrink: 0 }} />;
-  return <span style={{ fontSize: 16 }}>{emoji}</span>;
 }
 
 // ─── App ──────────────────────────────────────────────────────────

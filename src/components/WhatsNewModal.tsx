@@ -4,6 +4,7 @@ import { Modal } from "./Modal";
 import { Button } from "./Button";
 import { getCurrentVersion } from "../lib/updater";
 import { fetchReleaseNotes, parseChangeBullets, type ReleaseInfo } from "../lib/releaseNotes";
+import { formatDateFull } from "../lib/format";
 import { color, radius, space, text, weight } from "../tokens";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
@@ -86,7 +87,7 @@ export function WhatsNewModal() {
           Novedades de v{release.version}
         </span>
       }
-      subtitle={`Publicado ${formatDate(release.publishedAt)}`}
+      subtitle={`Publicado ${formatDateFull(release.publishedAt, { month: 'long' })}`}
       maxWidth={560}
       footer={
         <>
@@ -207,13 +208,4 @@ function ChangeBullet({ text }: { text: string }) {
       <span>{message}</span>
     </span>
   );
-}
-
-function formatDate(iso: string): string {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" });
-  } catch {
-    return iso;
-  }
 }

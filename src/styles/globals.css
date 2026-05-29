@@ -117,7 +117,7 @@ tr.hoverable:hover td {
   background: var(--success);
 }
 
-/* ─── ImageUpload trigger (ui/ImageUpload.tsx) ───────────────────────
+/* ─── Image upload trigger (ui/WorkspaceAssetUpload.tsx) ─────────────
  * Overlay con ícono de cámara visible solo en hover del trigger.
  * El overlay siempre está en el DOM (cuando hay imagen) y se muestra
  * vía opacity, así sacamos el useState(hovered) de React.

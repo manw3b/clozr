@@ -111,3 +111,14 @@ export function formatDaysAgo(days: number): string {
 export function plural(n: number, sing: string, plur: string): string {
   return n === 1 ? sing : plur;
 }
+
+/**
+ * Fecha local "YYYY-MM-DD" de un Date. Usar SIEMPRE esto en vez de
+ * `date.toISOString().slice(0, 10)`: toISOString convierte a UTC, y en
+ * Argentina (UTC-3) eso adelanta un día a partir de las 21:00 hora local
+ * → followups/tareas/cobros con fecha equivocada. Esta versión respeta
+ * el huso horario del dispositivo.
+ */
+export function toLocalISODate(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}

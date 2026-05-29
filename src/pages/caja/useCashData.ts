@@ -5,6 +5,7 @@ import { useExchangeRateStore } from "../../store/exchangeRateStore";
 import { cashDb } from "../../lib/db/cash";
 import { cashSessionsDb } from "../../lib/db/cashSessions";
 import { getTodayISO } from "../../lib/hooks";
+import { toLocalISODate } from "../../lib/format";
 import { dbCashMovementToDomain, cashCategoryToDb } from "../../lib/mappers";
 import { qk, invalidate } from "../../lib/queryKeys";
 import { useCloudQueryConfig } from "../../lib/useCloudPolling";
@@ -18,7 +19,7 @@ export type CashPeriod = "today" | "week" | "month";
  */
 export function periodRange(period: CashPeriod): { from: string; to: string } {
   const today = new Date();
-  const to = today.toISOString().slice(0, 10);
+  const to = toLocalISODate(today);
   const from = new Date(today);
   if (period === "today") {
     // mismo día
@@ -30,7 +31,7 @@ export function periodRange(period: CashPeriod): { from: string; to: string } {
   } else {
     from.setDate(1);
   }
-  return { from: from.toISOString().slice(0, 10), to };
+  return { from: toLocalISODate(from), to };
 }
 
 /**

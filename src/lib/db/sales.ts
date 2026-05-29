@@ -700,6 +700,14 @@ export async function getDayStats(
   businessId: string,
   date: string,
 ): Promise<{ total: number; count: number }> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    // En cloud reutilizamos getAll (ya mapea) y agregamos por día. El
+    // business_id no particiona en cloud (workspace == negocio).
+    const all = await getAll(workspaceId);
+    const day = all.filter((s) => (s.sale_date ?? "").slice(0, 10) === date);
+    return { total: day.reduce((sum, s) => sum + s.total, 0), count: day.length };
+  }
   const rows = await dbSelect<{ total: number; count: number }>(
     `SELECT COALESCE(SUM(total), 0) AS total, COUNT(*) AS count
      FROM sales
@@ -710,6 +718,14 @@ export async function getDayStats(
 }
 
 export async function getPendingCobros(workspaceId: string, limit = 3): Promise<Sale[]> {
+  const ctx = cloudCtx();
+  if (ctx) {
+    const all = await getAll(workspaceId);
+    return all
+      .filter((s) => s.is_paid === 0 && s.balance > 0)
+      .sort((a, b) => (b.sale_date ?? "").localeCompare(a.sale_date ?? ""))
+      .slice(0, limit);
+  }
   return dbSelect<Sale>(
     `SELECT * FROM sales
      WHERE workspace_id = ? AND is_paid = 0 AND balance > 0
@@ -793,6 +809,40 @@ export async function createManualDebt(
   if (data.due_date) noteParts.push(`Vence: ${data.due_date}`);
   const notes = noteParts.join(" · ");
 
+  const itemId = crypto.randomUUID();
+
+  const ctx = cloudCtx();
+  if (ctx) {
+    // En cloud la deuda manual es una sale sin pagos ni movimientos de
+    // caja: solo un item descriptivo y balance = amount. out_of_stock_sale
+    // = 1 para que nunca toque inventario.
+    const cloudUserId = useCloudAuthStore.getState().userId;
+    const cloudUserEmail = useCloudAuthStore.getState().email;
+    const res = await createSaleCloud(ctx.jwt, ctx.wsId, {
+      id,
+      customer_id: data.customer_id,
+      customer_name: data.customer_name,
+      seller_id: cloudUserId || data.seller_id || null,
+      seller_name: data.seller_name ?? cloudUserEmail ?? null,
+      subtotal: data.amount, total: data.amount, total_paid: 0,
+      balance: data.amount, is_paid: 0,
+      notes,
+      payment_method: null,
+      out_of_stock_sale: 1,
+      sale_date: now,
+      items: [{
+        id: itemId, catalog_item_id: null, description: concept,
+        quantity: 1, unit_price: data.amount, base_price: data.amount,
+        subtotal: data.amount, imei: null, from_stock: 0,
+      }],
+      payments: [],
+      cash_movements: [],
+      stock_decrements: [],
+    });
+    if (!res.ok) throw new Error(`No se pudo crear la deuda en la nube: ${res.error}`);
+    return { id };
+  }
+
   await dbExecute(
     `INSERT INTO sales (
       id, workspace_id, business_id, customer_id, customer_name, seller_id, seller_name,
@@ -818,7 +868,6 @@ export async function createManualDebt(
   );
 
   // Una sola sale_item descriptiva (sin catalog_item_id, sin IMEI)
-  const itemId = crypto.randomUUID();
   await dbExecute(
     `INSERT INTO sale_items (
       id, sale_id, catalog_item_id, description, quantity, unit_price, base_price, subtotal, imei, from_stock

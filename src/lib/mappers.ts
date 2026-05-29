@@ -34,6 +34,7 @@ import type {
   CashCategory,
   PaymentMethod,
 } from "../types/domain";
+import { toLocalISODate } from "./format";
 
 /** Maps the DB-stored payment method (snake_case) back to the domain PaymentMethod (kebab-case). */
 function paymentMethodFromDb(m: string | null): PaymentMethod | undefined {
@@ -87,7 +88,7 @@ export function dbTaskToDomain(t: DbTask): Task {
 /* ── Followups ──────────────────────────────────────────────── */
 
 export function dbFollowupToDomain(f: DbFollowup): FollowUp {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toLocalISODate();
   const isOverdue = f.due_date < today;
   // Reason desde el kind del DB; si no hay kind, deriva del estado
   let reason: FollowUp["reason"];

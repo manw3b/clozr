@@ -219,6 +219,28 @@ export async function removeTemplate(id: string): Promise<void> {
  *
  * Devuelve el número de tareas creadas (debugging / toast).
  */
+/**
+ * Inicio (YYYY-MM-DD, hora local) de la ventana de recurrencia para una
+ * frequency dada. La materialización crea como máximo UNA tarea por ventana:
+ *   - daily   → hoy
+ *   - weekly  → lunes de la semana actual
+ *   - monthly → día 1 del mes actual
+ *
+ * Antes esto chequeaba siempre "hoy", así que las tareas semanales/mensuales
+ * se re-materializaban TODOS los días — bug que rompía la frecuencia.
+ */
+function windowStartISO(frequency: "daily" | "weekly" | "monthly"): string {
+  const d = new Date();
+  if (frequency === "weekly") {
+    const dow = d.getDay(); // 0=domingo..6=sábado
+    const sinceMonday = (dow + 6) % 7;
+    d.setDate(d.getDate() - sinceMonday);
+  } else if (frequency === "monthly") {
+    d.setDate(1);
+  }
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export async function materializeForToday(
   workspaceId: string,
   userId: string,
@@ -253,29 +275,27 @@ export async function materializeForToday(
 
   if (templates.length === 0) return 0;
 
-  const today = new Date();
-  const todayISO = today.toISOString().slice(0, 10); // "2026-05-20"
   let created = 0;
 
   if (ctx) {
     // Cloud path: chequear tareas existentes con un solo list + filtro
-    // local (más barato que N round-trips de "exists" check).
+    // local (más barato que N round-trips de "exists" check). Guardamos
+    // (template_id, fecha) para poder filtrar por ventana de frecuencia.
     const existingRes = await tasksApi.list(ctx.jwt, ctx.wsId);
-    const existingToday = existingRes.ok
-      ? new Set(
-          (existingRes.data.items as unknown as Array<Record<string, unknown>>)
-            .filter((t) =>
-              t.template_id &&
-              t.assigned_to === effectiveUserId &&
-              typeof t.created_at === "string" &&
-              t.created_at.slice(0, 10) === todayISO
-            )
-            .map((t) => String(t.template_id))
-        )
-      : new Set<string>();
+    const existing = existingRes.ok
+      ? (existingRes.data.items as unknown as Array<Record<string, unknown>>)
+          .filter((t) =>
+            t.template_id &&
+            t.assigned_to === effectiveUserId &&
+            typeof t.created_at === "string"
+          )
+          .map((t) => ({ tpl: String(t.template_id), date: (t.created_at as string).slice(0, 10) }))
+      : [];
 
     for (const tpl of templates) {
-      if (existingToday.has(tpl.id)) continue;
+      const winStart = windowStartISO(tpl.frequency);
+      const already = existing.some((e) => e.tpl === tpl.id && e.date >= winStart);
+      if (already) continue;
       const taskId = crypto.randomUUID();
       const res = await tasksApi.create(ctx.jwt, ctx.wsId, {
         id: taskId,
@@ -295,13 +315,14 @@ export async function materializeForToday(
 
   // Local path original.
   for (const tpl of templates) {
+    const winStart = windowStartISO(tpl.frequency);
     const existing = await dbSelect<{ id: string }>(
       `SELECT id FROM tasks
        WHERE workspace_id = ?
          AND template_id = ?
          AND assigned_to = ?
-         AND date(created_at) = ?`,
-      [workspaceId, tpl.id, userId, todayISO],
+         AND date(created_at) >= ?`,
+      [workspaceId, tpl.id, userId, winStart],
     );
     if (existing.length > 0) continue;
 

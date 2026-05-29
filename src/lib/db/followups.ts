@@ -1,6 +1,7 @@
 import { dbSelect, dbExecute } from "./index";
 import { useCloudAuthStore } from "../../store/cloudAuthStore";
 import { followupsApi, type CloudFollowup } from "../cloudAuth";
+import { toLocalISODate } from "../format";
 import type { Followup, CreateFollowupInput } from "./types";
 
 function fuCloudCtx(): { jwt: string; wsId: string } | null {
@@ -163,7 +164,7 @@ export async function createPostSaleFollowup(
 
   const due = new Date();
   due.setDate(due.getDate() + daysAfter);
-  const dueIso = due.toISOString().slice(0, 10);
+  const dueIso = toLocalISODate(due);
 
   await create(workspaceId, businessId, {
     customer_id: customerId,
@@ -210,7 +211,7 @@ export async function scanInactiveCustomers(
 
   if (inactive.length === 0) return 0;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toLocalISODate();
   let created = 0;
   for (const row of inactive) {
     const days = Math.floor(
@@ -261,7 +262,7 @@ export async function createStageFollowup(
 
   const due = new Date();
   due.setDate(due.getDate() + daysAfter);
-  const dueIso = due.toISOString().slice(0, 10);
+  const dueIso = toLocalISODate(due);
 
   await create(workspaceId, businessId, {
     customer_id: customerId,

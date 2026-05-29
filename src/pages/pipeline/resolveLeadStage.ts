@@ -62,7 +62,9 @@ export function resolveLeadStage(
 
   // 4. Fallback: primera etapa no-terminal (mantener el lead "vivo").
   const firstOpen = stages.find((s) => !s.terminal);
-  return firstOpen?.id ?? stages[0]!.id;
+  // stages.length > 0 está garantizado arriba, pero evitamos el `!`:
+  // si por alguna razón no hubiera [0], volver al rawStage es inocuo.
+  return firstOpen?.id ?? stages[0]?.id ?? rawStage;
 }
 
 /** True si el id NO matchea ninguna etapa exacta — el lead necesita

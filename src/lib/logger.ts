@@ -75,6 +75,7 @@ function emit(level: Level, message: string, payload?: LogPayload) {
 
   switch (level) {
     case "debug":
+      // eslint-disable-next-line no-console -- logger sink: debug solo en DEV
       if (import.meta.env.DEV) console.debug(...args);
       break;
     case "info":
@@ -104,8 +105,9 @@ export const log = {
 export function errorMessage(e: unknown, fallback = "Ocurrió un error"): string {
   if (e instanceof Error) return e.message;
   if (typeof e === "string") return e;
-  if (e && typeof e === "object" && "message" in e && typeof (e as any).message === "string") {
-    return (e as any).message;
+  if (e && typeof e === "object" && "message" in e) {
+    const msg = (e as { message: unknown }).message;
+    if (typeof msg === "string") return msg;
   }
   return fallback;
 }

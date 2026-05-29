@@ -24,6 +24,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useCloudAuthStore } from "../store/cloudAuthStore";
 import { useUIStore } from "../store/uiStore";
 import { parseAuthDeepLink, parseJwtPayload, fetchMe } from "./cloudAuth";
+import { log } from "./logger";
 
 const REASON_LABELS: Record<string, string> = {
   invalid_token: "El link de acceso no es válido. Pedí uno nuevo.",
@@ -44,15 +45,13 @@ export function useCloudAuthListener(): void {
       try {
         const unl = await listen<string>("auth:deep-link", (event) => {
           const url = event.payload;
-          // eslint-disable-next-line no-console
-          console.log("[cloud-auth] deep link received:", url);
+          log.info("deep link received", { scope: "cloud-auth", data: { url } });
 
           const parsed = parseAuthDeepLink(url);
           if (!parsed) {
             // URL clozr:// con un path que no reconocemos. Ignoramos en
             // silencio — capaz es un deep link de otra feature futura.
-            // eslint-disable-next-line no-console
-            console.warn("[cloud-auth] unrecognized deep link:", url);
+            log.warn("unrecognized deep link", { scope: "cloud-auth", data: { url } });
             return;
           }
 
@@ -100,13 +99,12 @@ export function useCloudAuthListener(): void {
         });
         unlistenFn = unl;
       } catch (e) {
-        // eslint-disable-next-line no-console
-        console.error("[cloud-auth] failed to listen:", e);
+        log.error("failed to listen", { scope: "cloud-auth", err: e });
       }
     })();
 
     return () => {
       if (unlistenFn) unlistenFn();
     };
-  }, [setSession, showToast]);
+  }, [setSession, setWorkspaces, showToast]);
 }

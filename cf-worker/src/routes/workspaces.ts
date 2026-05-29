@@ -20,7 +20,7 @@
 
 import type { Env } from "../index";
 import { ensureSchema } from "../schema";
-import { requireAuth, type AuthClaims } from "../auth";
+import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, type Row, type TursoArg } from "../turso";
 import { sendInviteEmail } from "../email";
 
@@ -216,7 +216,6 @@ export async function handleInviteMember(workspaceId: string, req: Request, env:
   }).catch((e) => {
     // Best-effort: si el email falla, la membership ya está en DB. El
     // user puede pedir magic link manualmente y va a aparecer su invite.
-    // eslint-disable-next-line no-console
     console.warn("[invite] email failed (membership creado igual):", e);
   });
 

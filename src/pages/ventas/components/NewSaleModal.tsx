@@ -630,7 +630,7 @@ function PaymentMethodCard({
 }) {
   const factor = 1 + (method.modifier_pct || 0) / 100;
   let displayAmount: number | null;
-  let displayCurrency: "ARS" | "USD" = method.currency;
+  const displayCurrency: "ARS" | "USD" = method.currency;
   if (method.currency === "USD") {
     displayAmount = amountUsd * factor;
   } else {

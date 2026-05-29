@@ -90,7 +90,6 @@ export async function handleAuthRequest(req: Request, env: Env): Promise<Respons
     });
   } catch (e) {
     emailFailed = true;
-    // eslint-disable-next-line no-console
     console.warn("[auth/request] email send failed (magic_link igual creado):", e);
   }
 

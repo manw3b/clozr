@@ -92,7 +92,6 @@ export function useMoveLead() {
         }
       } catch (followupErr) {
         // Visible en DevTools console pero NO interrumpe el move.
-        // eslint-disable-next-line no-console
         console.warn("[useMoveLead] followup auto-stage falló (no rompe el move):", followupErr);
       }
     },

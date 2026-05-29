@@ -147,7 +147,6 @@ export default function WorkspaceAssetUpload({
           setOptimisticUrl(null);
           URL.revokeObjectURL(tempUrl);
           // No throw — el caller suele mostrar toasts; acá log y damos error visual.
-          // eslint-disable-next-line no-console
           console.error("Upload falló:", res.error);
           return;
         }

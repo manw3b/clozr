@@ -10,6 +10,7 @@ import {
   Tag,
   Receipt,
   ExternalLink,
+  type LucideIcon,
 } from 'lucide-react';
 import { color, radius, space, text, weight } from '../../../tokens';
 import { formatMoney, formatTime } from '../../../lib/format';
@@ -30,7 +31,7 @@ interface CashMovementsListProps {
 
 const categoryIcons: Record<
   CashCategory,
-  { icon: React.ComponentType<any>; tone: 'success' | 'danger' | 'info' | 'warning' | 'neutral' }
+  { icon: LucideIcon; tone: 'success' | 'danger' | 'info' | 'warning' | 'neutral' }
 > = {
   'sale-payment':  { icon: ShoppingCart, tone: 'success' },
   'cash-in':       { icon: ArrowUp, tone: 'success' },

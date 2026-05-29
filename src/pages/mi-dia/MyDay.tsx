@@ -104,6 +104,7 @@ export function MyDay({
             followUps={data.followUps}
             onWhatsApp={(f) => onWhatsApp(f.clientId, { message: buildFollowupWhatsAppMessage(f) })}
             onCall={(f) => onCall(f.clientId)}
+            onViewDetail={() => onNavigate('clientes')}
             onViewAll={() => onNavigate('pipeline')}
           />
 

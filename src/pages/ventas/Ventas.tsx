@@ -30,6 +30,7 @@ import { SalesMetrics } from './components/SalesMetrics';
 import { SalesSparkChart } from './components/SalesSparkChart';
 import { SaleDrawer } from './components/SaleDrawer';
 import { NewSaleModal } from './components/NewSaleModal';
+import { CollectPaymentModal } from '../../components/CollectPaymentModal';
 import { buildSalesTimeline } from '../../lib/groupings';
 import { useSalesList, useMarkSalePaid, useCreateSale } from './useSalesData';
 import { useUIStore } from '../../store/uiStore';
@@ -74,6 +75,7 @@ export function Ventas() {
   const ctxMenu = useContextMenu();
   const [ctxSale, setCtxSale] = useState<Sale | null>(null);
   const [newSaleOpen, setNewSaleOpen] = useState(false);
+  const [payingSale, setPayingSale] = useState<Sale | null>(null);
 
   useEffect(() => {
     const handler = () => setNewSaleOpen(true);
@@ -216,6 +218,33 @@ export function Ventas() {
     openWhatsApp(client.phone, body);
   }
 
+  /**
+   * Envía un comprobante de compra por WhatsApp para una venta pagada.
+   * No usa plantilla del workspace — es un resumen factual de la operación
+   * (cliente, producto, total, forma de pago) con un cierre de agradecimiento.
+   */
+  async function handleSendReceipt(sale: Sale) {
+    const client = allClients.find((c) => c.id === sale.clientId);
+    if (!client?.phone) {
+      showToast('Este cliente no tiene teléfono registrado', 'error');
+      return;
+    }
+    const negocio = activeWorkspace?.name ?? '';
+    const metodo = sale.paymentMethod ? PAYMENT_METHOD_LABELS[sale.paymentMethod] : null;
+    const lines = [
+      negocio ? `🧾 *Comprobante de compra — ${negocio}*` : '🧾 *Comprobante de compra*',
+      '',
+      `Cliente: ${sale.clientName}`,
+      `Producto: ${sale.product}`,
+      `Total: ${formatMoney(sale.amount, sale.currency)}`,
+      metodo ? `Forma de pago: ${metodo}` : null,
+      sale.number ? `Comprobante N° ${sale.number}` : null,
+      '',
+      '¡Gracias por tu compra! 🙌',
+    ].filter((l): l is string => l !== null);
+    openWhatsApp(client.phone, lines.join('\n'));
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: space[5], height: '100%' }}>
       <PageHeader
@@ -346,12 +375,17 @@ export function Ventas() {
           sale={openSale}
           onClose={() => setOpenSaleId(null)}
           onMarkPaid={() => handleMarkPaid(openSale.id)}
-          onAddPayment={() => showToast('Pagos parciales: próximamente')}
+          onAddPayment={() => setPayingSale(openSale)}
           onEdit={() => showToast('Editar venta: próximamente')}
           onCancel={() => showToast('Cancelar venta: próximamente')}
           onOpenClient={() => {
             setOpenSaleId(null);
             setActiveScreen('customers');
+          }}
+          onSendReceipt={() => {
+            handleSendReceipt(openSale).catch((e) => {
+              showToast(e instanceof Error ? e.message : 'No se pudo abrir WhatsApp', 'error');
+            });
           }}
         />
       )}
@@ -361,6 +395,23 @@ export function Ventas() {
         open={newSaleOpen}
         onClose={() => setNewSaleOpen(false)}
         onSubmit={handleNewSale}
+      />
+
+      {/* Modal Cobrar (pago parcial o total) */}
+      <CollectPaymentModal
+        open={!!payingSale}
+        onClose={() => setPayingSale(null)}
+        sale={
+          payingSale
+            ? {
+                id: payingSale.id,
+                clientName: payingSale.clientName,
+                total: payingSale.amount,
+                balance: payingSale.amount - payingSale.paid,
+                currency: payingSale.currency as 'ARS' | 'USD',
+              }
+            : null
+        }
       />
 
       {/* Context menu (click derecho en una venta) */}

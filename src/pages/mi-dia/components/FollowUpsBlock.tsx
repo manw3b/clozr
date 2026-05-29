@@ -12,6 +12,7 @@ interface FollowUpsBlockProps {
   followUps: FollowUp[];
   onWhatsApp: (followUp: FollowUp) => void;
   onCall: (followUp: FollowUp) => void;
+  onViewDetail: (followUp: FollowUp) => void;
   onViewAll: () => void;
 }
 
@@ -25,7 +26,7 @@ const reasonLabels: Record<FollowUpReason, { label: string; tone: 'warning' | 'd
   'cliente-inactivo': { label: 'Cliente inactivo', tone: 'warning' },
 };
 
-export function FollowUpsBlock({ followUps, onWhatsApp, onCall, onViewAll }: FollowUpsBlockProps) {
+export function FollowUpsBlock({ followUps, onWhatsApp, onCall, onViewDetail, onViewAll }: FollowUpsBlockProps) {
   return (
     <SectionCard
       title="Seguimientos"
@@ -50,6 +51,7 @@ export function FollowUpsBlock({ followUps, onWhatsApp, onCall, onViewAll }: Fol
             followUp={f}
             onWhatsApp={() => onWhatsApp(f)}
             onCall={() => onCall(f)}
+            onViewDetail={() => onViewDetail(f)}
             isLast={idx === followUps.length - 1}
           />
         ))
@@ -62,11 +64,13 @@ function FollowUpRow({
   followUp,
   onWhatsApp,
   onCall,
+  onViewDetail,
   isLast,
 }: {
   followUp: FollowUp;
   onWhatsApp: () => void;
   onCall: () => void;
+  onViewDetail: () => void;
   isLast: boolean;
 }) {
   const reason = reasonLabels[followUp.reason];
@@ -148,7 +152,7 @@ function FollowUpRow({
           <Phone size={15} strokeWidth={2.2} />
         </QuickActionButton>
         <QuickActionButton
-          onClick={() => {}}
+          onClick={onViewDetail}
           ariaLabel={`Ver detalle de ${followUp.clientName}`}
         >
           <ArrowRight size={15} strokeWidth={2.2} />

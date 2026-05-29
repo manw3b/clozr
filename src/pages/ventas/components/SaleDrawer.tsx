@@ -28,6 +28,7 @@ interface SaleDrawerProps {
   onEdit?: () => void;
   onCancel?: () => void;
   onOpenClient?: () => void;
+  onSendReceipt?: () => void;
 }
 
 export function SaleDrawer({
@@ -37,6 +38,7 @@ export function SaleDrawer({
   onAddPayment,
   onEdit,
   onOpenClient,
+  onSendReceipt,
 }: SaleDrawerProps) {
   const remaining = sale.amount - sale.paid;
   const isOverdue =
@@ -61,7 +63,7 @@ export function SaleDrawer({
       }
       footer={
         sale.status === 'paid' ? (
-          <Button variant="secondary" size="md" iconLeft={<WhatsAppIcon size={15} color="var(--success)" />} fullWidth onClick={() => {}}>
+          <Button variant="secondary" size="md" iconLeft={<WhatsAppIcon size={15} color="var(--success)" />} fullWidth onClick={onSendReceipt} disabled={!onSendReceipt}>
             Enviar comprobante por WhatsApp
           </Button>
         ) : (

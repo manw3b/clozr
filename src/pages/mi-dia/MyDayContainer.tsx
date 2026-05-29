@@ -306,7 +306,7 @@ export function MyDayContainer() {
           pipeline: "pipeline",
           clientes: "customers",
           ventas: "sales",
-          deudas: "cash",
+          deudas: "deudas",
         };
         const target = map[page];
         if (target) setActiveScreen(target);

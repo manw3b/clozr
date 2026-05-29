@@ -53,7 +53,7 @@ export const CLOZR_TIPS: ClozrTip[] = [
   // ── Personalidad ──────────────────────────────────────────────
   { emoji: "🛠️", text: "Clozr fue hecho desde y para iPhone Club. Lo que ves es lo que necesitábamos." },
   { emoji: "✨", text: "Cada release pasa por verificación automática antes de publicarse — nada llega roto a propósito." },
-  { emoji: "📊", text: "Reportes próximamente. Mientras tanto, el ticket promedio y top egresos están en cada pantalla." },
+  { emoji: "📊", text: "En Reportes tenés ventas por período, ticket promedio, ranking de vendedores y top de egresos." },
 ];
 
 /** Tip random consistente dentro de una misma sesión (no rota al re-render).

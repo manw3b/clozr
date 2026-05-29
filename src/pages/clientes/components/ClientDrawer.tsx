@@ -12,6 +12,8 @@ import {
   Clock,
   Tag,
   Check,
+  Copy,
+  Wallet,
 } from 'lucide-react';
 import { WhatsAppIcon } from '../../../components/icons/WhatsAppIcon';
 import { Drawer } from '../../../components/Drawer';
@@ -28,6 +30,12 @@ import {
   TikTokIcon,
   XIcon,
 } from '../../../components/icons/SocialIcons';
+import {
+  ContextMenu,
+  ContextMenuItem,
+  useContextMenu,
+} from '../../../components/ContextMenu';
+import { useUIStore } from '../../../store/uiStore';
 import { useCustomerTags, useSetCustomerTags } from '../useClientsData';
 import { ManualDebtModal } from './ManualDebtModal';
 import type { ClientTag } from '../../../types/domain';
@@ -97,6 +105,7 @@ export function ClientDrawer({
           onWhatsApp={onWhatsApp}
           onCall={onCall}
           onEmail={onEmail}
+          onAddDebt={() => setDebtModalOpen(true)}
         />
       }
       footer={
@@ -200,6 +209,7 @@ function ClientHeader({
   onEdit,
   onCall,
   onEmail,
+  onAddDebt,
 }: {
   client: ClientDetail;
   onClose: () => void;
@@ -207,7 +217,10 @@ function ClientHeader({
   onWhatsApp: () => void;
   onCall: () => void;
   onEmail?: () => void;
+  onAddDebt: () => void;
 }) {
+  const moreMenu = useContextMenu();
+  const { showToast } = useUIStore();
   return (
     <div
       style={{
@@ -262,7 +275,7 @@ function ClientHeader({
           <IconButton onClick={onEdit} title="Editar">
             <Pencil size={15} strokeWidth={2.2} />
           </IconButton>
-          <IconButton onClick={() => {}} title="Más opciones">
+          <IconButton onClick={(e) => moreMenu.openAt(e)} title="Más opciones">
             <MoreVertical size={15} strokeWidth={2.2} />
           </IconButton>
           <IconButton onClick={onClose} title="Cerrar">
@@ -270,6 +283,30 @@ function ClientHeader({
           </IconButton>
         </div>
       </div>
+
+      {moreMenu.open && (
+        <ContextMenu position={moreMenu.position} onClose={moreMenu.close}>
+          <ContextMenuItem
+            icon={<Wallet size={14} />}
+            onClick={() => {
+              moreMenu.close();
+              onAddDebt();
+            }}
+          >
+            Registrar deuda manual
+          </ContextMenuItem>
+          <ContextMenuItem
+            icon={<Copy size={14} />}
+            onClick={() => {
+              navigator.clipboard.writeText(client.id).catch(() => {});
+              showToast('ID del cliente copiado', 'success');
+              moreMenu.close();
+            }}
+          >
+            Copiar ID
+          </ContextMenuItem>
+        </ContextMenu>
+      )}
 
       {/* Quick contact actions */}
       <div style={{ display: 'flex', gap: space[2] }}>
@@ -333,7 +370,7 @@ function IconButton({
   title,
 }: {
   children: React.ReactNode;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent) => void;
   title: string;
 }) {
   return (

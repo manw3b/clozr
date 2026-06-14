@@ -27,6 +27,10 @@ export interface Env {
   SESSION_TTL_DAYS: string;
   DEEP_LINK_SCHEME: string;
   ALLOWED_ORIGINS: string;
+  // Google OAuth (F: login con Google). client_id puede ser var; el secret
+  // se setea con `wrangler secret put GOOGLE_CLIENT_SECRET`.
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
   // R2 bucket binding (I) — para logos/banners del workspace.
   ASSETS: R2Bucket;
 }
@@ -34,6 +38,7 @@ export interface Env {
 import { handleAuthRequest } from "./routes/request";
 import { handleAuthVerify } from "./routes/verify";
 import { handleAuthVerifyCode } from "./routes/verify-code";
+import { handleGoogleStart, handleGoogleCallback } from "./routes/google";
 import { handleMe } from "./routes/me";
 import { ensureSchema } from "./schema";
 import {
@@ -375,6 +380,13 @@ export default {
           // No CORS: este endpoint lo abre el USUARIO desde su email,
           // navega directo, no es una request cross-origin del app.
           return handleAuthVerify(req, env);
+
+        // Google OAuth — navegaciones del browser (302), sin CORS.
+        case "GET /auth/google/start":
+          return handleGoogleStart(req, env);
+
+        case "GET /auth/google/callback":
+          return handleGoogleCallback(req, env);
 
         case "GET /me":
           return cors(req, env, await handleMe(req, env));

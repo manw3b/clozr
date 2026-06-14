@@ -31,6 +31,10 @@ export interface Env {
   // se setea con `wrangler secret put GOOGLE_CLIENT_SECRET`.
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
+  // AI Triage (PoC): key de la API de Claude para el cron matutino que
+  // redacta follow-ups de leads estancados. Se setea con
+  // `wrangler secret put ANTHROPIC_API_KEY`. Si falta, el cron hace skip.
+  ANTHROPIC_API_KEY: string;
   // R2 bucket binding (I) — para logos/banners del workspace.
   ASSETS: R2Bucket;
 }
@@ -85,8 +89,16 @@ import {
 import { SIMPLE_TABLE_SPECS } from "./routes/simpleTables";
 import { handleDecrementStock } from "./routes/catalog-stock";
 import { handleClientError } from "./routes/errors";
+import { runAiTriage } from "./cron/aiTriage";
 
 export default {
+  // ── Cron: AI Triage matutino (PoC) ───────────────────────────────────
+  // Lo dispara Cloudflare según wrangler.toml [triggers]. ctx.waitUntil
+  // mantiene vivo el isolate hasta que termina el barrido de workspaces.
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(runAiTriage(env));
+  },
+
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
 
@@ -142,6 +154,18 @@ export default {
         // re-correr llamando directo. ensureSchema es idempotente, OK.
         await ensureSchema(env);
         return cors(req, env, json({ ok: true, ranAt: new Date().toISOString() }));
+      }
+
+      // ── Admin: disparar el AI Triage a mano (PoC) ──────────────────
+      // Para testear en prod sin esperar al cron. Mismo gate shared-secret
+      // que /admin/migrations (x-admin-secret == JWT_SECRET).
+      if (route === "POST /admin/ai-triage") {
+        const provided = req.headers.get("x-admin-secret");
+        if (!provided || provided !== env.JWT_SECRET) {
+          return cors(req, env, json({ error: "unauthorized" }, 401));
+        }
+        const result = await runAiTriage(env);
+        return cors(req, env, json({ ok: true, ...result }));
       }
 
       // ── Rutas con path dinámico (/workspaces/:id/...) ─────────────

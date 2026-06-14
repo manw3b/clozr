@@ -32,6 +32,15 @@ compatibility_flags = ["nodejs_compat"]
 binding = "ASSETS"
 bucket_name = "clozr-assets"
 
+# ── AI Triage matutino (PoC) ───────────────────────────────────────────
+# Cron de Cloudflare: corre runAiTriage (src/cron/aiTriage.ts) que redacta
+# follow-ups de leads estancados con una llamada a Claude Haiku.
+# "0 11 * * *" = 11:00 UTC = 8:00 AM ART (UTC-3). Ajustar si cambia la zona.
+# Requiere el secret: `wrangler secret put ANTHROPIC_API_KEY`.
+# Si el secret no está, el cron hace skip limpio (no rompe).
+[triggers]
+crons = ["0 11 * * *"]
+
 # Sender + asunto del email magic-link. No son secretos.
 [vars]
 # Sandbox: Resend solo deja mandar emails al owner de la cuenta

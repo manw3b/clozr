@@ -28,7 +28,7 @@ let initPromise: Promise<void> | null = null;
  *
  * Bump cuando agregues un CREATE TABLE / ALTER TABLE / safeAddColumn.
  */
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 export function ensureSchema(env: Env): Promise<void> {
   if (!initPromise) initPromise = applySchemaIfNeeded(env);
@@ -542,6 +542,44 @@ async function applySchema(env: Env): Promise<void> {
     {
       sql: `CREATE INDEX IF NOT EXISTS idx_followups_workspace
             ON followups(workspace_id, deleted_at, due_at)`,
+    },
+  );
+
+  // ── R6: Sesiones de caja (apertura/cierre diario + arqueo) ────────
+  //
+  // Una sesión por día por workspace (UNIQUE parcial sobre las no-borradas).
+  // Guarda los saldos de APERTURA y de CIERRE (arqueo físico contado) por
+  // moneda. El "esperado" y la diferencia los calcula la UI a partir de los
+  // cash_movements del día — acá sólo persistimos los balances.
+  await tursoQuery(
+    env,
+    {
+      sql: `CREATE TABLE IF NOT EXISTS cash_sessions (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+        session_date TEXT NOT NULL,
+        opened_at TEXT NOT NULL DEFAULT (datetime('now')),
+        opened_balance_ars REAL NOT NULL DEFAULT 0,
+        opened_balance_usd REAL NOT NULL DEFAULT 0,
+        opened_by TEXT REFERENCES users(id),
+        closed_at TEXT,
+        closed_balance_ars REAL,
+        closed_balance_usd REAL,
+        closed_by TEXT REFERENCES users(id),
+        notes TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
+      )`,
+    },
+    {
+      sql: `CREATE UNIQUE INDEX IF NOT EXISTS uq_cash_sessions_ws_date
+            ON cash_sessions(workspace_id, session_date)
+            WHERE deleted_at IS NULL`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_cash_sessions_ws
+            ON cash_sessions(workspace_id, deleted_at, session_date)`,
     },
   );
 

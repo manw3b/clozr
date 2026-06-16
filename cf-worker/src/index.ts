@@ -88,6 +88,11 @@ import {
 } from "./routes/_generic";
 import { SIMPLE_TABLE_SPECS } from "./routes/simpleTables";
 import { handleDecrementStock } from "./routes/catalog-stock";
+import {
+  handleListCashSessions,
+  handleOpenCashSession,
+  handleCloseCashSession,
+} from "./routes/cash-sessions";
 import { handleClientError } from "./routes/errors";
 import { runAiTriage } from "./cron/aiTriage";
 
@@ -323,6 +328,21 @@ export default {
         return cors(req, env, await handleDecrementStock(
           wsDecrementStockMatch[1]!, wsDecrementStockMatch[2]!, req, env,
         ));
+      }
+
+      // R6 — Sesiones de caja (open/close/list). DEBE ir antes del loop generic
+      // (no hay spec 'cash-sessions', pero registramos explícito por claridad).
+      const wsCashOpenMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/cash-sessions\/open\/?$/);
+      if (wsCashOpenMatch && req.method === "POST") {
+        return cors(req, env, await handleOpenCashSession(wsCashOpenMatch[1]!, req, env));
+      }
+      const wsCashCloseMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/cash-sessions\/([^/]+)\/close\/?$/);
+      if (wsCashCloseMatch && req.method === "POST") {
+        return cors(req, env, await handleCloseCashSession(wsCashCloseMatch[1]!, wsCashCloseMatch[2]!, req, env));
+      }
+      const wsCashSessionsMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/cash-sessions\/?$/);
+      if (wsCashSessionsMatch && req.method === "GET") {
+        return cors(req, env, await handleListCashSessions(wsCashSessionsMatch[1]!, req, env));
       }
 
       // Simple tables (R4+R5) — usan generic dispatcher.

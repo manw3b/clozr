@@ -79,6 +79,33 @@ export async function handleListSales(workspaceId: string, req: Request, env: En
   return json({ sales: rows ?? [] });
 }
 
+/* ── GET sale-items (bulk, para reportes) ────────────────────────────── */
+//
+// Todos los ítems de venta del workspace en UNA query (JOIN con sales para
+// traer sale_date + scope por workspace_id). Evita el N+1 de pedir getSale
+// por cada venta. Read-only. Lo consume Reportes v2 (margen + top productos),
+// cruzando catalog_item_id → cost del catálogo client-side.
+export async function handleListSaleItems(workspaceId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+  const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
+  if (!role || !ROLES_READ.has(role)) return json({ error: "forbidden" }, 403);
+
+  const [rows] = await tursoQuery(env, {
+    sql: `SELECT si.id, si.sale_id, si.catalog_item_id, si.description,
+                 si.quantity, si.unit_price, si.subtotal,
+                 s.sale_date, s.created_at AS sale_created_at,
+                 s.seller_name, s.customer_name
+            FROM sale_items si
+            JOIN sales s ON si.sale_id = s.id
+            WHERE s.workspace_id = ? AND s.deleted_at IS NULL
+            ORDER BY s.sale_date DESC, s.created_at DESC`,
+    args: [workspaceId],
+  });
+  return json({ items: rows ?? [] });
+}
+
 /* ── GET one (con items + payments) ──────────────────────────────────── */
 
 export async function handleGetSale(workspaceId: string, saleId: string, req: Request, env: Env): Promise<Response> {

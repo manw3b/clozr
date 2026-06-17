@@ -80,7 +80,7 @@ import {
 } from "./routes/pipeline";
 import {
   handleListSales, handleGetSale, handleCreateSale, handleUpdateSale,
-  handleDeleteSale, handleAddPayment, handleImportSales,
+  handleDeleteSale, handleAddPayment, handleImportSales, handleListSaleItems,
 } from "./routes/sales";
 import {
   handleGenericList, handleGenericCreate, handleGenericUpdate,
@@ -250,6 +250,12 @@ export default {
       //   GET/PATCH/DELETE      /workspaces/:wid/sales/:sid
       //   POST                  /workspaces/:wid/sales/:sid/payments
       //   POST                  /workspaces/:wid/sales/import
+      // Bulk de ítems de venta (para Reportes v2). Va antes de las rutas de
+      // sales; no colisiona ('sale-items' no matchea la regex de 'sales').
+      const wsSaleItemsMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sale-items\/?$/);
+      if (wsSaleItemsMatch && req.method === "GET") {
+        return cors(req, env, await handleListSaleItems(wsSaleItemsMatch[1]!, req, env));
+      }
       const wsSalesImportMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales\/import\/?$/);
       const wsSalePaymentMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales\/([^/]+)\/payments\/?$/);
       const wsSaleMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales(?:\/([^/]+))?\/?$/);

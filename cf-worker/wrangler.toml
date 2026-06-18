@@ -43,10 +43,10 @@ crons = ["0 11 * * *"]
 
 # Sender + asunto del email magic-link. No son secretos.
 [vars]
-# Sandbox: Resend solo deja mandar emails al owner de la cuenta
-# (pyter.import@gmail.com) hasta que verifiquemos un dominio propio.
-# Cuando F1.7 conecte un dominio, swappear por "Clozr <login@tudominio>".
-RESEND_FROM = "Clozr <onboarding@resend.dev>"
+# Dominio propio clozr.online VERIFICADO en Resend (2026-06-18, región
+# sa-east-1, DNS en Hostinger: DKIM resend._domainkey + SPF/MX en send).
+# Ya se puede mandar a CUALQUIER destinatario (no solo al owner de la cuenta).
+RESEND_FROM = "Clozr <acceso@clozr.online>"
 MAGIC_LINK_TTL_MIN = "15"
 SESSION_TTL_DAYS = "30"
 DEEP_LINK_SCHEME = "clozr"

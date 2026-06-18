@@ -37,7 +37,7 @@ const SALE_EDITABLE = [
 
 const ITEM_EDITABLE = [
   "catalog_item_id", "description", "quantity", "unit_price",
-  "base_price", "subtotal", "imei", "from_stock",
+  "base_price", "subtotal", "imei", "from_stock", "unit_cost",
 ] as const;
 
 const PAYMENT_EDITABLE = [
@@ -94,7 +94,7 @@ export async function handleListSaleItems(workspaceId: string, req: Request, env
 
   const [rows] = await tursoQuery(env, {
     sql: `SELECT si.id, si.sale_id, si.catalog_item_id, si.description,
-                 si.quantity, si.unit_price, si.subtotal,
+                 si.quantity, si.unit_price, si.subtotal, si.unit_cost,
                  s.sale_date, s.created_at AS sale_created_at,
                  s.seller_name, s.customer_name
             FROM sale_items si

@@ -28,7 +28,7 @@ let initPromise: Promise<void> | null = null;
  *
  * Bump cuando agregues un CREATE TABLE / ALTER TABLE / safeAddColumn.
  */
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 export function ensureSchema(env: Env): Promise<void> {
   if (!initPromise) initPromise = applySchemaIfNeeded(env);
@@ -468,6 +468,13 @@ async function applySchema(env: Env): Promise<void> {
       sql: `CREATE INDEX IF NOT EXISTS idx_sale_payments_sale ON sale_payments(sale_id)`,
     },
   );
+
+  // 008 — snapshot del costo unitario al momento de la venta. Antes Reportes
+  // re-joinea el costo ACTUAL del catálogo, así que editar el costo de un
+  // producto reescribía el margen histórico. Persistiendo unit_cost por ítem,
+  // el margen de cada venta queda congelado. Ventas viejas quedan en 0 → el
+  // cliente cae al join del catálogo como fallback (back-compat, sin backfill).
+  await safeAddColumn(env, "sale_items", "unit_cost", "REAL DEFAULT 0");
 
   // ── F2-B R4: Tareas + cash_movements + followups ─────────────────
   await tursoQuery(

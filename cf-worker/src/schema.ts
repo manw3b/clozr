@@ -28,7 +28,7 @@ let initPromise: Promise<void> | null = null;
  *
  * Bump cuando agregues un CREATE TABLE / ALTER TABLE / safeAddColumn.
  */
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 export function ensureSchema(env: Env): Promise<void> {
   if (!initPromise) initPromise = applySchemaIfNeeded(env);
@@ -475,6 +475,27 @@ async function applySchema(env: Env): Promise<void> {
   // el margen de cada venta queda congelado. Ventas viejas quedan en 0 → el
   // cliente cae al join del catálogo como fallback (back-compat, sin backfill).
   await safeAddColumn(env, "sale_items", "unit_cost", "REAL DEFAULT 0");
+
+  // 009 — precios por tipo de cliente. Cada producto del catálogo puede tener
+  // un precio sugerido distinto por tipo de cliente (final/revendedor/
+  // mayorista/empresa). En ARS (la web es ARS-only). Sin fila = sin precio
+  // especial para ese tipo → la venta cae al precio base del catálogo.
+  await tursoQuery(
+    env,
+    {
+      sql: `CREATE TABLE IF NOT EXISTS catalog_prices (
+        workspace_id TEXT NOT NULL,
+        catalog_item_id TEXT NOT NULL,
+        customer_type TEXT NOT NULL,
+        price REAL,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (catalog_item_id, customer_type)
+      )`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_catalog_prices_ws ON catalog_prices(workspace_id)`,
+    },
+  );
 
   // ── F2-B R4: Tareas + cash_movements + followups ─────────────────
   await tursoQuery(

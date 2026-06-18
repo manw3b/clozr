@@ -82,6 +82,7 @@ import {
   handleListSales, handleGetSale, handleCreateSale, handleUpdateSale,
   handleDeleteSale, handleAddPayment, handleImportSales, handleListSaleItems,
 } from "./routes/sales";
+import { handleListCatalogPrices, handleSetCatalogPrice } from "./routes/catalogPrices";
 import {
   handleGenericList, handleGenericCreate, handleGenericUpdate,
   handleGenericDelete, handleGenericImport,
@@ -255,6 +256,15 @@ export default {
       const wsSaleItemsMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sale-items\/?$/);
       if (wsSaleItemsMatch && req.method === "GET") {
         return cors(req, env, await handleListSaleItems(wsSaleItemsMatch[1]!, req, env));
+      }
+
+      // Precios por tipo de cliente (catalog_prices). PK compuesta → ruta propia
+      // (no entra en el dispatcher genérico). Va antes del loop genérico.
+      const wsCatalogPricesMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/catalog-prices\/?$/);
+      if (wsCatalogPricesMatch) {
+        const wsId = wsCatalogPricesMatch[1]!;
+        if (req.method === "GET") return cors(req, env, await handleListCatalogPrices(wsId, req, env));
+        if (req.method === "PUT") return cors(req, env, await handleSetCatalogPrice(wsId, req, env));
       }
       const wsSalesImportMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales\/import\/?$/);
       const wsSalePaymentMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales\/([^/]+)\/payments\/?$/);

@@ -28,7 +28,7 @@ let initPromise: Promise<void> | null = null;
  *
  * Bump cuando agregues un CREATE TABLE / ALTER TABLE / safeAddColumn.
  */
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 export function ensureSchema(env: Env): Promise<void> {
   if (!initPromise) initPromise = applySchemaIfNeeded(env);
@@ -494,6 +494,33 @@ async function applySchema(env: Env): Promise<void> {
     },
     {
       sql: `CREATE INDEX IF NOT EXISTS idx_catalog_prices_ws ON catalog_prices(workspace_id)`,
+    },
+  );
+
+  // 010 — dedupe de payment_methods + índice único parcial. El seed del
+  // desktop sembraba los métodos default con un UUID nuevo por fila desde
+  // varios lugares a la vez (sin uniqueness), así que se duplicaron 2-3x y se
+  // sincronizaron a la nube. Las ventas referencian el método por NOMBRE (no
+  // por id), así que soft-deletear los duplicados es seguro. Orden importa:
+  // primero limpiar, después crear el índice único (si no, el CREATE falla).
+  await tursoQuery(
+    env,
+    {
+      // Conservar una fila por (workspace_id, name); soft-delete del resto.
+      sql: `UPDATE payment_methods
+              SET deleted_at = datetime('now')
+              WHERE deleted_at IS NULL
+                AND id NOT IN (
+                  SELECT MIN(id) FROM payment_methods
+                    WHERE deleted_at IS NULL
+                    GROUP BY workspace_id, name
+                )`,
+    },
+    {
+      // Único parcial: evita que se vuelvan a duplicar (INSERT OR IGNORE del
+      // import desktop ahora es idempotente por nombre).
+      sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_methods_uniq
+              ON payment_methods(workspace_id, name) WHERE deleted_at IS NULL`,
     },
   );
 

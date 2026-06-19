@@ -43,7 +43,7 @@ import { handleAuthRequest } from "./routes/request";
 import { handleAuthVerify } from "./routes/verify";
 import { handleAuthVerifyCode } from "./routes/verify-code";
 import { handleGoogleStart, handleGoogleCallback } from "./routes/google";
-import { handleMe } from "./routes/me";
+import { handleMe, handleUpdateMe } from "./routes/me";
 import { ensureSchema } from "./schema";
 import {
   handleCreateWorkspace,
@@ -450,6 +450,9 @@ export default {
 
         case "GET /me":
           return cors(req, env, await handleMe(req, env));
+
+        case "PATCH /me":
+          return cors(req, env, await handleUpdateMe(req, env));
 
         case "POST /workspaces":
           return cors(req, env, await handleCreateWorkspace(req, env));

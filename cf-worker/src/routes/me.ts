@@ -121,6 +121,25 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
   return json(body);
 }
 
+/**
+ * PATCH /me — editar el perfil del usuario logueado. Hoy solo `name`.
+ */
+export async function handleUpdateMe(req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+
+  let body: { name?: unknown };
+  try { body = (await req.json()) as { name?: unknown }; } catch { return json({ error: "invalid_body" }, 400); }
+
+  if (typeof body.name !== "string") return json({ error: "missing_name" }, 400);
+  const name = body.name.trim();
+  if (!name) return json({ error: "empty_name" }, 400);
+
+  await tursoExec(env, `UPDATE users SET name = ? WHERE id = ?`, [name, auth.userId]);
+  return json({ ok: true, name });
+}
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,

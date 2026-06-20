@@ -22,11 +22,9 @@ import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, tursoTransaction, type TursoArg } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
+import { requirePerm } from "../permissions";
 
 const ROLES_READ = new Set(["owner", "admin", "vendedor", "viewer"]);
-const ROLES_CREATE = new Set(["owner", "admin", "vendedor"]);
-const ROLES_EDIT = new Set(["owner", "admin", "vendedor"]);
-const ROLES_DELETE = new Set(["owner", "admin"]);
 
 const SALE_EDITABLE = [
   "customer_id", "customer_name", "seller_id", "seller_name",
@@ -89,8 +87,11 @@ export async function handleListSaleItems(workspaceId: string, req: Request, env
   await ensureSchema(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
+  // GET /sale-items alimenta Reportes → requiere reports.view (managers).
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
-  if (!role || !ROLES_READ.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const deniedReports = requirePerm(role, "reports.view");
+  if (deniedReports) return deniedReports;
 
   const [rows] = await tursoQuery(env, {
     sql: `SELECT si.id, si.sale_id, si.catalog_item_id, si.description,
@@ -153,7 +154,9 @@ export async function handleCreateSale(workspaceId: string, req: Request, env: E
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
-  if (!role || !ROLES_CREATE.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "sales.write");
+  if (denied) return denied;
 
   let body: CreateSaleBody;
   try { body = (await req.json()) as CreateSaleBody; } catch { return json({ error: "invalid_body" }, 400); }
@@ -268,7 +271,9 @@ export async function handleUpdateSale(workspaceId: string, saleId: string, req:
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
-  if (!role || !ROLES_EDIT.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "sales.write");
+  if (denied) return denied;
 
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
@@ -293,7 +298,9 @@ export async function handleAddPayment(workspaceId: string, saleId: string, req:
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
-  if (!role || !ROLES_EDIT.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "sales.write");
+  if (denied) return denied;
 
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
@@ -342,7 +349,9 @@ export async function handleDeleteSale(workspaceId: string, saleId: string, req:
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
-  if (!role || !ROLES_DELETE.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "sales.write");
+  if (denied) return denied;
 
   await tursoExec(
     env,

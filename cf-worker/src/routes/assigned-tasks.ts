@@ -22,9 +22,9 @@ import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoQuery, type TursoArg } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
+import { requirePerm } from "../permissions";
 
 const ROLES_READ = new Set(["owner", "admin", "vendedor", "viewer"]);
-const ROLES_MANAGE = new Set(["owner", "admin"]);
 
 const EDITABLE = [
   "title", "description", "frequency", "target_time", "target_count",
@@ -64,7 +64,11 @@ export async function handleCreateAssignedTaskTemplate(workspaceId: string, req:
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
-  if (!role || !ROLES_MANAGE.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  {
+    const denied = requirePerm(role, "settings.manage");
+    if (denied) return denied;
+  }
 
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
@@ -99,7 +103,11 @@ export async function handleUpdateAssignedTaskTemplate(workspaceId: string, temp
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
-  if (!role || !ROLES_MANAGE.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  {
+    const denied = requirePerm(role, "settings.manage");
+    if (denied) return denied;
+  }
 
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
@@ -122,7 +130,11 @@ export async function handleDeleteAssignedTaskTemplate(workspaceId: string, temp
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
-  if (!role || !ROLES_MANAGE.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  {
+    const denied = requirePerm(role, "settings.manage");
+    if (denied) return denied;
+  }
 
   await tursoExec(
     env,

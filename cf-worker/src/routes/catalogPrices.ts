@@ -22,9 +22,9 @@ import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
+import { requirePerm } from "../permissions";
 
 const ROLES_READ = new Set(["owner", "admin", "vendedor", "viewer"]);
-const ROLES_SET = new Set(["owner", "admin"]);
 const ALLOWED_TYPES = new Set(["final", "revendedor", "mayorista", "empresa"]);
 
 export async function handleListCatalogPrices(workspaceId: string, req: Request, env: Env): Promise<Response> {
@@ -48,7 +48,9 @@ export async function handleSetCatalogPrice(workspaceId: string, req: Request, e
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
-  if (!role || !ROLES_SET.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "inventory.write");
+  if (denied) return denied;
 
   let body: { catalog_item_id?: unknown; customer_type?: unknown; price?: unknown };
   try { body = (await req.json()) as typeof body; } catch { return json({ error: "invalid_body" }, 400); }

@@ -18,9 +18,9 @@ import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoQuery, tursoExec, tursoFirst } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
+import { requirePerm } from "../permissions";
 
 const ALL_ROLES = new Set(["owner", "admin", "vendedor", "viewer"]);
-const STAFF_ROLES = new Set(["owner", "admin", "vendedor"]);
 
 function num(v: unknown, fallback = 0): number {
   const n = Number(v);
@@ -48,7 +48,9 @@ export async function handleOpenCashSession(wsId: string, req: Request, env: Env
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
-  if (!role || !STAFF_ROLES.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "cash.write");
+  if (denied) return denied;
 
   let body: Record<string, unknown>;
   try {
@@ -119,7 +121,9 @@ export async function handleCloseCashSession(
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
-  if (!role || !STAFF_ROLES.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "cash.write");
+  if (denied) return denied;
 
   let body: Record<string, unknown>;
   try {

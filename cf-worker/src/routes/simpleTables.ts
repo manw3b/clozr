@@ -27,6 +27,8 @@ export const tasksSpec: TableSpec = {
   rolesCreate: STAFF_ROLES,
   rolesEdit: STAFF_ROLES,
   rolesDelete: MGMT_ROLES,
+  // Plan de equipos: /tasks* → tasks.write (owner/admin/vendedor).
+  permission: "tasks.write",
   orderBy: "due_at ASC, created_at DESC",
 };
 
@@ -42,6 +44,8 @@ export const cashSpec: TableSpec = {
   rolesCreate: STAFF_ROLES,
   rolesEdit: MGMT_ROLES,   // Movimientos no se editan así nomás — solo admin/owner
   rolesDelete: MGMT_ROLES,
+  // Plan de equipos: /cash* → cash.write (owner/admin/vendedor).
+  permission: "cash.write",
   orderBy: "moved_at DESC",
 };
 
@@ -74,6 +78,8 @@ export const catalogSpec: TableSpec = {
   rolesCreate: MGMT_ROLES,
   rolesEdit: MGMT_ROLES,
   rolesDelete: MGMT_ROLES,
+  // Plan de equipos: /catalog* → inventory.write (owner/admin).
+  permission: "inventory.write",
   orderBy: "sort_order ASC, category ASC, name ASC",
 };
 

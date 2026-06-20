@@ -23,6 +23,7 @@ import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, type Row, type TursoArg } from "../turso";
 import { sendInviteEmail } from "../email";
+import { requirePerm } from "../permissions";
 
 /* ── POST /workspaces ────────────────────────────────────────────────── */
 
@@ -73,7 +74,8 @@ export async function handleUpdateWorkspace(workspaceId: string, req: Request, e
 
   const me = await membership(env, workspaceId, auth.userId);
   if (!me) return json({ error: "not_a_member" }, 403);
-  if (!canManageTeam(String(me.role))) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(String(me.role), "settings.manage");
+  if (denied) return denied;
 
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
@@ -112,10 +114,6 @@ async function membership(env: Env, workspaceId: string, userId: string): Promis
        WHERE workspace_id = ? AND user_id = ? AND status = 'active'`,
     [workspaceId, userId],
   );
-}
-
-function canManageTeam(role: string): boolean {
-  return role === "owner" || role === "admin";
 }
 
 /* ── GET /workspaces/:id/members ─────────────────────────────────────── */
@@ -159,7 +157,10 @@ export async function handleInviteMember(workspaceId: string, req: Request, env:
 
   const me = await membership(env, workspaceId, auth.userId);
   if (!me) return json({ error: "not_a_member" }, 403);
-  if (!canManageTeam(String(me.role))) return json({ error: "forbidden" }, 403);
+  {
+    const denied = requirePerm(String(me.role), "team.manage");
+    if (denied) return denied;
+  }
 
   let body: InviteBody;
   try { body = (await req.json()) as InviteBody; } catch { return json({ error: "invalid_body" }, 400); }
@@ -239,7 +240,10 @@ export async function handlePatchMember(
 
   const me = await membership(env, workspaceId, auth.userId);
   if (!me) return json({ error: "not_a_member" }, 403);
-  if (!canManageTeam(String(me.role))) return json({ error: "forbidden" }, 403);
+  {
+    const denied = requirePerm(String(me.role), "team.manage");
+    if (denied) return denied;
+  }
 
   let body: PatchBody;
   try { body = (await req.json()) as PatchBody; } catch { return json({ error: "invalid_body" }, 400); }
@@ -315,7 +319,10 @@ export async function handleIssueAccessCode(
 
   const me = await membership(env, workspaceId, auth.userId);
   if (!me) return json({ error: "not_a_member" }, 403);
-  if (!canManageTeam(String(me.role))) return json({ error: "forbidden" }, 403);
+  {
+    const denied = requirePerm(String(me.role), "team.manage");
+    if (denied) return denied;
+  }
 
   const target = await tursoFirst(
     env,
@@ -379,7 +386,10 @@ export async function handleRevokeMember(
 
   const me = await membership(env, workspaceId, auth.userId);
   if (!me) return json({ error: "not_a_member" }, 403);
-  if (!canManageTeam(String(me.role))) return json({ error: "forbidden" }, 403);
+  {
+    const denied = requirePerm(String(me.role), "team.manage");
+    if (denied) return denied;
+  }
 
   const target = await tursoFirst(
     env,

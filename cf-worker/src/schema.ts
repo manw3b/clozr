@@ -31,7 +31,15 @@ let initPromise: Promise<void> | null = null;
 const SCHEMA_VERSION = 10;
 
 export function ensureSchema(env: Env): Promise<void> {
-  if (!initPromise) initPromise = applySchemaIfNeeded(env);
+  if (!initPromise) {
+    initPromise = applySchemaIfNeeded(env).catch((e) => {
+      // Si la migración falla, NO cacheamos el rechazo: lo reseteamos para que
+      // la próxima request reintente, en vez de dejar el isolate "envenenado"
+      // devolviendo 500 a todo hasta que Cloudflare lo recicle.
+      initPromise = null;
+      throw e;
+    });
+  }
   return initPromise;
 }
 
@@ -745,7 +753,10 @@ async function applySchema(env: Env): Promise<void> {
   // Backfill: los registros viejos sin dueño quedan asignados al owner del
   // workspace (managers ven todo igual, así que no cambia su vista; pero deja
   // los datos históricos con un dueño concreto en vez de NULL). Idempotente:
-  // solo toca filas con owner_id NULL.
+  // solo toca filas con owner_id NULL. NO-fatal: si algo falla acá, logueamos
+  // pero no rompemos ensureSchema — las columnas ya están agregadas y los
+  // handlers funcionan; el backfill y los índices son optimizaciones.
+  try {
   await tursoQuery(
     env,
     {
@@ -785,6 +796,9 @@ async function applySchema(env: Env): Promise<void> {
             ON pipeline_items(workspace_id, owner_id)`,
     },
   );
+  } catch (e) {
+    console.error("[schema] backfill/índices owner_id fallaron (no-fatal):", e);
+  }
 
   // ── 012 (plan equipos T3) — billing Mercado Pago + asientos ────────
   //
@@ -796,8 +810,13 @@ async function applySchema(env: Env): Promise<void> {
   //   seats       : asientos permitidos (free=1, pro=3, team=9999 ~ ilimitado)
   //   plan_status : 'active' | 'trialing' | 'past_due' | 'cancelled'
   //   mp_preapproval_id : id de la suscripción (preapproval) en Mercado Pago
-  await safeAddColumn(env, "cloud_workspaces", "plan", "TEXT NOT NULL DEFAULT 'free'");
-  await safeAddColumn(env, "cloud_workspaces", "seats", "INTEGER NOT NULL DEFAULT 1");
+  //
+  // OJO: sin NOT NULL en el ALTER. SQLite/libSQL puede rechazar
+  // `ADD COLUMN ... NOT NULL DEFAULT ...` sobre una tabla con filas; el resto
+  // del schema agrega columnas siempre con DEFAULT a secas. Los defaults
+  // cubren el valor inicial y el código lee con `?? 'free'` / `?? 1`.
+  await safeAddColumn(env, "cloud_workspaces", "plan", "TEXT DEFAULT 'free'");
+  await safeAddColumn(env, "cloud_workspaces", "seats", "INTEGER DEFAULT 1");
   await safeAddColumn(env, "cloud_workspaces", "plan_status", "TEXT DEFAULT 'active'");
   await safeAddColumn(env, "cloud_workspaces", "mp_preapproval_id", "TEXT");
 }

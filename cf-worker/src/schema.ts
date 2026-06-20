@@ -28,7 +28,7 @@ let initPromise: Promise<void> | null = null;
  *
  * Bump cuando agregues un CREATE TABLE / ALTER TABLE / safeAddColumn.
  */
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 
 export function ensureSchema(env: Env): Promise<void> {
   if (!initPromise) initPromise = applySchemaIfNeeded(env);
@@ -724,6 +724,65 @@ async function applySchema(env: Env): Promise<void> {
     {
       sql: `CREATE INDEX IF NOT EXISTS idx_customer_tags_workspace
             ON customer_tags(workspace_id, deleted_at)`,
+    },
+  );
+
+  // ── 011 (plan equipos T2) — owner_id: el vendedor ve solo lo suyo ──
+  //
+  // El vendedor solo ve/edita los registros que le pertenecen; owner/admin
+  // ven todo el workspace. Agregamos owner_id a las 3 tablas de datos
+  // operativos por-dueño (customers, sales, pipeline_items) y filtramos por
+  // él en los handlers cuando el rol es 'vendedor'. Caja, stages, catálogo,
+  // tareas y demás quedan COMPARTIDOS (no se scopean por dueño).
+  //
+  // pipeline_items YA tiene owner_id (era el "dueño/vendedor asignado" del
+  // lead) — safeAddColumn skipea el duplicate y reusamos esa columna como
+  // campo de alcance. customers/sales no lo tenían (usaban created_by).
+  await safeAddColumn(env, "customers", "owner_id", "TEXT");
+  await safeAddColumn(env, "sales", "owner_id", "TEXT");
+  await safeAddColumn(env, "pipeline_items", "owner_id", "TEXT");
+
+  // Backfill: los registros viejos sin dueño quedan asignados al owner del
+  // workspace (managers ven todo igual, así que no cambia su vista; pero deja
+  // los datos históricos con un dueño concreto en vez de NULL). Idempotente:
+  // solo toca filas con owner_id NULL.
+  await tursoQuery(
+    env,
+    {
+      sql: `UPDATE customers SET owner_id = (
+              SELECT user_id FROM memberships
+                WHERE workspace_id = customers.workspace_id
+                  AND role = 'owner' AND status = 'active' AND user_id IS NOT NULL
+                LIMIT 1)
+            WHERE owner_id IS NULL`,
+    },
+    {
+      sql: `UPDATE sales SET owner_id = (
+              SELECT user_id FROM memberships
+                WHERE workspace_id = sales.workspace_id
+                  AND role = 'owner' AND status = 'active' AND user_id IS NOT NULL
+                LIMIT 1)
+            WHERE owner_id IS NULL`,
+    },
+    {
+      sql: `UPDATE pipeline_items SET owner_id = (
+              SELECT user_id FROM memberships
+                WHERE workspace_id = pipeline_items.workspace_id
+                  AND role = 'owner' AND status = 'active' AND user_id IS NOT NULL
+                LIMIT 1)
+            WHERE owner_id IS NULL`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_customers_owner
+            ON customers(workspace_id, owner_id)`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_sales_owner
+            ON sales(workspace_id, owner_id)`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_pipeline_items_owner
+            ON pipeline_items(workspace_id, owner_id)`,
     },
   );
 }

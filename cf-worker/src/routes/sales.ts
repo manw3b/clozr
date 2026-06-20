@@ -59,6 +59,28 @@ function pick(input: Record<string, unknown>, allowed: readonly string[]): Recor
   return out;
 }
 
+/**
+ * T2: si el rol es 'vendedor', verifica que la venta le pertenezca antes de
+ * mutarla (PATCH/payment/DELETE). Devuelve Response (404/403) o null si OK.
+ */
+async function assertOwnsSale(
+  env: Env,
+  workspaceId: string,
+  saleId: string,
+  role: string,
+  userId: string,
+): Promise<Response | null> {
+  if (role !== "vendedor") return null;
+  const row = await tursoFirst(
+    env,
+    `SELECT owner_id FROM sales WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+    [saleId, workspaceId],
+  );
+  if (!row) return json({ error: "not_found" }, 404);
+  if (String(row.owner_id ?? "") !== userId) return json({ error: "forbidden" }, 403);
+  return null;
+}
+
 /* ── GET list (header only) ─────────────────────────────────────────── */
 
 export async function handleListSales(workspaceId: string, req: Request, env: Env): Promise<Response> {
@@ -68,11 +90,13 @@ export async function handleListSales(workspaceId: string, req: Request, env: En
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role || !ROLES_READ.has(role)) return json({ error: "forbidden" }, 403);
 
+  // T2: el vendedor ve solo SUS ventas; managers y viewer ven todo.
+  const scoped = role === "vendedor";
   const [rows] = await tursoQuery(env, {
     sql: `SELECT * FROM sales
-            WHERE workspace_id = ? AND deleted_at IS NULL
+            WHERE workspace_id = ? AND deleted_at IS NULL${scoped ? " AND owner_id = ?" : ""}
             ORDER BY sale_date DESC, created_at DESC`,
-    args: [workspaceId],
+    args: scoped ? [workspaceId, auth.userId] : [workspaceId],
   });
   return json({ sales: rows ?? [] });
 }
@@ -116,10 +140,12 @@ export async function handleGetSale(workspaceId: string, saleId: string, req: Re
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role || !ROLES_READ.has(role)) return json({ error: "forbidden" }, 403);
 
+  // T2: el vendedor solo abre SUS ventas.
+  const scoped = role === "vendedor";
   const sale = await tursoFirst(
     env,
-    `SELECT * FROM sales WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
-    [saleId, workspaceId],
+    `SELECT * FROM sales WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL${scoped ? " AND owner_id = ?" : ""}`,
+    scoped ? [saleId, workspaceId, auth.userId] : [saleId, workspaceId],
   );
   if (!sale) return json({ error: "not_found" }, 404);
 
@@ -164,8 +190,9 @@ export async function handleCreateSale(workspaceId: string, req: Request, env: E
   const id = (typeof body.id === "string" && body.id) ? body.id : crypto.randomUUID();
   const saleFields = pick(body as Record<string, unknown>, SALE_EDITABLE);
 
-  const cols = ["id", "workspace_id", "created_by", ...Object.keys(saleFields)];
-  const vals: TursoArg[] = [id, workspaceId, auth.userId, ...Object.values(saleFields)];
+  // T2: owner_id = creador (sub del JWT) para el alcance del vendedor.
+  const cols = ["id", "workspace_id", "created_by", "owner_id", ...Object.keys(saleFields)];
+  const vals: TursoArg[] = [id, workspaceId, auth.userId, auth.userId, ...Object.values(saleFields)];
 
   // C2: insertamos sale + items + payments en una transacción atómica
   // via tursoTransaction (BEGIN/COMMIT en la misma pipeline). Si CUALQUIER
@@ -275,6 +302,9 @@ export async function handleUpdateSale(workspaceId: string, saleId: string, req:
   const denied = requirePerm(role, "sales.write");
   if (denied) return denied;
 
+  const ownerErr = await assertOwnsSale(env, workspaceId, saleId, role, auth.userId);
+  if (ownerErr) return ownerErr;
+
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
   const fields = pick(body, SALE_EDITABLE);
@@ -301,6 +331,9 @@ export async function handleAddPayment(workspaceId: string, saleId: string, req:
   if (!role) return json({ error: "forbidden" }, 403);
   const denied = requirePerm(role, "sales.write");
   if (denied) return denied;
+
+  const ownerErr = await assertOwnsSale(env, workspaceId, saleId, role, auth.userId);
+  if (ownerErr) return ownerErr;
 
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
@@ -353,6 +386,9 @@ export async function handleDeleteSale(workspaceId: string, saleId: string, req:
   const denied = requirePerm(role, "sales.write");
   if (denied) return denied;
 
+  const ownerErr = await assertOwnsSale(env, workspaceId, saleId, role, auth.userId);
+  if (ownerErr) return ownerErr;
+
   await tursoExec(
     env,
     `UPDATE sales SET deleted_at = datetime('now')
@@ -392,8 +428,9 @@ export async function handleImportSales(workspaceId: string, req: Request, env: 
     if (exists) { skipped++; continue; }
     const fields = pick(s as Record<string, unknown>, SALE_EDITABLE);
     const createdAt = typeof s.created_at === "string" ? s.created_at : null;
-    const cols = ["id", "workspace_id", "created_by", ...Object.keys(fields)];
-    const vals: TursoArg[] = [id, workspaceId, auth.userId, ...Object.values(fields)];
+    // Import es owner-only → owner_id = el owner que sube el bootstrap.
+    const cols = ["id", "workspace_id", "created_by", "owner_id", ...Object.keys(fields)];
+    const vals: TursoArg[] = [id, workspaceId, auth.userId, auth.userId, ...Object.values(fields)];
     if (createdAt) { cols.push("created_at"); vals.push(createdAt); }
 
     const stmts: Array<{ sql: string; args: TursoArg[] }> = [{

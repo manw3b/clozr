@@ -35,6 +35,13 @@ export interface Env {
   // redacta follow-ups de leads estancados. Se setea con
   // `wrangler secret put ANTHROPIC_API_KEY`. Si falta, el cron hace skip.
   ANTHROPIC_API_KEY: string;
+  // Billing (T3) — Mercado Pago suscripciones (preapproval). Se setean con
+  // `wrangler secret put MP_ACCESS_TOKEN` y `wrangler secret put
+  // MP_WEBHOOK_SECRET`. Si MP_ACCESS_TOKEN falta, /billing/checkout devuelve
+  // 503. MP_WEBHOOK_SECRET valida la firma del webhook (si falta, se loguea
+  // y se procesa igual — solo recomendado para dev).
+  MP_ACCESS_TOKEN: string;
+  MP_WEBHOOK_SECRET: string;
   // R2 bucket binding (I) — para logos/banners del workspace.
   ASSETS: R2Bucket;
 }
@@ -95,6 +102,7 @@ import {
   handleCloseCashSession,
 } from "./routes/cash-sessions";
 import { handleClientError } from "./routes/errors";
+import { handleBillingCheckout, handleBillingWebhook } from "./routes/billing";
 import { runAiTriage } from "./cron/aiTriage";
 
 export default {
@@ -286,6 +294,13 @@ export default {
         if (sId && req.method === "DELETE")  return cors(req, env, await handleDeleteSale(wsId, sId, req, env));
       }
 
+      // T3 — Billing checkout (crea preapproval MP). Va antes del PATCH
+      // workspace genérico; su path es más específico (.../billing/checkout).
+      const wsBillingCheckoutMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/billing\/checkout\/?$/);
+      if (wsBillingCheckoutMatch && req.method === "POST") {
+        return cors(req, env, await handleBillingCheckout(wsBillingCheckoutMatch[1]!, req, env));
+      }
+
       // G/A4 — PATCH workspace (daily_goal, industry, name, etc).
       // Match exacto sin /members ni /invite etc — esos van después.
       const wsPatchMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/?$/);
@@ -447,6 +462,11 @@ export default {
 
         case "GET /auth/google/callback":
           return handleGoogleCallback(req, env);
+
+        // T3 — Webhook de Mercado Pago. Público (sin auth de sesión): MP lo
+        // llama server-to-server. La firma se valida dentro del handler.
+        case "POST /billing/webhook":
+          return cors(req, env, await handleBillingWebhook(req, env));
 
         case "GET /me":
           return cors(req, env, await handleMe(req, env));

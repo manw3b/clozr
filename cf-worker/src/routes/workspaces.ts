@@ -55,7 +55,11 @@ export async function handleCreateWorkspace(req: Request, env: Env): Promise<Res
     },
   );
 
-  return json({ id: workspaceId, name, role: "owner", status: "active" }, 201);
+  // Plan por defecto (T3): free / 1 asiento / active (column defaults).
+  return json(
+    { id: workspaceId, name, role: "owner", status: "active", plan: "free", seats: 1, plan_status: "active" },
+    201,
+  );
 }
 
 /* ── PATCH /workspaces/:wid ───────────────────────────────────────────── */
@@ -179,6 +183,20 @@ export async function handleInviteMember(workspaceId: string, req: Request, env:
     [workspaceId, email],
   );
   if (existing) return json({ error: "already_member", status: existing.status }, 409);
+
+  // T3: seat-gate. Miembros activos+invitados no pueden superar los asientos
+  // del plan. Free = 1 (solo el owner) → invitar equipo requiere upgrade.
+  // El front mapea `seat_limit` a un CTA de "mejorá tu plan".
+  const usedRow = await tursoFirst(
+    env,
+    `SELECT COUNT(*) AS n FROM memberships
+       WHERE workspace_id = ? AND status IN ('active', 'invited')`,
+    [workspaceId],
+  );
+  const seatsRow = await tursoFirst(env, `SELECT seats FROM cloud_workspaces WHERE id = ?`, [workspaceId]);
+  const used = usedRow ? Number(usedRow.n) : 0;
+  const seats = seatsRow ? Number(seatsRow.seats ?? 1) : 1;
+  if (used >= seats) return json({ error: "seat_limit", used, seats }, 402);
 
   // Si el email ya es un user existente, lo linkeamos (status active
   // directo). Si no, queda con user_id NULL y status='invited' — al

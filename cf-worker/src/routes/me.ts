@@ -32,6 +32,10 @@ interface WorkspaceForUser {
   /** I: keys del R2 bucket (relativas — el cliente arma /assets/{key}). */
   logo_key: string | null;
   banner_key: string | null;
+  /** T3: plan/asientos/estado de suscripción del workspace (billing MP). */
+  plan: string;
+  seats: number;
+  plan_status: string;
 }
 
 interface MeResponse {
@@ -74,7 +78,7 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
     },
     {
       sql: `SELECT w.id, w.name, w.industry, w.daily_goal, w.daily_goal_currency, w.daily_goal_count,
-                   w.logo_key, w.banner_key,
+                   w.logo_key, w.banner_key, w.plan, w.seats, w.plan_status,
                    m.role, m.status
               FROM memberships m
               INNER JOIN cloud_workspaces w ON w.id = m.workspace_id
@@ -116,6 +120,9 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
       daily_goal_count: Number(r.daily_goal_count ?? 0),
       logo_key: r.logo_key === null ? null : String(r.logo_key),
       banner_key: r.banner_key === null ? null : String(r.banner_key),
+      plan: String(r.plan ?? "free"),
+      seats: Number(r.seats ?? 1),
+      plan_status: String(r.plan_status ?? "active"),
     })),
   };
   return json(body);

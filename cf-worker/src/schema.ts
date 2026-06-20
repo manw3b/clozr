@@ -28,7 +28,7 @@ let initPromise: Promise<void> | null = null;
  *
  * Bump cuando agregues un CREATE TABLE / ALTER TABLE / safeAddColumn.
  */
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 
 export function ensureSchema(env: Env): Promise<void> {
   if (!initPromise) initPromise = applySchemaIfNeeded(env);
@@ -785,6 +785,21 @@ async function applySchema(env: Env): Promise<void> {
             ON pipeline_items(workspace_id, owner_id)`,
     },
   );
+
+  // ── 012 (plan equipos T3) — billing Mercado Pago + asientos ────────
+  //
+  // Estado de suscripción del workspace. Free = 1 asiento (invitar equipo es
+  // pago). El webhook de MP es la única fuente que escribe estas columnas
+  // tras un cobro/cancelación; el resto del backend solo las lee (seat-gate
+  // en invite, exposición en /me).
+  //   plan        : 'free' | 'pro' | 'team'
+  //   seats       : asientos permitidos (free=1, pro=3, team=9999 ~ ilimitado)
+  //   plan_status : 'active' | 'trialing' | 'past_due' | 'cancelled'
+  //   mp_preapproval_id : id de la suscripción (preapproval) en Mercado Pago
+  await safeAddColumn(env, "cloud_workspaces", "plan", "TEXT NOT NULL DEFAULT 'free'");
+  await safeAddColumn(env, "cloud_workspaces", "seats", "INTEGER NOT NULL DEFAULT 1");
+  await safeAddColumn(env, "cloud_workspaces", "plan_status", "TEXT DEFAULT 'active'");
+  await safeAddColumn(env, "cloud_workspaces", "mp_preapproval_id", "TEXT");
 }
 
 /**

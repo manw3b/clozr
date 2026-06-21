@@ -27,6 +27,9 @@ export interface Env {
   SESSION_TTL_DAYS: string;
   DEEP_LINK_SCHEME: string;
   ALLOWED_ORIGINS: string;
+  // Consola Clozr: lista de emails super-admin (separada por comas). Gate
+  // server-side de las rutas /console/*. Ver superadmin.ts.
+  SUPERADMIN_EMAILS: string;
   // Google OAuth (F: login con Google). client_id puede ser var; el secret
   // se setea con `wrangler secret put GOOGLE_CLIENT_SECRET`.
   GOOGLE_CLIENT_ID: string;
@@ -103,6 +106,9 @@ import {
 } from "./routes/cash-sessions";
 import { handleClientError } from "./routes/errors";
 import { handleBillingCheckout, handleBillingWebhook } from "./routes/billing";
+import {
+  handleListCodes, handleCreateCode, handleUpdateCode, handleRedeemCode,
+} from "./routes/console";
 import { runAiTriage } from "./cron/aiTriage";
 import { runPlanDowngrade } from "./cron/planDowngrade";
 
@@ -196,6 +202,17 @@ export default {
         }
         const result = await runPlanDowngrade(env);
         return cors(req, env, json({ ok: true, ...result }));
+      }
+
+      // ── Consola Clozr (super-admin) — códigos canjeables ──────────
+      // GET/POST /console/codes ; PATCH /console/codes/:id. El gate
+      // super-admin (por email) se chequea dentro de cada handler.
+      const consoleCodeMatch = url.pathname.match(/^\/console\/codes(?:\/([^/]+))?\/?$/);
+      if (consoleCodeMatch) {
+        const codeId = consoleCodeMatch[1];
+        if (!codeId && req.method === "GET")   return cors(req, env, await handleListCodes(req, env));
+        if (!codeId && req.method === "POST")  return cors(req, env, await handleCreateCode(req, env));
+        if (codeId && req.method === "PATCH")  return cors(req, env, await handleUpdateCode(codeId, req, env));
       }
 
       // ── Rutas con path dinámico (/workspaces/:id/...) ─────────────
@@ -315,6 +332,12 @@ export default {
       const wsBillingCheckoutMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/billing\/checkout\/?$/);
       if (wsBillingCheckoutMatch && req.method === "POST") {
         return cors(req, env, await handleBillingCheckout(wsBillingCheckoutMatch[1]!, req, env));
+      }
+
+      // Consola Clozr — canje de código (lo pega el owner del workspace).
+      const wsRedeemMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/redeem-code\/?$/);
+      if (wsRedeemMatch && req.method === "POST") {
+        return cors(req, env, await handleRedeemCode(wsRedeemMatch[1]!, req, env));
       }
 
       // G/A4 — PATCH workspace (daily_goal, industry, name, etc).

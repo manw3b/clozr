@@ -32,7 +32,7 @@ import { requirePerm } from "../permissions";
 const MP_API = "https://api.mercadopago.com";
 
 /** plan → monto ARS/mes + asientos. Fuente de verdad del pricing del backend. */
-const PLAN_CONFIG: Record<string, { amount: number; seats: number; label: string }> = {
+export const PLAN_CONFIG: Record<string, { amount: number; seats: number; label: string }> = {
   pro: { amount: 25000, seats: 3, label: "Clozr Pro" },
   team: { amount: 60000, seats: 9999, label: "Clozr Team" },
 };

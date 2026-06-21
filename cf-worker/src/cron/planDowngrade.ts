@@ -30,6 +30,8 @@ export interface DowngradeResult {
   eligible: number;
   /** Workspaces efectivamente bajados a Free. */
   downgraded: number;
+  /** Workspaces bajados a Free por vencimiento de licencia gratuita (Consola). */
+  licensesExpired: number;
 }
 
 /** Punto de entrada — lo llaman el handler `scheduled` y el trigger manual. */
@@ -73,7 +75,46 @@ export async function runPlanDowngrade(env: Env): Promise<DowngradeResult> {
     }
   }
 
+  // ── Vencimiento de licencias gratuitas (Consola Clozr) ─────────────────
+  // Un código de licencia activa un plan pago gratis hasta license_expires_at.
+  // Al vencer, lo bajamos a Free. NO tocamos suscripciones MP reales
+  // (mp_preapproval_id != NULL). Todo el bloque es NO-FATAL: si la columna no
+  // existe (migración 014 salteada) o falla la query, logueamos y seguimos —
+  // la degradación por billing MP de arriba ya corrió.
+  let licensesExpired = 0;
+  try {
+    const [licRows] = await tursoQuery(env, {
+      sql: `SELECT id FROM cloud_workspaces
+              WHERE plan != 'free'
+                AND mp_preapproval_id IS NULL
+                AND license_expires_at IS NOT NULL
+                AND license_expires_at <= datetime('now')`,
+    });
+    for (const w of licRows ?? []) {
+      const wid = String(w.id);
+      try {
+        await tursoExec(
+          env,
+          `UPDATE cloud_workspaces
+              SET plan = 'free', seats = 1, plan_status = 'active',
+                  license_expires_at = NULL, updated_at = datetime('now')
+            WHERE id = ?
+              AND plan != 'free'
+              AND mp_preapproval_id IS NULL
+              AND license_expires_at IS NOT NULL
+              AND license_expires_at <= datetime('now')`,
+          [wid],
+        );
+        licensesExpired++;
+      } catch (err) {
+        console.error(`[plan-downgrade] licencia ${wid} falló:`, err);
+      }
+    }
+  } catch (err) {
+    console.error("[plan-downgrade] barrido de licencias falló (no-fatal):", err);
+  }
+
   const eligible = (rows ?? []).length;
-  console.log(`[plan-downgrade] listo: ${eligible} elegibles, ${downgraded} degradados a Free`);
-  return { eligible, downgraded };
+  console.log(`[plan-downgrade] listo: ${eligible} elegibles, ${downgraded} degradados a Free, ${licensesExpired} licencias vencidas`);
+  return { eligible, downgraded, licensesExpired };
 }

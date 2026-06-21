@@ -16,6 +16,7 @@
 import type { Env } from "../index";
 import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
+import { isSuperAdmin } from "../superadmin";
 import { tursoExec, tursoQuery } from "../turso";
 
 interface WorkspaceForUser {
@@ -47,6 +48,8 @@ interface MeResponse {
     plan: string;
     /** F: nichos comprados como add-ons. Hoy todos []. */
     owned_industries: string[];
+    /** Consola Clozr: ¿es super-admin de la plataforma? (gate por email) */
+    is_superadmin: boolean;
   };
   workspaces: WorkspaceForUser[];
 }
@@ -108,6 +111,7 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
       name: userRow.name === null ? null : String(userRow.name),
       plan: String(userRow.plan ?? "free"),
       owned_industries: ownedIndustries,
+      is_superadmin: isSuperAdmin(auth.email, env),
     },
     workspaces: (wsRows ?? []).map((r) => ({
       id: String(r.id),

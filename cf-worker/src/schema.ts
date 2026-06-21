@@ -28,6 +28,13 @@ let initPromise: Promise<void> | null = null;
  *
  * Bump cuando agregues un CREATE TABLE / ALTER TABLE / safeAddColumn.
  */
+// NOTA: la Consola (migración 014) NO bumpea esta versión a propósito. Bumpear
+// fuerza a TODOS los cold-starts a re-correr applySchema completo — justo lo que
+// rompió prod en el intento "v12" anterior. En cambio, las tablas de la Consola
+// se crean de forma lazy y auto-curativa vía ensureConsoleSchema(), que llaman
+// los handlers /console/* y el canje. Para una DB fresca, el bloque 014 dentro
+// de applySchema igual las crea. Sólo bumpear si agregás una migración que el
+// resto del backend necesite leer en frío.
 const SCHEMA_VERSION = 11;
 
 export function ensureSchema(env: Env): Promise<void> {
@@ -828,6 +835,90 @@ async function applySchema(env: Env): Promise<void> {
   // El webhook lo setea sólo en la transición a un estado no-activo y lo limpia
   // (NULL) al reactivar. NULL ⇒ sin degradación pendiente.
   await safeAddColumn(env, "cloud_workspaces", "plan_status_changed_at", "TEXT");
+
+  // ── 014 (Consola Clozr — Fase 1) — códigos de licencia/descuento ───────
+  //
+  // Tablas para la Consola super-admin: códigos canjeables (licencia o
+  // descuento) + log de canjes. La columna `license_expires_at` marca hasta
+  // cuándo un workspace tiene un plan activado por licencia gratuita; el cron
+  // de degradación lo baja a Free cuando vence (sin pisar suscripciones MP,
+  // que tienen mp_preapproval_id != NULL).
+  //
+  // NO-FATAL: todo el bloque va en try/catch. Si algo de acá falla, NO debe
+  // tumbar ensureSchema (lección del break v12 en prod) — los handlers de la
+  // Consola se auto-curan llamando a ensureConsoleSchema(), que reintenta de
+  // forma idempotente (CREATE IF NOT EXISTS + safeAddColumn).
+  try {
+    await ensureConsoleSchema(env);
+  } catch (e) {
+    console.error("[schema] migración 014 (consola) falló (no-fatal):", e);
+  }
+}
+
+/**
+ * DDL de la Consola (Fase 1). Idempotente (CREATE IF NOT EXISTS). Se aplica
+ * tanto en el applySchema global como, defensivamente, al entrar a cualquier
+ * handler de la Consola — así la disponibilidad de la Consola no depende de
+ * que la migración global haya corrido sin error.
+ *
+ * console_codes.kind:
+ *   'license'  → activa plan (pro/team) gratis en un workspace, con expiry.
+ *   'discount' → % o monto fijo; se canjea y queda registrado (la aplicación
+ *                al checkout MP es de una fase posterior).
+ */
+const CONSOLE_DDL: ReadonlyArray<{ sql: string }> = [
+  {
+    sql: `CREATE TABLE IF NOT EXISTS console_codes (
+      id TEXT PRIMARY KEY,
+      code TEXT NOT NULL UNIQUE,
+      kind TEXT NOT NULL,                 -- 'license' | 'discount'
+      -- licencia:
+      plan TEXT,                          -- 'pro' | 'team'
+      duration_days INTEGER,              -- vigencia desde el canje (NULL = usa expires_at)
+      -- descuento:
+      discount_type TEXT,                 -- 'percent' | 'amount'
+      discount_value INTEGER,             -- % (1-100) o monto ARS
+      -- comunes:
+      max_uses INTEGER,                   -- NULL = ilimitado
+      uses INTEGER NOT NULL DEFAULT 0,
+      expires_at TEXT,                    -- el código no se puede canjear pasada esta fecha
+      note TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      disabled_at TEXT
+    )`,
+  },
+  { sql: `CREATE INDEX IF NOT EXISTS idx_console_codes_kind ON console_codes(kind, disabled_at)` },
+  {
+    sql: `CREATE TABLE IF NOT EXISTS console_code_redemptions (
+      id TEXT PRIMARY KEY,
+      code_id TEXT NOT NULL,
+      code TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      workspace_id TEXT,
+      user_id TEXT,
+      redeemed_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  },
+  { sql: `CREATE INDEX IF NOT EXISTS idx_console_redemptions_code ON console_code_redemptions(code_id)` },
+];
+
+let consoleSchemaReady = false;
+
+/**
+ * Garantiza las tablas de la Consola. Memoizado por isolate; reintenta si
+ * falló (deja consoleSchemaReady en false). Lo llaman los handlers de la
+ * Consola (y el applySchema global) — barato e idempotente.
+ */
+export async function ensureConsoleSchema(env: Env): Promise<void> {
+  if (consoleSchemaReady) return;
+  await tursoQuery(env, ...CONSOLE_DDL);
+  // Columna en cloud_workspaces: hasta cuándo vale un plan activado por
+  // licencia gratuita. La agregamos acá (no solo en applySchema) para que el
+  // handler de canje la tenga garantizada aunque la migración global se
+  // hubiese salteado. safeAddColumn es idempotente (ignora duplicate column).
+  await safeAddColumn(env, "cloud_workspaces", "license_expires_at", "TEXT");
+  consoleSchemaReady = true;
 }
 
 /**

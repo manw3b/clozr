@@ -23,6 +23,9 @@ export interface SidebarItem {
   label: string;
   icon: LucideIcon;
   badge?: number;
+  /** Acento por módulo (ADN visual): color del ícono e item activo. */
+  accent?: string;
+  accentBg?: string;
 }
 
 // F.navigation:
@@ -33,17 +36,17 @@ const SECTIONS: { title?: string; items: SidebarItem[] }[] = [
   {
     items: [
       { id: 'home', label: 'Mi Día', icon: Home },
-      { id: 'pipeline', label: 'Pipeline', icon: GitBranch },
-      { id: 'customers', label: 'Clientes', icon: Users },
+      { id: 'pipeline', label: 'Pipeline', icon: GitBranch, accent: 'var(--mod-pipeline)', accentBg: 'var(--mod-pipeline-bg)' },
+      { id: 'customers', label: 'Clientes', icon: Users, accent: 'var(--mod-clientes)', accentBg: 'var(--mod-clientes-bg)' },
       { id: 'sales', label: 'Ventas', icon: ShoppingCart },
     ],
   },
   {
     title: 'Operaciones',
     items: [
-      { id: 'cash', label: 'Caja', icon: Wallet },
+      { id: 'cash', label: 'Caja', icon: Wallet, accent: 'var(--mod-caja)', accentBg: 'var(--mod-caja-bg)' },
       { id: 'deudas', label: 'Deudas', icon: Receipt },
-      { id: 'inventory', label: 'Inventario', icon: Package },
+      { id: 'inventory', label: 'Inventario', icon: Package, accent: 'var(--mod-inventario)', accentBg: 'var(--mod-inventario-bg)' },
       { id: 'tasks', label: 'Tareas', icon: CheckSquare },
       { id: 'reportes', label: 'Reportes', icon: BarChart3 },
     ],
@@ -259,6 +262,7 @@ function NavButton({
   onClick: () => void;
 }) {
   const Icon = item.icon;
+  const accent = item.accent;
   return (
     <button
       onClick={onClick}
@@ -275,6 +279,8 @@ function NavButton({
         fontWeight: active ? weight.semibold : weight.medium,
         position: 'relative',
         textAlign: 'left',
+        // Acento por módulo: activo toma el color del módulo (bg + texto).
+        ...(active && accent ? { background: item.accentBg, color: accent } : {}),
       }}
     >
       {/* Indicator vertical para item activo */}
@@ -286,12 +292,12 @@ function NavButton({
             top: 6,
             bottom: 6,
             width: 3,
-            background: color.primary,
+            background: accent ?? color.primary,
             borderRadius: radius.full,
           }}
         />
       )}
-      <Icon size={18} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+      <Icon size={18} strokeWidth={2.2} style={{ flexShrink: 0, color: accent ?? undefined, opacity: accent && !active ? 0.8 : 1 }} />
       {!collapsed && (
         <>
           <span style={{ flex: 1 }}>{item.label}</span>
@@ -300,7 +306,7 @@ function NavButton({
               style={{
                 fontSize: text.xs,
                 fontWeight: weight.bold,
-                background: active ? color.primary : color.surface2,
+                background: active ? (accent ?? color.primary) : color.surface2,
                 color: active ? '#FFFFFF' : color.textMuted,
                 padding: '1px 6px',
                 borderRadius: radius.full,

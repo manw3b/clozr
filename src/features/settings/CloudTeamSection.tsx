@@ -37,9 +37,17 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const INVITABLE_ROLES: Array<{ value: "admin" | "vendedor" | "viewer"; label: string; desc: string }> = [
-  { value: "admin", label: "Encargado", desc: "Casi todo menos cambios críticos." },
-  { value: "vendedor", label: "Vendedor", desc: "Vende, crea clientes, cobra." },
-  { value: "viewer", label: "Solo lectura", desc: "Ve pero no edita." },
+  { value: "admin", label: "Encargado", desc: "Casi todo menos equipo y facturación: precios, catálogo, costos, borrar ventas." },
+  { value: "vendedor", label: "Vendedor", desc: "Vende y cobra, crea clientes y leads, registra caja. No ve costos ni edita precios." },
+  { value: "viewer", label: "Solo lectura", desc: "Ve todo, pero no crea ni edita nada." },
+];
+
+/** Qué puede hacer cada rol — leyenda visible en la sección de equipo. */
+const ROLE_LEGEND: Array<{ label: string; desc: string }> = [
+  { label: "Dueño", desc: "Control total: maneja el equipo, el plan y la facturación, y los ajustes del workspace. Incluye todo lo del Encargado." },
+  { label: "Encargado", desc: "Casi todo: ve costos, edita precios, catálogo e inventario, borra ventas y clientes, regulariza y maneja pagos. No toca equipo ni facturación." },
+  { label: "Vendedor", desc: "El día a día: crea ventas y cobra, crea y edita clientes y leads, registra caja. No ve costos, no edita precios ni borra." },
+  { label: "Solo lectura", desc: "Ve la información del negocio pero no puede crear ni editar nada." },
 ];
 
 export function CloudTeamSection() {
@@ -309,6 +317,24 @@ El código vence en ${accessCodeModal.expiresInMin} minutos.`;
           </div>
         </form>
       )}
+
+      {/* Leyenda de roles — qué puede hacer cada uno */}
+      <div style={{ ...cardStyle, marginBottom: 16 }}>
+        <div style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text, marginBottom: 10 }}>
+          ¿Qué puede hacer cada rol?
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {ROLE_LEGEND.map((r) => (
+            <div key={r.label} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <ShieldCheck size={15} color={color.primary} style={{ marginTop: 2, flexShrink: 0 }} />
+              <div>
+                <span style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text }}>{r.label}</span>
+                <span style={{ fontSize: text.xs, color: color.textDim }}> — {r.desc}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Lista miembros */}
       {loading && members === null && (

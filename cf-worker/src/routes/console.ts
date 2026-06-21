@@ -25,22 +25,9 @@ import { getRoleInWorkspace, json } from "./_generic";
 import { requirePerm } from "../permissions";
 import { PLAN_CONFIG } from "./billing";
 import { unlockCatalog } from "../catalog";
+import { generateCode } from "../codes";
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
-
-/** Alfabeto sin caracteres ambiguos (0/O, 1/I/L) para códigos legibles. */
-const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-
-/** Genera "CLOZR-XXXX-XXXX" con entropía de crypto. */
-function generateCode(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(8));
-  let s = "";
-  for (let i = 0; i < bytes.length; i++) {
-    s += CODE_ALPHABET[bytes[i]! % CODE_ALPHABET.length];
-    if (i === 3) s += "-";
-  }
-  return `CLOZR-${s}`;
-}
 
 /** Normaliza un código tipeado por el usuario: mayúsculas, sin espacios. */
 function normalizeCode(raw: string): string {

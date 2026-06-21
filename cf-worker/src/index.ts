@@ -119,6 +119,7 @@ import {
 import { runAiTriage } from "./cron/aiTriage";
 import { runPlanDowngrade } from "./cron/planDowngrade";
 import { runRepricing } from "./cron/reprice";
+import { runDunning } from "./cron/dunning";
 import { getBlueRate } from "./dolar";
 
 export default {
@@ -129,7 +130,15 @@ export default {
     // Dos jobs independientes en el mismo trigger diario. Cada uno con su catch
     // para que un fallo (o un reject) de uno no impida el otro.
     ctx.waitUntil(runAiTriage(env).catch((e) => console.error("[cron] ai-triage:", e)));
-    ctx.waitUntil(runPlanDowngrade(env).catch((e) => console.error("[cron] plan-downgrade:", e)));
+    // Dunning corre DESPUÉS de la degradación (encadenado, no en paralelo) para
+    // que los workspaces recién bajados a Free (dunning_stage = 3) reciban el
+    // win-back en la misma corrida.
+    ctx.waitUntil(
+      runPlanDowngrade(env)
+        .catch((e) => console.error("[cron] plan-downgrade:", e))
+        .then(() => runDunning(env))
+        .catch((e) => console.error("[cron] dunning:", e)),
+    );
     ctx.waitUntil(runRepricing(env).catch((e) => console.error("[cron] reprice:", e)));
   },
 
@@ -208,6 +217,17 @@ export default {
           return cors(req, env, json({ error: "unauthorized" }, 401));
         }
         const result = await runPlanDowngrade(env);
+        return cors(req, env, json({ ok: true, ...result }));
+      }
+
+      // ── Admin: disparar el ciclo de dunning/win-back a mano (testeo) ───
+      // Manda los mails de cobranza pendientes según dunning_stage. Mismo gate
+      // shared-secret (x-admin-secret) que el resto de /admin.
+      if (route === "POST /admin/dunning") {
+        if (!adminOk(req, env)) {
+          return cors(req, env, json({ error: "unauthorized" }, 401));
+        }
+        const result = await runDunning(env);
         return cors(req, env, json({ ok: true, ...result }));
       }
 

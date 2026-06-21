@@ -169,3 +169,134 @@ Si no tenés Clozr: https://github.com/manw3b/clozr/releases/latest
 
 Si no esperabas esta invitación, ignorá este email.`;
 }
+
+/* ── Dunning (recordatorios de pago) ─────────────────────────────────────
+ * Mails del ciclo de cobranza cuando una suscripción falla / se cancela, antes
+ * de degradar a Free. Los dispara el cron cron/dunning.ts. */
+
+const APP_URL = "https://clozr.online/app";
+
+export interface SendDunningOpts {
+  to: string;
+  workspaceName: string;
+  planLabel: string;
+  /** 'first' = aviso inicial (pago falló) · 'final' = último aviso (gracia por vencer). */
+  stage: "first" | "final";
+  /** Días que faltan para bajar a Free. */
+  daysLeft: number;
+  apiKey: string;
+  from: string;
+}
+
+export async function sendDunningEmail(opts: SendDunningOpts): Promise<void> {
+  const isFinal = opts.stage === "final";
+  const d = Math.max(0, Math.round(opts.daysLeft));
+  const diasTxt = d === 1 ? "1 día" : `${d} días`;
+  const subject = isFinal
+    ? `Te ${d === 1 ? "queda" : "quedan"} ${diasTxt} de tu plan ${opts.planLabel}`
+    : `Hubo un problema con tu pago de Clozr`;
+
+  const intro = isFinal
+    ? `Tu plan <strong>${escapeHtml(opts.planLabel)}</strong> de <strong>${escapeHtml(opts.workspaceName)}</strong> está por vencer. Si no regularizás el pago, en <strong>${escapeHtml(diasTxt)}</strong> el espacio vuelve al plan Free y perdés los asientos de tu equipo y las funciones del plan.`
+    : `No pudimos cobrar la renovación de tu plan <strong>${escapeHtml(opts.planLabel)}</strong> en <strong>${escapeHtml(opts.workspaceName)}</strong>. Tenés <strong>${escapeHtml(diasTxt)}</strong> para regularizarlo antes de que el espacio vuelva al plan Free.`;
+
+  const html = `<!doctype html>
+<html>
+<body style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; color: #1f2937;">
+  <h1 style="font-size: 22px; margin: 0 0 16px;">${escapeHtml(isFinal ? "Tu plan está por vencer" : "Tu pago no se procesó")}</h1>
+  <p style="font-size: 15px; line-height: 1.6; color: #374151;">${intro}</p>
+  <p style="margin: 24px 0 8px;">
+    <a href="${APP_URL}" style="display: inline-block; padding: 12px 22px; background: #ef4444; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">
+      Regularizar mi pago
+    </a>
+  </p>
+  <p style="font-size: 13px; color: #6b7280; line-height: 1.5; margin-top: 20px;">
+    Entrá a <strong>Ajustes → Plan y facturación</strong> y volvé a activar tu plan. Si ya lo regularizaste, ignorá este mensaje.
+  </p>
+  <p style="font-size: 12px; color: #9ca3af; margin-top: 28px;">Clozr · el CRM simple para tu negocio.</p>
+</body>
+</html>`;
+
+  const text = `${isFinal ? "Tu plan Clozr está por vencer" : "Tu pago de Clozr no se procesó"}
+
+${stripTags(intro)}
+
+Regularizá en: ${APP_URL} (Ajustes → Plan y facturación)
+
+Si ya lo regularizaste, ignorá este mensaje.`;
+
+  await sendViaResend(opts.apiKey, { from: opts.from, to: opts.to, subject, html, text });
+}
+
+/* ── Win-back (recuperación tras bajar a Free) ───────────────────────────── */
+
+export interface SendWinbackOpts {
+  to: string;
+  workspaceName: string;
+  /** Código de descuento de recuperación. */
+  code: string;
+  /** % de descuento del código. */
+  pct: number;
+  /** Días de validez del código. */
+  validDays: number;
+  apiKey: string;
+  from: string;
+}
+
+export async function sendWinbackEmail(opts: SendWinbackOpts): Promise<void> {
+  const subject = `Volvé a Clozr y llevate ${opts.pct}% off`;
+  const html = `<!doctype html>
+<html>
+<body style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; color: #1f2937;">
+  <h1 style="font-size: 22px; margin: 0 0 16px;">Te extrañamos 👋</h1>
+  <p style="font-size: 15px; line-height: 1.6; color: #374151;">
+    <strong>${escapeHtml(opts.workspaceName)}</strong> volvió al plan Free. Si querés retomar donde lo dejaste, te dejamos un
+    <strong>${opts.pct}% de descuento</strong> en tu próximo pago — válido por ${opts.validDays} días.
+  </p>
+  <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 24px; font-weight: 700; letter-spacing: 2px; padding: 16px 24px; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 10px; text-align: center; color: #111827; margin: 20px 0;">
+    ${escapeHtml(opts.code)}
+  </div>
+  <p style="margin: 8px 0 8px;">
+    <a href="${APP_URL}" style="display: inline-block; padding: 12px 22px; background: #ef4444; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">
+      Reactivar mi plan
+    </a>
+  </p>
+  <p style="font-size: 13px; color: #6b7280; line-height: 1.5; margin-top: 18px;">
+    Canjealo en <strong>Ajustes → Plan y facturación → ¿Tenés un código?</strong> y después mejorá tu plan.
+  </p>
+  <p style="font-size: 12px; color: #9ca3af; margin-top: 28px;">Clozr · el CRM simple para tu negocio.</p>
+</body>
+</html>`;
+
+  const text = `Te extrañamos.
+
+${opts.workspaceName} volvió al plan Free. Te dejamos un ${opts.pct}% de descuento en tu próximo pago (válido por ${opts.validDays} días):
+
+Código: ${opts.code}
+
+Canjealo en Ajustes → Plan y facturación → "¿Tenés un código?" y mejorá tu plan:
+${APP_URL}`;
+
+  await sendViaResend(opts.apiKey, { from: opts.from, to: opts.to, subject, html, text });
+}
+
+/** POST a Resend. Lanza si la respuesta no es OK (el caller decide qué hacer). */
+async function sendViaResend(
+  apiKey: string,
+  msg: { from: string; to: string; subject: string; html: string; text: string },
+): Promise<void> {
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+    body: JSON.stringify(msg),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`[resend] HTTP ${res.status}: ${body.slice(0, 300)}`);
+  }
+}
+
+/** Quita tags HTML para la versión texto plano (los intros traen <strong>). */
+function stripTags(s: string): string {
+  return s.replace(/<[^>]+>/g, "");
+}

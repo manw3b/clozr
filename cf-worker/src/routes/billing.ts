@@ -582,7 +582,8 @@ export async function handleBillingWebhook(req: Request, env: Env): Promise<Resp
       env,
       `UPDATE cloud_workspaces
          SET plan = ?, seats = ?, extra_seats = ?, billing_interval = ?, plan_status = 'active',
-             mp_preapproval_id = ?, plan_status_changed_at = NULL, updated_at = datetime('now')
+             mp_preapproval_id = ?, plan_status_changed_at = NULL, dunning_stage = 0,
+             updated_at = datetime('now')
          WHERE id = ?`,
       [plan, cfg.baseSeats + effectiveExtra, effectiveExtra, interval, dataId, wid],
     );

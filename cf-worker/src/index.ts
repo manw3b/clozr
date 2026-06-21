@@ -94,6 +94,7 @@ import {
 import {
   handleListSales, handleGetSale, handleCreateSale, handleUpdateSale,
   handleDeleteSale, handleAddPayment, handleImportSales, handleListSaleItems,
+  handleSendWarranty,
 } from "./routes/sales";
 import { handleListCatalogPrices, handleSetCatalogPrice } from "./routes/catalogPrices";
 import {
@@ -388,6 +389,7 @@ export default {
       }
       const wsSalesImportMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales\/import\/?$/);
       const wsSalePaymentMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales\/([^/]+)\/payments\/?$/);
+      const wsSaleWarrantyMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales\/([^/]+)\/warranty\/?$/);
       const wsSaleMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales(?:\/([^/]+))?\/?$/);
 
       if (wsSalesImportMatch && req.method === "POST") {
@@ -395,6 +397,9 @@ export default {
       }
       if (wsSalePaymentMatch && req.method === "POST") {
         return cors(req, env, await handleAddPayment(wsSalePaymentMatch[1]!, wsSalePaymentMatch[2]!, req, env));
+      }
+      if (wsSaleWarrantyMatch && req.method === "POST") {
+        return cors(req, env, await handleSendWarranty(wsSaleWarrantyMatch[1]!, wsSaleWarrantyMatch[2]!, req, env));
       }
       if (wsSaleMatch) {
         const wsId = wsSaleMatch[1]!;

@@ -23,6 +23,7 @@ import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, tursoTransaction, type TursoArg } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
 import { requirePerm } from "../permissions";
+import { sendWarrantyEmail } from "../email";
 
 const ROLES_READ = new Set(["owner", "admin", "vendedor", "viewer"]);
 
@@ -79,6 +80,47 @@ async function assertOwnsSale(
   if (!row) return json({ error: "not_found" }, 404);
   if (String(row.owner_id ?? "") !== userId) return json({ error: "forbidden" }, 403);
   return null;
+}
+
+/* ── POST garantía: envía el certificado por mail al cliente ─────────── */
+
+export async function handleSendWarranty(
+  workspaceId: string,
+  saleId: string,
+  req: Request,
+  env: Env,
+): Promise<Response> {
+  await ensureSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+  const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
+  if (!role || !new Set(["owner", "admin", "vendedor"]).has(role)) {
+    return json({ error: "forbidden" }, 403);
+  }
+  if (!env.RESEND_API_KEY || !env.RESEND_FROM) {
+    return json({ error: "email_not_configured" }, 503);
+  }
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const to = typeof body.to === "string" ? body.to.trim() : "";
+  const months = Number(body.months);
+  if (!to || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return json({ error: "invalid_email" }, 400);
+  if (!Number.isFinite(months) || months <= 0) return json({ error: "invalid_months" }, 400);
+  void saleId; // disponible por si más adelante guardamos la garantía en la venta
+  try {
+    await sendWarrantyEmail({
+      to,
+      customerName: typeof body.customerName === "string" && body.customerName.trim() ? body.customerName : "Cliente",
+      businessName: typeof body.businessName === "string" && body.businessName.trim() ? body.businessName : "tu compra",
+      items: typeof body.items === "string" ? body.items : "",
+      months,
+      startDate: typeof body.startDate === "string" ? body.startDate : "",
+      apiKey: env.RESEND_API_KEY,
+      from: env.RESEND_FROM,
+    });
+  } catch (e) {
+    return json({ error: "send_failed", detail: String(e).slice(0, 200) }, 502);
+  }
+  return json({ ok: true });
 }
 
 /* ── GET list (header only) ─────────────────────────────────────────── */

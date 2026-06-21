@@ -280,6 +280,59 @@ ${APP_URL}`;
   await sendViaResend(opts.apiKey, { from: opts.from, to: opts.to, subject, html, text });
 }
 
+/* ── Garantía (al cerrar una venta) ─────────────────────────────────────── */
+
+export interface SendWarrantyOpts {
+  to: string;
+  customerName: string;
+  businessName: string;
+  /** Resumen de lo comprado, ej. "iPhone 13 128GB Negro". */
+  items: string;
+  months: number;
+  /** Fecha de inicio (texto ya formateado, ej. "21/06/2026"). */
+  startDate: string;
+  apiKey: string;
+  from: string;
+}
+
+export async function sendWarrantyEmail(opts: SendWarrantyOpts): Promise<void> {
+  const meses = opts.months === 1 ? "1 mes" : `${opts.months} meses`;
+  const subject = `Garantía de tu compra — ${opts.businessName}`;
+  const itemsLine = opts.items
+    ? `<p style="font-size: 14px; color: #374151; margin: 0 0 4px;"><strong>Producto:</strong> ${escapeHtml(opts.items)}</p>`
+    : "";
+  const dateLine = opts.startDate
+    ? `<p style="font-size: 14px; color: #374151; margin: 0 0 4px;"><strong>Desde:</strong> ${escapeHtml(opts.startDate)}</p>`
+    : "";
+  const html = `<!doctype html>
+<html>
+<body style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; color: #1f2937;">
+  <div style="border: 1px solid #e5e7eb; border-radius: 14px; padding: 28px;">
+    <div style="font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: #9ca3af;">Certificado de garantía</div>
+    <h1 style="font-size: 22px; margin: 6px 0 4px;">${escapeHtml(opts.businessName)}</h1>
+    <p style="font-size: 15px; line-height: 1.5; color: #374151; margin: 14px 0 16px;">
+      Hola ${escapeHtml(opts.customerName)}, gracias por tu compra. Esta es tu garantía:
+    </p>
+    ${itemsLine}
+    ${dateLine}
+    <p style="font-size: 14px; color: #374151; margin: 0 0 16px;"><strong>Cobertura:</strong> ${escapeHtml(meses)}</p>
+    <div style="background: #f3f4f6; border-radius: 10px; padding: 14px 16px; font-size: 13px; color: #6b7280; line-height: 1.5;">
+      Conservá este correo como comprobante. Ante cualquier inconveniente cubierto por la garantía, contactanos respondiendo este mail.
+    </div>
+  </div>
+  <p style="font-size: 12px; color: #9ca3af; margin-top: 18px; text-align: center;">Enviado con Clozr</p>
+</body>
+</html>`;
+  const text = `Certificado de garantía — ${opts.businessName}
+
+Hola ${opts.customerName}, gracias por tu compra.
+${opts.items ? `Producto: ${opts.items}\n` : ""}${opts.startDate ? `Desde: ${opts.startDate}\n` : ""}Cobertura: ${meses}
+
+Conservá este correo como comprobante. Ante cualquier inconveniente cubierto por la garantía, respondé este mail.`;
+
+  await sendViaResend(opts.apiKey, { from: opts.from, to: opts.to, subject, html, text });
+}
+
 /** POST a Resend. Lanza si la respuesta no es OK (el caller decide qué hacer). */
 async function sendViaResend(
   apiKey: string,

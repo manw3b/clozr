@@ -142,11 +142,21 @@ export async function handleCreateStage(workspaceId: string, req: Request, env: 
 
   const cols = ["id", "workspace_id", ...Object.keys(fields)];
   const vals: TursoArg[] = [id, workspaceId, ...Object.values(fields)];
-  await tursoExec(
-    env,
-    `INSERT INTO pipeline_stages (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`,
-    vals,
-  );
+  try {
+    await tursoExec(
+      env,
+      `INSERT INTO pipeline_stages (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`,
+      vals,
+    );
+  } catch (e) {
+    // id de pipeline_stages es PK global: un id repetido (p.ej. semillas con
+    // ids fijos en otro workspace) choca. Devolvemos 409 en vez de 500.
+    const msg = e instanceof Error ? e.message.toLowerCase() : String(e);
+    if (msg.includes("unique") || msg.includes("primary key")) {
+      return json({ error: "duplicate_id", id }, 409);
+    }
+    throw e;
+  }
   return json({ ok: true, id }, 201);
 }
 

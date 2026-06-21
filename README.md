@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/banner.png" alt="Clozr — El sistema operativo para tu negocio" width="860">
+</p>
+
 # Clozr
 
 CRM de escritorio para emprendedores y pequeños negocios. Multi-empresa, multi-usuario,

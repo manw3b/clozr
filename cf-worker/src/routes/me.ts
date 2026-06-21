@@ -14,7 +14,7 @@
  */
 
 import type { Env } from "../index";
-import { ensureSchema, ensureWorkspaceColumns } from "../schema";
+import { ensureSchema, ensureWorkspaceColumns, ensureBillingSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { isSuperAdmin } from "../superadmin";
 import { tursoExec, tursoQuery } from "../turso";
@@ -45,6 +45,8 @@ interface WorkspaceForUser {
   plan_status: string;
   /** Crecimiento: intervalo de cobro ('monthly' | 'annual'). */
   billing_interval: string;
+  /** Crecimiento: si este espacio está cubierto por el plan de otro, su id. */
+  covered_by: string | null;
 }
 
 interface MeResponse {
@@ -65,6 +67,7 @@ interface MeResponse {
 export async function handleMe(req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
   await ensureWorkspaceColumns(env); // garantiza la columna icon antes del SELECT
+  await ensureBillingSchema(env); // garantiza covered_by_workspace_id / billing_interval
 
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
@@ -93,6 +96,7 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
                    w.logo_key, w.banner_key, w.icon, w.unlocked_catalogs,
                    w.discount_type, w.discount_value, w.discount_target,
                    w.plan, w.seats, w.plan_status, w.billing_interval,
+                   w.covered_by_workspace_id,
                    m.role, m.status
               FROM memberships m
               INNER JOIN cloud_workspaces w ON w.id = m.workspace_id
@@ -144,6 +148,7 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
       seats: Number(r.seats ?? 1),
       plan_status: String(r.plan_status ?? "active"),
       billing_interval: String(r.billing_interval ?? "monthly"),
+      covered_by: r.covered_by_workspace_id == null ? null : String(r.covered_by_workspace_id),
     })),
   };
   return json(body);

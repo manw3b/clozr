@@ -44,6 +44,9 @@ export const PLAN_CONFIG: Record<string, { usd: number; baseSeats: number; label
 /** Cada empleado extra (más allá de los incluidos en el plan) cuesta esto/mes. */
 export const EXTRA_SEAT_USD = 5;
 
+/** Cada espacio/sucursal adicional cubierto por el plan cuesta esto/mes. */
+export const ESPACIO_USD = 10;
+
 /** Anual = 10× el mensual → 2 meses gratis. */
 export const ANNUAL_MULTIPLIER = 10;
 
@@ -58,12 +61,42 @@ export function periodUsd(planUsd: number, extraSeats: number, interval: "monthl
   return interval === "annual" ? monthly * ANNUAL_MULTIPLIER : monthly;
 }
 
+/** USD a cobrar por período por los espacios adicionales cubiertos por el plan. */
+export function espaciosPeriodUsd(coveredCount: number, interval: "monthly" | "annual"): number {
+  const monthly = coveredCount * ESPACIO_USD;
+  return interval === "annual" ? monthly * ANNUAL_MULTIPLIER : monthly;
+}
+
+/** Cuántos espacios/sucursales cubre (paga) este workspace. */
+export async function countCoveredSpaces(env: Env, payerWorkspaceId: string): Promise<number> {
+  const row = await tursoFirst(
+    env,
+    `SELECT COUNT(*) AS n FROM cloud_workspaces WHERE covered_by_workspace_id = ?`,
+    [payerWorkspaceId],
+  );
+  return Number(row?.n ?? 0);
+}
+
+/** Texto descriptivo de la suscripción (reason de MP): plan + empleados + espacios. */
+export function billingReason(
+  cfg: { label: string },
+  extraSeats: number,
+  coveredSpaces: number,
+  interval: "monthly" | "annual",
+): string {
+  const parts = [cfg.label];
+  if (extraSeats > 0) parts.push(`${extraSeats} empleado(s)`);
+  if (coveredSpaces > 0) parts.push(`${coveredSpaces} espacio(s)`);
+  return `${parts.join(" + ")} (${interval === "annual" ? "anual" : "mensual"})`;
+}
+
 const TRIAL_DAYS = 14;
 
 /* ── POST /workspaces/:wid/billing/checkout ──────────────────────────── */
 
 export async function handleBillingCheckout(workspaceId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureBillingSchema(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
 
@@ -97,8 +130,10 @@ export async function handleBillingCheckout(workspaceId: string, req: Request, e
   if (!ws) return json({ error: "not_found" }, 404);
 
   // Precio en USD (fuente de verdad), por período (mensual/anual), con descuento
-  // del workspace si aplica, → ARS al blue del momento.
-  const baseUsd = periodUsd(cfg.usd, extraSeats, interval);
+  // del workspace si aplica, → ARS al blue del momento. Incluye los espacios
+  // adicionales que este workspace ya cubra (normalmente 0 en un alta nueva).
+  const covered = await countCoveredSpaces(env, workspaceId);
+  const baseUsd = periodUsd(cfg.usd, extraSeats, interval) + espaciosPeriodUsd(covered, interval);
   const totalUsd = await applyWorkspaceDiscount(env, workspaceId, baseUsd, "plan", plan);
   let amountArs: number;
   try {
@@ -108,9 +143,8 @@ export async function handleBillingCheckout(workspaceId: string, req: Request, e
     return json({ error: "exchange_unavailable" }, 503);
   }
 
-  const periodLabel = interval === "annual" ? "anual" : "mensual";
   const preapproval = {
-    reason: `${cfg.label}${extraSeats > 0 ? ` + ${extraSeats} empleado(s)` : ""} (${periodLabel})`,
+    reason: billingReason(cfg, extraSeats, covered, interval),
     external_reference: `${workspaceId}:${plan}:${extraSeats}:${interval}`,
     payer_email: auth.email,
     back_url: "https://clozr.online/app",
@@ -186,12 +220,14 @@ export async function handleUpdateSeats(workspaceId: string, req: Request, env: 
   if (!env.MP_ACCESS_TOKEN) return json({ error: "billing_unavailable" }, 503);
 
   const interval = normInterval(ws.billing_interval);
-  const baseUsd = periodUsd(cfg.usd, extra, interval);
+  // El monto sigue cubriendo los espacios adicionales que ya tenga el plan.
+  const covered = await countCoveredSpaces(env, workspaceId);
+  const baseUsd = periodUsd(cfg.usd, extra, interval) + espaciosPeriodUsd(covered, interval);
   const totalUsd = await applyWorkspaceDiscount(env, workspaceId, baseUsd, "plan", plan);
   let amountArs: number;
   try { amountArs = await usdToArs(totalUsd); } catch { return json({ error: "exchange_unavailable" }, 503); }
 
-  const reason = `${cfg.label}${extra > 0 ? ` + ${extra} empleado(s)` : ""} (${interval === "annual" ? "anual" : "mensual"})`;
+  const reason = billingReason(cfg, extra, covered, interval);
   let upd: { ok: boolean; status: number };
   try {
     upd = await updatePreapprovalAmount(env, preId, amountArs, reason);
@@ -211,6 +247,164 @@ export async function handleUpdateSeats(workspaceId: string, req: Request, env: 
     [extra, seats, workspaceId],
   );
   return json({ ok: true, seats, extra_seats: extra });
+}
+
+/* ── POST /workspaces/:wid/cover ──────────────────────────────────────────
+ * Suma un espacio/sucursal adicional (del MISMO dueño) al plan de :wid, que es
+ * el "principal" que paga. El espacio cubierto copia el plan del principal y NO
+ * paga aparte: el monto de la suscripción del principal sube ESPACIO_USD/mes.
+ * Mismo patrón que /billing/seats: actualiza el monto del preapproval en MP y,
+ * si MP lo acepta, persiste la cobertura. Si MP rechaza el cambio de monto,
+ * devuelve needs_recheckout (el front ofrece re-suscribir). Body: { target_workspace_id }. */
+export async function handleCoverSpace(payerWorkspaceId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  await ensureBillingSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+  const role = await getRoleInWorkspace(env, payerWorkspaceId, auth.userId);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "billing.manage");
+  if (denied) return denied;
+
+  let body: { target_workspace_id?: unknown };
+  try { body = (await req.json()) as { target_workspace_id?: unknown }; } catch { return json({ error: "invalid_body" }, 400); }
+  const targetId = typeof body.target_workspace_id === "string" ? body.target_workspace_id : "";
+  if (!targetId) return json({ error: "missing_target" }, 400);
+  if (targetId === payerWorkspaceId) return json({ error: "cannot_cover_self" }, 400);
+
+  // El principal: plan pago, activo, con suscripción MP propia, y NO cubierto él
+  // mismo (un espacio cubierto no puede cubrir a otros).
+  const payer = await tursoFirst(
+    env,
+    `SELECT plan, plan_status, mp_preapproval_id, billing_interval, extra_seats, owner_user_id, covered_by_workspace_id
+       FROM cloud_workspaces WHERE id = ?`,
+    [payerWorkspaceId],
+  );
+  if (!payer) return json({ error: "not_found" }, 404);
+  if (String(payer.owner_user_id ?? "") !== auth.userId) return json({ error: "forbidden" }, 403);
+  const plan = String(payer.plan ?? "free");
+  const cfg = PLAN_CONFIG[plan];
+  if (!cfg) return json({ error: "not_a_paid_plan" }, 409);
+  if (payer.plan_status !== "active") return json({ error: "plan_not_active" }, 409);
+  if (payer.covered_by_workspace_id) return json({ error: "payer_is_covered" }, 409);
+  const preId = payer.mp_preapproval_id ? String(payer.mp_preapproval_id) : "";
+  if (!preId) return json({ error: "no_subscription" }, 409);
+  if (!env.MP_ACCESS_TOKEN) return json({ error: "billing_unavailable" }, 503);
+
+  // El espacio a cubrir: del MISMO dueño, Free, y no cubierto ya por nadie.
+  const target = await tursoFirst(
+    env,
+    `SELECT plan, owner_user_id, covered_by_workspace_id FROM cloud_workspaces WHERE id = ?`,
+    [targetId],
+  );
+  if (!target) return json({ error: "target_not_found" }, 404);
+  if (String(target.owner_user_id ?? "") !== auth.userId) return json({ error: "target_not_owned" }, 403);
+  if (target.covered_by_workspace_id) return json({ error: "target_already_covered" }, 409);
+  if (PLAN_CONFIG[String(target.plan ?? "free")]) return json({ error: "target_is_paid" }, 409);
+
+  const interval = normInterval(payer.billing_interval);
+  const extra = Number(payer.extra_seats ?? 0);
+  const newCovered = (await countCoveredSpaces(env, payerWorkspaceId)) + 1;
+  const baseUsd = periodUsd(cfg.usd, extra, interval) + espaciosPeriodUsd(newCovered, interval);
+  const totalUsd = await applyWorkspaceDiscount(env, payerWorkspaceId, baseUsd, "plan", plan);
+  let amountArs: number;
+  try { amountArs = await usdToArs(totalUsd); } catch { return json({ error: "exchange_unavailable" }, 503); }
+
+  let upd: { ok: boolean; status: number };
+  try {
+    upd = await updatePreapprovalAmount(env, preId, amountArs, billingReason(cfg, extra, newCovered, interval));
+  } catch (e) {
+    console.error("[billing] update preapproval (cover) falló:", e);
+    return json({ error: "billing_upstream" }, 502);
+  }
+  if (!upd.ok) {
+    console.warn("[billing] MP rechazó el update de monto (cover):", upd.status);
+    return json({ error: "needs_recheckout", status: upd.status }, 409);
+  }
+
+  // Cubrir: el espacio copia el plan del principal (asientos base, sin extras ni
+  // suscripción propia) y queda apuntando al pagador. Limpia cualquier
+  // licencia/gracia previa.
+  await tursoExec(
+    env,
+    `UPDATE cloud_workspaces
+        SET plan = ?, seats = ?, extra_seats = 0, plan_status = 'active',
+            billing_interval = ?, covered_by_workspace_id = ?,
+            mp_preapproval_id = NULL, license_expires_at = NULL,
+            plan_status_changed_at = NULL, updated_at = datetime('now')
+      WHERE id = ?`,
+    [plan, cfg.baseSeats, interval, payerWorkspaceId, targetId],
+  );
+  return json({ ok: true, covered: newCovered, plan });
+}
+
+/* ── POST /workspaces/:wid/uncover ────────────────────────────────────────
+ * Quita un espacio cubierto del plan del principal :wid. El espacio vuelve a
+ * Free y el monto del principal baja ESPACIO_USD/mes. La baja del monto en MP es
+ * best-effort: aunque MP la rechace, liberamos el espacio igual (bajar el monto
+ * nunca requiere re-autorización, y el re-pricing diario corrige cualquier
+ * desfasaje). Body: { target_workspace_id }. */
+export async function handleUncoverSpace(payerWorkspaceId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  await ensureBillingSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+  const role = await getRoleInWorkspace(env, payerWorkspaceId, auth.userId);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "billing.manage");
+  if (denied) return denied;
+
+  let body: { target_workspace_id?: unknown };
+  try { body = (await req.json()) as { target_workspace_id?: unknown }; } catch { return json({ error: "invalid_body" }, 400); }
+  const targetId = typeof body.target_workspace_id === "string" ? body.target_workspace_id : "";
+  if (!targetId) return json({ error: "missing_target" }, 400);
+
+  const target = await tursoFirst(
+    env,
+    `SELECT covered_by_workspace_id FROM cloud_workspaces WHERE id = ?`,
+    [targetId],
+  );
+  if (!target) return json({ error: "target_not_found" }, 404);
+  if (String(target.covered_by_workspace_id ?? "") !== payerWorkspaceId) {
+    return json({ error: "not_covered_by_this_workspace" }, 409);
+  }
+
+  // Liberar el espacio → Free. Lo hacemos SIEMPRE (aunque el ajuste de monto en
+  // MP falle): deja de estar cubierto y el monto del principal lo corrige el
+  // re-pricing si hiciera falta.
+  await tursoExec(
+    env,
+    `UPDATE cloud_workspaces
+        SET plan = 'free', seats = 1, extra_seats = 0, plan_status = 'active',
+            covered_by_workspace_id = NULL, mp_preapproval_id = NULL,
+            updated_at = datetime('now')
+      WHERE id = ?`,
+    [targetId],
+  );
+
+  // Bajar el monto del principal (best-effort).
+  const payer = await tursoFirst(
+    env,
+    `SELECT plan, plan_status, mp_preapproval_id, billing_interval, extra_seats FROM cloud_workspaces WHERE id = ?`,
+    [payerWorkspaceId],
+  );
+  const plan = String(payer?.plan ?? "free");
+  const cfg = PLAN_CONFIG[plan];
+  const preId = payer?.mp_preapproval_id ? String(payer.mp_preapproval_id) : "";
+  if (cfg && preId && payer?.plan_status === "active" && env.MP_ACCESS_TOKEN) {
+    const interval = normInterval(payer.billing_interval);
+    const extra = Number(payer.extra_seats ?? 0);
+    const covered = await countCoveredSpaces(env, payerWorkspaceId);
+    const baseUsd = periodUsd(cfg.usd, extra, interval) + espaciosPeriodUsd(covered, interval);
+    try {
+      const totalUsd = await applyWorkspaceDiscount(env, payerWorkspaceId, baseUsd, "plan", plan);
+      const amountArs = await usdToArs(totalUsd);
+      await updatePreapprovalAmount(env, preId, amountArs, billingReason(cfg, extra, covered, interval));
+    } catch (e) {
+      console.warn("[billing] no pude bajar el monto al descubrir un espacio (no-fatal):", e);
+    }
+  }
+  return json({ ok: true });
 }
 
 /* ── POST /workspaces/:wid/catalog/checkout ──────────────────────────────

@@ -19,7 +19,7 @@
  */
 
 import type { Env } from "../index";
-import { ensureSchema } from "../schema";
+import { ensureSchema, ensureBillingSchema } from "../schema";
 import { tursoQuery, tursoExec } from "../turso";
 
 /** Días de gracia tras cancelado/past_due antes de bajar a Free. */
@@ -32,11 +32,14 @@ export interface DowngradeResult {
   downgraded: number;
   /** Workspaces bajados a Free por vencimiento de licencia gratuita (Consola). */
   licensesExpired: number;
+  /** Espacios cubiertos liberados a Free porque su principal dejó de pagar. */
+  coverageReleased: number;
 }
 
 /** Punto de entrada — lo llaman el handler `scheduled` y el trigger manual. */
 export async function runPlanDowngrade(env: Env): Promise<DowngradeResult> {
   await ensureSchema(env);
+  await ensureBillingSchema(env); // garantiza covered_by_workspace_id / extra_seats
 
   // Workspaces pagos cuya suscripción está cancelada/en mora y cuyo período de
   // gracia ya venció. plan_status_changed_at NULL ⇒ sin reloj corriendo (no se
@@ -118,7 +121,44 @@ export async function runPlanDowngrade(env: Env): Promise<DowngradeResult> {
     console.error("[plan-downgrade] barrido de licencias falló (no-fatal):", err);
   }
 
+  // ── Cascada de espacios cubiertos (sucursales adicionales) ─────────────
+  // Un espacio cubierto copia el plan del "principal" que lo paga. Si el
+  // principal ya cayó a Free (por los barridos de arriba, en esta misma corrida)
+  // o ya no existe, liberamos el espacio cubierto a Free también. Corre AL FINAL
+  // para ver a los principales ya degradados. NO-fatal.
+  let coverageReleased = 0;
+  try {
+    const [orphanRows] = await tursoQuery(env, {
+      sql: `SELECT c.id AS id FROM cloud_workspaces c
+              WHERE c.covered_by_workspace_id IS NOT NULL
+                AND NOT EXISTS (
+                  SELECT 1 FROM cloud_workspaces p
+                    WHERE p.id = c.covered_by_workspace_id AND p.plan != 'free'
+                )`,
+    });
+    for (const w of orphanRows ?? []) {
+      const wid = String(w.id);
+      try {
+        await tursoExec(
+          env,
+          `UPDATE cloud_workspaces
+              SET plan = 'free', seats = 1, extra_seats = 0, plan_status = 'active',
+                  covered_by_workspace_id = NULL, mp_preapproval_id = NULL,
+                  license_expires_at = NULL, plan_status_changed_at = NULL,
+                  updated_at = datetime('now')
+            WHERE id = ? AND covered_by_workspace_id IS NOT NULL`,
+          [wid],
+        );
+        coverageReleased++;
+      } catch (err) {
+        console.error(`[plan-downgrade] liberar espacio cubierto ${wid} falló:`, err);
+      }
+    }
+  } catch (err) {
+    console.error("[plan-downgrade] barrido de espacios cubiertos falló (no-fatal):", err);
+  }
+
   const eligible = (rows ?? []).length;
-  console.log(`[plan-downgrade] listo: ${eligible} elegibles, ${downgraded} degradados a Free, ${licensesExpired} licencias vencidas`);
-  return { eligible, downgraded, licensesExpired };
+  console.log(`[plan-downgrade] listo: ${eligible} elegibles, ${downgraded} degradados a Free, ${licensesExpired} licencias vencidas, ${coverageReleased} espacios liberados`);
+  return { eligible, downgraded, licensesExpired, coverageReleased };
 }

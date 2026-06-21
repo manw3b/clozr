@@ -21,7 +21,10 @@ import { ensureSchema, ensureBillingSchema } from "../schema";
 import { tursoQuery } from "../turso";
 import { getBlueRate } from "../dolar";
 import { applyWorkspaceDiscount } from "../discounts";
-import { PLAN_CONFIG, periodUsd, normInterval, updatePreapprovalAmount } from "../routes/billing";
+import {
+  PLAN_CONFIG, periodUsd, espaciosPeriodUsd, normInterval,
+  countCoveredSpaces, billingReason, updatePreapprovalAmount,
+} from "../routes/billing";
 
 /** Umbral de desvío para re-precificar (5%). Evita updates por cambios chicos. */
 const DRIFT_THRESHOLD = 0.05;
@@ -71,7 +74,10 @@ export async function runRepricing(env: Env): Promise<RepriceResult> {
     const extra = w.extra_seats != null
       ? Number(w.extra_seats)
       : Math.max(0, Number(w.seats ?? cfg.baseSeats) - cfg.baseSeats);
-    const baseUsd = periodUsd(cfg.usd, extra, normInterval(w.billing_interval));
+    const interval = normInterval(w.billing_interval);
+    // Espacios/sucursales adicionales que este plan cubre (se suman al monto).
+    const covered = await countCoveredSpaces(env, String(w.id));
+    const baseUsd = periodUsd(cfg.usd, extra, interval) + espaciosPeriodUsd(covered, interval);
     // Re-aplicamos el descuento del workspace (si lo tiene) para no "perderlo"
     // al re-precificar.
     const effUsd = await applyWorkspaceDiscount(env, String(w.id), baseUsd, "plan", plan);
@@ -99,7 +105,7 @@ export async function runRepricing(env: Env): Promise<RepriceResult> {
         result.skipped++;
         continue;
       }
-      const reason = extra > 0 ? `${cfg.label} + ${extra} empleado(s)` : cfg.label;
+      const reason = billingReason(cfg, extra, covered, interval);
       const upd = await updatePreapprovalAmount(env, preId, targetArs, reason);
       if (upd.ok) result.updated++;
       else result.failed++;

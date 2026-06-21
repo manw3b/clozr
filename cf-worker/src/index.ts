@@ -108,7 +108,10 @@ import {
   handleCloseCashSession,
 } from "./routes/cash-sessions";
 import { handleClientError } from "./routes/errors";
-import { handleBillingCheckout, handleBillingWebhook, handleUpdateSeats, handleCatalogCheckout } from "./routes/billing";
+import {
+  handleBillingCheckout, handleBillingWebhook, handleUpdateSeats, handleCatalogCheckout,
+  handleCoverSpace, handleUncoverSpace,
+} from "./routes/billing";
 import {
   handleListCodes, handleCreateCode, handleUpdateCode, handleRedeemCode,
   handleListConsoleWorkspaces, handleGetReferralCode,
@@ -413,6 +416,17 @@ export default {
       const wsReferralMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/referral\/?$/);
       if (wsReferralMatch && req.method === "POST") {
         return cors(req, env, await handleGetReferralCode(wsReferralMatch[1]!, req, env));
+      }
+
+      // Espacios/sucursales — sumar/quitar un espacio cubierto al plan del
+      // principal (:wid es el que paga; el target va en el body).
+      const wsCoverMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/cover\/?$/);
+      if (wsCoverMatch && req.method === "POST") {
+        return cors(req, env, await handleCoverSpace(wsCoverMatch[1]!, req, env));
+      }
+      const wsUncoverMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/uncover\/?$/);
+      if (wsUncoverMatch && req.method === "POST") {
+        return cors(req, env, await handleUncoverSpace(wsUncoverMatch[1]!, req, env));
       }
 
       // G/A4 — PATCH workspace (daily_goal, industry, name, etc).

@@ -942,6 +942,12 @@ export async function ensureBillingSchema(env: Env): Promise<void> {
   // Crecimiento: intervalo de cobro ('monthly' | 'annual'). El anual = 10×
   // mensual (2 meses gratis); lo leen checkout, seats y el re-pricing.
   await safeAddColumn(env, "cloud_workspaces", "billing_interval", "TEXT DEFAULT 'monthly'");
+  // Crecimiento (espacios/sucursales adicionales): si este workspace está
+  // cubierto por el plan de OTRO (el "principal" que paga), guardamos acá el id
+  // del pagador. NULL = espacio independiente (paga su propio plan o es Free).
+  // El espacio cubierto copia el plan del principal y suma ESPACIO_USD/mes a esa
+  // única suscripción (ver routes/billing.ts cover/uncover + cron de degradación).
+  await safeAddColumn(env, "cloud_workspaces", "covered_by_workspace_id", "TEXT");
   billingSchemaReady = true;
 }
 

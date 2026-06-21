@@ -108,6 +108,7 @@ import { handleClientError } from "./routes/errors";
 import { handleBillingCheckout, handleBillingWebhook } from "./routes/billing";
 import {
   handleListCodes, handleCreateCode, handleUpdateCode, handleRedeemCode,
+  handleListConsoleWorkspaces,
 } from "./routes/console";
 import { runAiTriage } from "./cron/aiTriage";
 import { runPlanDowngrade } from "./cron/planDowngrade";
@@ -204,7 +205,11 @@ export default {
         return cors(req, env, json({ ok: true, ...result }));
       }
 
-      // ── Consola Clozr (super-admin) — códigos canjeables ──────────
+      // ── Consola Clozr (super-admin) ───────────────────────────────
+      // GET /console/workspaces (panel de cuentas).
+      if (url.pathname === "/console/workspaces" && req.method === "GET") {
+        return cors(req, env, await handleListConsoleWorkspaces(req, env));
+      }
       // GET/POST /console/codes ; PATCH /console/codes/:id. El gate
       // super-admin (por email) se chequea dentro de cada handler.
       const consoleCodeMatch = url.pathname.match(/^\/console\/codes(?:\/([^/]+))?\/?$/);

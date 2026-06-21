@@ -83,12 +83,16 @@ export async function runPlanDowngrade(env: Env): Promise<DowngradeResult> {
   // la degradación por billing MP de arriba ya corrió.
   let licensesExpired = 0;
   try {
+    // datetime(license_expires_at): normaliza el formato (puede venir en ISO con
+    // T/Z desde toISOString() o como fecha del admin) para comparar contra
+    // datetime('now'). Si el valor es inválido, datetime() da NULL y la fila
+    // queda excluida (no se degrada por error).
     const [licRows] = await tursoQuery(env, {
       sql: `SELECT id FROM cloud_workspaces
               WHERE plan != 'free'
                 AND mp_preapproval_id IS NULL
                 AND license_expires_at IS NOT NULL
-                AND license_expires_at <= datetime('now')`,
+                AND datetime(license_expires_at) <= datetime('now')`,
     });
     for (const w of licRows ?? []) {
       const wid = String(w.id);
@@ -102,7 +106,7 @@ export async function runPlanDowngrade(env: Env): Promise<DowngradeResult> {
               AND plan != 'free'
               AND mp_preapproval_id IS NULL
               AND license_expires_at IS NOT NULL
-              AND license_expires_at <= datetime('now')`,
+              AND datetime(license_expires_at) <= datetime('now')`,
           [wid],
         );
         licensesExpired++;

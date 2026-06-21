@@ -206,8 +206,39 @@ export async function handleUpdateCode(codeId: string, req: Request, env: Env): 
   return json({ ok: true });
 }
 
-/* ── POST /workspaces/:wid/redeem-code ───────────────────────────────── */
+/* ── GET /console/workspaces ─────────────────────────────────────────── */
 
+/**
+ * Panel de cuentas: todos los workspaces de la plataforma con su dueño
+ * (contacto), plan, estado, # de miembros y fecha de creación. Distingue
+ * pago real (mp_preapproval_id) de licencia gratis (license_expires_at).
+ */
+export async function handleListConsoleWorkspaces(req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  const gate = await requireSuperAdmin(req, env);
+  if (gate instanceof Response) return gate;
+  // Garantiza la columna license_expires_at (la agrega ensureConsoleSchema).
+  await ensureConsoleSchema(env);
+
+  const [rows, userCountRows] = await tursoQuery(
+    env,
+    {
+      sql: `SELECT w.id, w.name, w.plan, w.seats, w.plan_status, w.created_at,
+                   w.license_expires_at, w.mp_preapproval_id,
+                   u.email AS owner_email, u.name AS owner_name,
+                   (SELECT COUNT(*) FROM memberships m
+                      WHERE m.workspace_id = w.id AND m.status = 'active') AS member_count
+              FROM cloud_workspaces w
+              LEFT JOIN users u ON u.id = w.owner_user_id
+             ORDER BY w.created_at DESC`,
+    },
+    { sql: `SELECT COUNT(*) AS n FROM users` },
+  );
+
+  return json({ items: rows ?? [], total_users: Number(userCountRows?.[0]?.n ?? 0) });
+}
+
+/* ── POST /workspaces/:wid/redeem-code ───────────────────────────────── */
 export async function handleRedeemCode(workspaceId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
   const auth = await requireAuth(req, env);

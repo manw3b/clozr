@@ -27,6 +27,7 @@ import { ensureSchema, ensureBillingSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst } from "../turso";
 import { usdToArs } from "../dolar";
+import { CATALOG_PACKS, unlockCatalog } from "../catalog";
 import { getRoleInWorkspace, json } from "./_generic";
 import { requirePerm } from "../permissions";
 
@@ -191,6 +192,61 @@ export async function handleUpdateSeats(workspaceId: string, req: Request, env: 
   return json({ ok: true, seats, extra_seats: extra });
 }
 
+/* ── POST /workspaces/:wid/catalog/checkout ──────────────────────────────
+ * Pago ÚNICO (no suscripción) para desbloquear un catálogo premium. Crea una
+ * preference de Checkout Pro (USD→ARS al blue) y devuelve init_point. El
+ * desbloqueo lo confirma el webhook de pago (type 'payment'). */
+export async function handleCatalogCheckout(workspaceId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+  const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "billing.manage");
+  if (denied) return denied;
+
+  let body: { catalog?: unknown };
+  try { body = (await req.json()) as { catalog?: unknown }; } catch { return json({ error: "invalid_body" }, 400); }
+  const catalog = typeof body.catalog === "string" ? body.catalog : "";
+  const pack = CATALOG_PACKS[catalog];
+  if (!pack) return json({ error: "invalid_catalog", allowed: Object.keys(CATALOG_PACKS) }, 400);
+
+  if (!env.MP_ACCESS_TOKEN) return json({ error: "billing_unavailable" }, 503);
+
+  let amountArs: number;
+  try { amountArs = await usdToArs(pack.usd); } catch { return json({ error: "exchange_unavailable" }, 503); }
+
+  const preference = {
+    items: [{ title: pack.label, quantity: 1, unit_price: amountArs, currency_id: "ARS" }],
+    external_reference: `catalog:${workspaceId}:${catalog}`,
+    payer: { email: auth.email },
+    back_urls: {
+      success: "https://clozr.online/app",
+      pending: "https://clozr.online/app",
+      failure: "https://clozr.online/app",
+    },
+    auto_return: "approved",
+  };
+
+  let mpRes: Response;
+  try {
+    mpRes = await fetch(`${MP_API}/checkout/preferences`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${env.MP_ACCESS_TOKEN}`, "content-type": "application/json" },
+      body: JSON.stringify(preference),
+    });
+  } catch (e) {
+    console.error("[catalog] fetch preference falló:", e);
+    return json({ error: "billing_upstream" }, 502);
+  }
+  const data = (await mpRes.json().catch(() => null)) as { init_point?: string; id?: string } | null;
+  if (!mpRes.ok || !data?.init_point) {
+    console.error("[catalog] MP rechazó la preference:", mpRes.status);
+    return json({ error: "billing_upstream", status: mpRes.status }, 502);
+  }
+  return json({ init_point: data.init_point });
+}
+
 /* ── POST /billing/webhook ───────────────────────────────────────────── */
 
 export async function handleBillingWebhook(req: Request, env: Env): Promise<Response> {
@@ -205,10 +261,6 @@ export async function handleBillingWebhook(req: Request, env: Env): Promise<Resp
   try { parsed = (await req.json()) as typeof parsed; } catch { /* puede venir vacío */ }
 
   const type = parsed.type ?? parsed.topic ?? url.searchParams.get("type") ?? url.searchParams.get("topic") ?? "";
-  // Solo nos interesan eventos de suscripción (preapproval).
-  if (type && !/preapproval/i.test(type)) {
-    return json({ ok: true, ignored: type });
-  }
 
   const dataId =
     parsed.data?.id ??
@@ -224,8 +276,36 @@ export async function handleBillingWebhook(req: Request, env: Env): Promise<Resp
   }
 
   if (!env.MP_ACCESS_TOKEN) {
-    console.error("[billing] webhook sin MP_ACCESS_TOKEN — no puedo consultar el preapproval");
+    console.error("[billing] webhook sin MP_ACCESS_TOKEN — no puedo consultar MP");
     return json({ ok: true, skipped: "no_token" });
+  }
+
+  // Pago ÚNICO (catálogo premium, F4): type 'payment'. Traemos el pago; si está
+  // aprobado y su external_reference es "catalog:wid:key", desbloqueamos.
+  if (/payment/i.test(type)) {
+    let payRes: Response;
+    try {
+      payRes = await fetch(`${MP_API}/v1/payments/${encodeURIComponent(dataId)}`, {
+        headers: { authorization: `Bearer ${env.MP_ACCESS_TOKEN}` },
+      });
+    } catch (e) {
+      console.error("[catalog] fetch payment (webhook) falló:", e);
+      return json({ ok: true, retry_later: true });
+    }
+    const pay = (await payRes.json().catch(() => null)) as { status?: string; external_reference?: string } | null;
+    if (!payRes.ok || !pay) return json({ ok: true, retry_later: true });
+    if (pay.status !== "approved") return json({ ok: true, payment_status: pay.status ?? "unknown" });
+    const parts = (pay.external_reference ?? "").split(":");
+    if (parts[0] !== "catalog" || !parts[1] || !parts[2]) {
+      return json({ ok: true, ignored: "bad_reference" });
+    }
+    await unlockCatalog(env, parts[1], parts[2]);
+    return json({ ok: true, unlocked: parts[2], workspace: parts[1] });
+  }
+
+  // Suscripciones (preapproval). Otros tipos → ignorar.
+  if (!/preapproval/i.test(type)) {
+    return json({ ok: true, ignored: type });
   }
 
   // Traer el preapproval real desde MP (no confiamos en el body del webhook

@@ -105,7 +105,7 @@ import {
   handleCloseCashSession,
 } from "./routes/cash-sessions";
 import { handleClientError } from "./routes/errors";
-import { handleBillingCheckout, handleBillingWebhook, handleUpdateSeats } from "./routes/billing";
+import { handleBillingCheckout, handleBillingWebhook, handleUpdateSeats, handleCatalogCheckout } from "./routes/billing";
 import {
   handleListCodes, handleCreateCode, handleUpdateCode, handleRedeemCode,
   handleListConsoleWorkspaces,
@@ -357,6 +357,13 @@ export default {
       const wsBillingSeatsMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/billing\/seats\/?$/);
       if (wsBillingSeatsMatch && req.method === "POST") {
         return cors(req, env, await handleUpdateSeats(wsBillingSeatsMatch[1]!, req, env));
+      }
+
+      // F4 — pago único para desbloquear un catálogo premium. Va ANTES del
+      // dispatcher genérico de /catalog para no colisionar con /catalog/:id.
+      const wsCatalogCheckoutMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/catalog\/checkout\/?$/);
+      if (wsCatalogCheckoutMatch && req.method === "POST") {
+        return cors(req, env, await handleCatalogCheckout(wsCatalogCheckoutMatch[1]!, req, env));
       }
 
       // Consola Clozr — canje de código (lo pega el owner del workspace).

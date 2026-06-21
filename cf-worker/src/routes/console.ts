@@ -24,6 +24,7 @@ import { tursoQuery, tursoFirst, tursoExec, tursoTransaction, type TursoArg } fr
 import { getRoleInWorkspace, json } from "./_generic";
 import { requirePerm } from "../permissions";
 import { PLAN_CONFIG } from "./billing";
+import { unlockCatalog } from "../catalog";
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 
@@ -72,7 +73,7 @@ export async function handleListCodes(req: Request, env: Env): Promise<Response>
   await ensureConsoleSchema(env);
 
   const [rows] = await tursoQuery(env, {
-    sql: `SELECT id, code, kind, plan, duration_days, discount_type, discount_value,
+    sql: `SELECT id, code, kind, plan, duration_days, discount_type, discount_value, target,
                  max_uses, uses, expires_at, note, created_at, disabled_at
             FROM console_codes
            ORDER BY created_at DESC`,
@@ -91,8 +92,8 @@ export async function handleCreateCode(req: Request, env: Env): Promise<Response
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
 
-  const kind = body.kind === "license" || body.kind === "discount" ? body.kind : null;
-  if (!kind) return json({ error: "invalid_kind", allowed: ["license", "discount"] }, 400);
+  const kind = body.kind === "license" || body.kind === "discount" || body.kind === "unlock" ? body.kind : null;
+  if (!kind) return json({ error: "invalid_kind", allowed: ["license", "discount", "unlock"] }, 400);
 
   // Campos comunes opcionales.
   const maxUses = body.max_uses == null ? null : asPosInt(body.max_uses);
@@ -111,6 +112,7 @@ export async function handleCreateCode(req: Request, env: Env): Promise<Response
   let durationDays: number | null = null;
   let discountType: string | null = null;
   let discountValue: number | null = null;
+  let target: string | null = null;
 
   if (kind === "license") {
     plan = body.plan === "pro" || body.plan === "team" ? body.plan : null;
@@ -119,12 +121,18 @@ export async function handleCreateCode(req: Request, env: Env): Promise<Response
       durationDays = asPosInt(body.duration_days);
       if (durationDays == null) return json({ error: "invalid_duration_days" }, 400);
     }
-  } else {
+  } else if (kind === "discount") {
     discountType = body.discount_type === "percent" || body.discount_type === "amount" ? body.discount_type : null;
     if (!discountType) return json({ error: "invalid_discount_type", allowed: ["percent", "amount"] }, 400);
     discountValue = asPosInt(body.discount_value);
     if (discountValue == null) return json({ error: "invalid_discount_value" }, 400);
     if (discountType === "percent" && discountValue > 100) return json({ error: "invalid_discount_value", max: 100 }, 400);
+  } else {
+    // unlock: target = "catalog:<key>" (ej "catalog:apple").
+    target = typeof body.target === "string" ? body.target.trim().toLowerCase() : "";
+    if (!/^catalog:[a-z0-9_-]+$/.test(target)) {
+      return json({ error: "invalid_target", hint: "catalog:<key>" }, 400);
+    }
   }
 
   // Código: el cliente puede sugerir uno (custom/vanity) o lo generamos.
@@ -137,9 +145,9 @@ export async function handleCreateCode(req: Request, env: Env): Promise<Response
       env,
       `INSERT INTO console_codes
          (id, code, kind, plan, duration_days, discount_type, discount_value,
-          max_uses, uses, expires_at, note, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, datetime('now'))`,
-      [id, code, kind, plan, durationDays, discountType, discountValue, maxUses, expiresAt, note, gate.userId],
+          target, max_uses, uses, expires_at, note, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, datetime('now'))`,
+      [id, code, kind, plan, durationDays, discountType, discountValue, target, maxUses, expiresAt, note, gate.userId],
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message.toLowerCase() : String(e);
@@ -153,7 +161,7 @@ export async function handleCreateCode(req: Request, env: Env): Promise<Response
     ok: true,
     code: {
       id, code, kind, plan, duration_days: durationDays,
-      discount_type: discountType, discount_value: discountValue,
+      discount_type: discountType, discount_value: discountValue, target,
       max_uses: maxUses, uses: 0, expires_at: expiresAt, note, disabled_at: null,
     },
   }, 201);
@@ -260,7 +268,7 @@ export async function handleRedeemCode(workspaceId: string, req: Request, env: E
 
   const row = await tursoFirst(
     env,
-    `SELECT id, code, kind, plan, duration_days, discount_type, discount_value,
+    `SELECT id, code, kind, plan, duration_days, discount_type, discount_value, target,
             max_uses, uses, expires_at, disabled_at
        FROM console_codes WHERE code = ?`,
     [code],
@@ -314,6 +322,30 @@ export async function handleRedeemCode(workspaceId: string, req: Request, env: E
     return json({
       ok: true, kind: "license", plan, seats: cfg.baseSeats, license_expires_at: licenseExpiresAt,
     });
+  }
+
+  if (kind === "unlock") {
+    // Desbloqueo de catálogo premium: target = "catalog:<key>".
+    const target = String(row.target ?? "");
+    const m = target.match(/^catalog:([a-z0-9_-]+)$/);
+    if (!m) return json({ error: "invalid_unlock_target" }, 422);
+    const catalogKey = m[1]!;
+    await unlockCatalog(env, workspaceId, catalogKey);
+    const redemptionId = crypto.randomUUID();
+    await tursoTransaction(
+      env,
+      {
+        sql: `UPDATE console_codes SET uses = uses + 1
+                WHERE id = ? AND (max_uses IS NULL OR uses < max_uses)`,
+        args: [codeId],
+      },
+      {
+        sql: `INSERT INTO console_code_redemptions (id, code_id, code, kind, workspace_id, user_id)
+              VALUES (?, ?, ?, 'unlock', ?, ?)`,
+        args: [redemptionId, codeId, code, workspaceId, auth.userId],
+      },
+    );
+    return json({ ok: true, kind: "unlock", target, catalog: catalogKey });
   }
 
   // Descuento: registramos el canje y devolvemos el beneficio. La aplicación

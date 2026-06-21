@@ -918,6 +918,9 @@ export async function ensureConsoleSchema(env: Env): Promise<void> {
   // handler de canje la tenga garantizada aunque la migración global se
   // hubiese salteado. safeAddColumn es idempotente (ignora duplicate column).
   await safeAddColumn(env, "cloud_workspaces", "license_expires_at", "TEXT");
+  // F4/F5: objetivo del código (ej "catalog:apple" para kind 'unlock', o el
+  // plan/función al que apunta un descuento). NULL para los códigos previos.
+  await safeAddColumn(env, "console_codes", "target", "TEXT");
   consoleSchemaReady = true;
 }
 
@@ -947,6 +950,8 @@ let workspaceColsReady = false;
 export async function ensureWorkspaceColumns(env: Env): Promise<void> {
   if (workspaceColsReady) return;
   await safeAddColumn(env, "cloud_workspaces", "icon", "TEXT");
+  // F4: catálogos premium desbloqueados (JSON array de keys, ej ["apple"]).
+  await safeAddColumn(env, "cloud_workspaces", "unlocked_catalogs", "TEXT");
   workspaceColsReady = true;
 }
 

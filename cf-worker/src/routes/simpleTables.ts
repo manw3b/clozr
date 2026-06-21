@@ -40,11 +40,14 @@ export const cashSpec: TableSpec = {
     "sale_id", "customer_name", "payment_method", "moved_at",
   ],
   required: ["kind", "amount"],
-  rolesRead: ALL_ROLES,
+  // Decisión de producto: la Caja (totales del negocio) la ven SOLO managers.
+  // El vendedor opera ventas — que generan movimientos vía la transacción de la
+  // venta (sales.write) — pero no ve los totales globales de caja.
+  rolesRead: MGMT_ROLES,
   rolesCreate: STAFF_ROLES,
   rolesEdit: MGMT_ROLES,   // Movimientos no se editan así nomás — solo admin/owner
   rolesDelete: MGMT_ROLES,
-  // Plan de equipos: /cash* → cash.write (owner/admin/vendedor).
+  // Plan de equipos: /cash* (escritura) → cash.write (owner/admin/vendedor).
   permission: "cash.write",
   orderBy: "moved_at DESC",
 };

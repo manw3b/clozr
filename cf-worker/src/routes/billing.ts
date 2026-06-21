@@ -179,24 +179,31 @@ export async function handleBillingWebhook(req: Request, env: Env): Promise<Resp
 
   if (planStatus === "active") {
     // Alta/renovación OK (incluye el período de trial: MP deja el preapproval
-    // en 'authorized'). Activamos el plan + asientos. Idempotente.
+    // en 'authorized'). Activamos el plan + asientos y limpiamos el reloj de
+    // gracia (plan_status_changed_at = NULL ⇒ sin degradación pendiente).
+    // Idempotente.
     await tursoExec(
       env,
       `UPDATE cloud_workspaces
-         SET plan = ?, seats = ?, plan_status = 'active', mp_preapproval_id = ?, updated_at = datetime('now')
+         SET plan = ?, seats = ?, plan_status = 'active', mp_preapproval_id = ?,
+             plan_status_changed_at = NULL, updated_at = datetime('now')
          WHERE id = ?`,
       [plan, cfg.seats, dataId, wid],
     );
   } else if (planStatus === "cancelled" || planStatus === "past_due") {
-    // Baja/pago atrasado: marcamos el estado pero NO bajamos plan/seats acá.
-    // La degradación a free tras el período de gracia (definir días con el
-    // usuario) queda como tarea aparte (cron). Idempotente.
+    // Baja/pago atrasado: marcamos el estado + el momento del cambio, pero NO
+    // bajamos plan/seats acá. El cron de degradación (cron/planDowngrade.ts)
+    // baja a Free pasados los días de gracia, contados desde
+    // plan_status_changed_at. Ese timestamp se setea SÓLO en la transición
+    // (CASE) para no reiniciar el reloj ante webhooks repetidos. Idempotente.
     await tursoExec(
       env,
       `UPDATE cloud_workspaces
-         SET plan_status = ?, mp_preapproval_id = ?, updated_at = datetime('now')
+         SET plan_status = ?, mp_preapproval_id = ?,
+             plan_status_changed_at = CASE WHEN plan_status != ? THEN datetime('now') ELSE plan_status_changed_at END,
+             updated_at = datetime('now')
          WHERE id = ?`,
-      [planStatus, dataId, wid],
+      [planStatus, dataId, planStatus, wid],
     );
   }
   // 'pending' u otros: no tocamos nada (esperamos el evento de autorización).

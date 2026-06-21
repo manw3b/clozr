@@ -104,13 +104,17 @@ import {
 import { handleClientError } from "./routes/errors";
 import { handleBillingCheckout, handleBillingWebhook } from "./routes/billing";
 import { runAiTriage } from "./cron/aiTriage";
+import { runPlanDowngrade } from "./cron/planDowngrade";
 
 export default {
   // ── Cron: AI Triage matutino (PoC) ───────────────────────────────────
   // Lo dispara Cloudflare según wrangler.toml [triggers]. ctx.waitUntil
   // mantiene vivo el isolate hasta que termina el barrido de workspaces.
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(runAiTriage(env));
+    // Dos jobs independientes en el mismo trigger diario. Cada uno con su catch
+    // para que un fallo (o un reject) de uno no impida el otro.
+    ctx.waitUntil(runAiTriage(env).catch((e) => console.error("[cron] ai-triage:", e)));
+    ctx.waitUntil(runPlanDowngrade(env).catch((e) => console.error("[cron] plan-downgrade:", e)));
   },
 
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -179,6 +183,18 @@ export default {
           return cors(req, env, json({ error: "unauthorized" }, 401));
         }
         const result = await runAiTriage(env);
+        return cors(req, env, json({ ok: true, ...result }));
+      }
+
+      // ── Admin: disparar la degradación de plan a mano (testeo) ─────
+      // Baja a Free los workspaces con la gracia vencida. Mismo gate
+      // shared-secret (x-admin-secret == JWT_SECRET) que /admin/ai-triage.
+      if (route === "POST /admin/plan-downgrade") {
+        const provided = req.headers.get("x-admin-secret");
+        if (!provided || provided !== env.JWT_SECRET) {
+          return cors(req, env, json({ error: "unauthorized" }, 401));
+        }
+        const result = await runPlanDowngrade(env);
         return cors(req, env, json({ ok: true, ...result }));
       }
 

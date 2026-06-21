@@ -28,7 +28,7 @@ let initPromise: Promise<void> | null = null;
  *
  * Bump cuando agregues un CREATE TABLE / ALTER TABLE / safeAddColumn.
  */
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 
 export function ensureSchema(env: Env): Promise<void> {
   if (!initPromise) {
@@ -819,6 +819,15 @@ async function applySchema(env: Env): Promise<void> {
   await safeAddColumn(env, "cloud_workspaces", "seats", "INTEGER DEFAULT 1");
   await safeAddColumn(env, "cloud_workspaces", "plan_status", "TEXT DEFAULT 'active'");
   await safeAddColumn(env, "cloud_workspaces", "mp_preapproval_id", "TEXT");
+
+  // ── 013 (plan equipos T3) — timestamp del cambio de estado de billing ──
+  //
+  // Marca CUÁNDO el workspace entró en 'cancelled'/'past_due'. El cron de
+  // degradación (cron/planDowngrade.ts) cuenta los días de gracia desde acá —
+  // no desde updated_at, que cambia por cualquier edición (logo, nombre, meta).
+  // El webhook lo setea sólo en la transición a un estado no-activo y lo limpia
+  // (NULL) al reactivar. NULL ⇒ sin degradación pendiente.
+  await safeAddColumn(env, "cloud_workspaces", "plan_status_changed_at", "TEXT");
 }
 
 /**

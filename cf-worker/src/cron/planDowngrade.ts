@@ -59,13 +59,14 @@ export async function runPlanDowngrade(env: Env): Promise<DowngradeResult> {
     try {
       // Re-chequeamos el estado en el WHERE: si un webhook reactivó el plan
       // entre el SELECT y este UPDATE, no lo bajamos. Limpia el reloj de gracia
-      // y suelta el preapproval (la suscripción ya no existe).
+      // y suelta el preapproval (la suscripción ya no existe). `dunning_stage = 3`
+      // marca "degradado, win-back pendiente" — lo levanta el cron de dunning.
       await tursoExec(
         env,
         `UPDATE cloud_workspaces
             SET plan = 'free', seats = 1, plan_status = 'active',
                 mp_preapproval_id = NULL, plan_status_changed_at = NULL,
-                updated_at = datetime('now')
+                dunning_stage = 3, updated_at = datetime('now')
           WHERE id = ?
             AND plan != 'free'
             AND plan_status IN ('cancelled', 'past_due')`,

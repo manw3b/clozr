@@ -948,6 +948,11 @@ export async function ensureBillingSchema(env: Env): Promise<void> {
   // El espacio cubierto copia el plan del principal y suma ESPACIO_USD/mes a esa
   // única suscripción (ver routes/billing.ts cover/uncover + cron de degradación).
   await safeAddColumn(env, "cloud_workspaces", "covered_by_workspace_id", "TEXT");
+  // Dunning / win-back: etapa del ciclo de cobranza enviada por mail.
+  //   0 = nada · 1 = aviso inicial (pago falló) · 2 = último aviso (gracia por
+  //   vencer) · 3 = degradado a Free, win-back pendiente · 4 = win-back enviado.
+  // El webhook la resetea a 0 al reactivarse; el cron de dunning la avanza.
+  await safeAddColumn(env, "cloud_workspaces", "dunning_stage", "INTEGER DEFAULT 0");
   billingSchemaReady = true;
 }
 

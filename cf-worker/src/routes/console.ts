@@ -297,7 +297,7 @@ export async function handleRedeemCode(workspaceId: string, req: Request, env: E
                      license_expires_at = ?, mp_preapproval_id = NULL,
                      plan_status_changed_at = NULL, updated_at = datetime('now')
                WHERE id = ?`,
-        args: [plan, cfg.seats, licenseExpiresAt, workspaceId],
+        args: [plan, cfg.baseSeats, licenseExpiresAt, workspaceId],
       },
       {
         sql: `UPDATE console_codes SET uses = uses + 1
@@ -312,7 +312,7 @@ export async function handleRedeemCode(workspaceId: string, req: Request, env: E
     );
 
     return json({
-      ok: true, kind: "license", plan, seats: cfg.seats, license_expires_at: licenseExpiresAt,
+      ok: true, kind: "license", plan, seats: cfg.baseSeats, license_expires_at: licenseExpiresAt,
     });
   }
 

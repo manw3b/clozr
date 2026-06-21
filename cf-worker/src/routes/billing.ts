@@ -26,16 +26,21 @@ import type { Env } from "../index";
 import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst } from "../turso";
+import { usdToArs } from "../dolar";
 import { getRoleInWorkspace, json } from "./_generic";
 import { requirePerm } from "../permissions";
 
 const MP_API = "https://api.mercadopago.com";
 
-/** plan → monto ARS/mes + asientos. Fuente de verdad del pricing del backend. */
-export const PLAN_CONFIG: Record<string, { amount: number; seats: number; label: string }> = {
-  pro: { amount: 25000, seats: 3, label: "Clozr Pro" },
-  team: { amount: 60000, seats: 9999, label: "Clozr Team" },
+/** plan → precio USD/mes + asientos base. Fuente de verdad del pricing.
+ *  Se cobra en ARS al dólar blue del momento (ver dolar.ts). */
+export const PLAN_CONFIG: Record<string, { usd: number; baseSeats: number; label: string }> = {
+  pro: { usd: 20, baseSeats: 2, label: "Clozr Pro" },
+  team: { usd: 45, baseSeats: 5, label: "Clozr Team" },
 };
+
+/** Cada empleado extra (más allá de los incluidos en el plan) cuesta esto/mes. */
+export const EXTRA_SEAT_USD = 5;
 
 const TRIAL_DAYS = 14;
 
@@ -56,25 +61,43 @@ export async function handleBillingCheckout(workspaceId: string, req: Request, e
     return json({ error: "billing_unavailable" }, 503);
   }
 
-  let body: { plan?: unknown };
-  try { body = (await req.json()) as { plan?: unknown }; } catch { return json({ error: "invalid_body" }, 400); }
+  let body: { plan?: unknown; extra_seats?: unknown };
+  try { body = (await req.json()) as { plan?: unknown; extra_seats?: unknown }; } catch { return json({ error: "invalid_body" }, 400); }
   const plan = typeof body.plan === "string" ? body.plan : "";
   const cfg = PLAN_CONFIG[plan];
   if (!cfg) return json({ error: "invalid_plan", allowed: Object.keys(PLAN_CONFIG) }, 400);
+
+  // Empleados extra (además de los incluidos en el plan): +EXTRA_SEAT_USD c/u.
+  let extraSeats = 0;
+  if (body.extra_seats != null) {
+    const n = Number(body.extra_seats);
+    if (!Number.isInteger(n) || n < 0 || n > 100) return json({ error: "invalid_extra_seats" }, 400);
+    extraSeats = n;
+  }
 
   // Confirmar que el workspace existe (y de paso traer su nombre no hace falta).
   const ws = await tursoFirst(env, `SELECT id FROM cloud_workspaces WHERE id = ?`, [workspaceId]);
   if (!ws) return json({ error: "not_found" }, 404);
 
+  // Precio en USD (fuente de verdad) → ARS al blue del momento.
+  const totalUsd = cfg.usd + extraSeats * EXTRA_SEAT_USD;
+  let amountArs: number;
+  try {
+    amountArs = await usdToArs(totalUsd);
+  } catch (e) {
+    console.error("[billing] no pude resolver la cotización del dólar:", e);
+    return json({ error: "exchange_unavailable" }, 503);
+  }
+
   const preapproval = {
-    reason: cfg.label,
-    external_reference: `${workspaceId}:${plan}`,
+    reason: extraSeats > 0 ? `${cfg.label} + ${extraSeats} empleado(s)` : cfg.label,
+    external_reference: `${workspaceId}:${plan}:${extraSeats}`,
     payer_email: auth.email,
     back_url: "https://clozr.online/app",
     auto_recurring: {
       frequency: 1,
       frequency_type: "months",
-      transaction_amount: cfg.amount,
+      transaction_amount: amountArs,
       currency_id: "ARS",
       free_trial: { frequency: TRIAL_DAYS, frequency_type: "days" },
     },
@@ -165,10 +188,13 @@ export async function handleBillingWebhook(req: Request, env: Env): Promise<Resp
     return json({ ok: true, retry_later: true });
   }
 
+  // external_reference = "wid:plan[:extraSeats]". El wid es un UUID (sin ':'),
+  // así que split directo. Las suscripciones viejas no traen extraSeats → 0.
   const ref = pre.external_reference ?? "";
-  const sep = ref.lastIndexOf(":");
-  const wid = sep > 0 ? ref.slice(0, sep) : ref;
-  const plan = sep > 0 ? ref.slice(sep + 1) : "";
+  const parts = ref.split(":");
+  const wid = parts[0] ?? "";
+  const plan = parts[1] ?? "";
+  const extraSeats = parts[2] != null ? Math.max(0, parseInt(parts[2], 10) || 0) : 0;
   const cfg = PLAN_CONFIG[plan];
   if (!wid || !cfg) {
     console.warn("[billing] external_reference inesperado:", ref);
@@ -188,7 +214,7 @@ export async function handleBillingWebhook(req: Request, env: Env): Promise<Resp
          SET plan = ?, seats = ?, plan_status = 'active', mp_preapproval_id = ?,
              plan_status_changed_at = NULL, updated_at = datetime('now')
          WHERE id = ?`,
-      [plan, cfg.seats, dataId, wid],
+      [plan, cfg.baseSeats + extraSeats, dataId, wid],
     );
   } else if (planStatus === "cancelled" || planStatus === "past_due") {
     // Baja/pago atrasado: marcamos el estado + el momento del cambio, pero NO

@@ -60,3 +60,7 @@ clientes-*.csv
 ventas-*.csv
 deudas-*.csv
 *.vcf
+
+# Artefactos de Next (este repo es Tauri/Vite; evita commits accidentales)
+.next/
+next-env.d.ts

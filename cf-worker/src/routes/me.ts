@@ -43,6 +43,8 @@ interface WorkspaceForUser {
   plan: string;
   seats: number;
   plan_status: string;
+  /** Crecimiento: intervalo de cobro ('monthly' | 'annual'). */
+  billing_interval: string;
 }
 
 interface MeResponse {
@@ -90,7 +92,7 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
       sql: `SELECT w.id, w.name, w.industry, w.daily_goal, w.daily_goal_currency, w.daily_goal_count,
                    w.logo_key, w.banner_key, w.icon, w.unlocked_catalogs,
                    w.discount_type, w.discount_value, w.discount_target,
-                   w.plan, w.seats, w.plan_status,
+                   w.plan, w.seats, w.plan_status, w.billing_interval,
                    m.role, m.status
               FROM memberships m
               INNER JOIN cloud_workspaces w ON w.id = m.workspace_id
@@ -141,6 +143,7 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
       plan: String(r.plan ?? "free"),
       seats: Number(r.seats ?? 1),
       plan_status: String(r.plan_status ?? "active"),
+      billing_interval: String(r.billing_interval ?? "monthly"),
     })),
   };
   return json(body);

@@ -936,6 +936,9 @@ let billingSchemaReady = false;
 export async function ensureBillingSchema(env: Env): Promise<void> {
   if (billingSchemaReady) return;
   await safeAddColumn(env, "cloud_workspaces", "extra_seats", "INTEGER DEFAULT 0");
+  // Crecimiento: intervalo de cobro ('monthly' | 'annual'). El anual = 10×
+  // mensual (2 meses gratis); lo leen checkout, seats y el re-pricing.
+  await safeAddColumn(env, "cloud_workspaces", "billing_interval", "TEXT DEFAULT 'monthly'");
   billingSchemaReady = true;
 }
 

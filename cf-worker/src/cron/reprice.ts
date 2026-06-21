@@ -21,7 +21,7 @@ import { ensureSchema, ensureBillingSchema } from "../schema";
 import { tursoQuery } from "../turso";
 import { getBlueRate } from "../dolar";
 import { applyWorkspaceDiscount } from "../discounts";
-import { PLAN_CONFIG, EXTRA_SEAT_USD, updatePreapprovalAmount } from "../routes/billing";
+import { PLAN_CONFIG, periodUsd, normInterval, updatePreapprovalAmount } from "../routes/billing";
 
 /** Umbral de desvío para re-precificar (5%). Evita updates por cambios chicos. */
 const DRIFT_THRESHOLD = 0.05;
@@ -53,7 +53,7 @@ export async function runRepricing(env: Env): Promise<RepriceResult> {
   }
 
   const [rows] = await tursoQuery(env, {
-    sql: `SELECT id, plan, seats, extra_seats, mp_preapproval_id
+    sql: `SELECT id, plan, seats, extra_seats, billing_interval, mp_preapproval_id
             FROM cloud_workspaces
            WHERE plan != 'free' AND plan_status = 'active' AND mp_preapproval_id IS NOT NULL`,
   });
@@ -71,7 +71,7 @@ export async function runRepricing(env: Env): Promise<RepriceResult> {
     const extra = w.extra_seats != null
       ? Number(w.extra_seats)
       : Math.max(0, Number(w.seats ?? cfg.baseSeats) - cfg.baseSeats);
-    const baseUsd = cfg.usd + extra * EXTRA_SEAT_USD;
+    const baseUsd = periodUsd(cfg.usd, extra, normInterval(w.billing_interval));
     // Re-aplicamos el descuento del workspace (si lo tiene) para no "perderlo"
     // al re-precificar.
     const effUsd = await applyWorkspaceDiscount(env, String(w.id), baseUsd, "plan", plan);

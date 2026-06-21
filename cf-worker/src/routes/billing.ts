@@ -44,6 +44,20 @@ export const PLAN_CONFIG: Record<string, { usd: number; baseSeats: number; label
 /** Cada empleado extra (más allá de los incluidos en el plan) cuesta esto/mes. */
 export const EXTRA_SEAT_USD = 5;
 
+/** Anual = 10× el mensual → 2 meses gratis. */
+export const ANNUAL_MULTIPLIER = 10;
+
+/** Normaliza el intervalo de cobro. */
+export function normInterval(v: unknown): "monthly" | "annual" {
+  return v === "annual" ? "annual" : "monthly";
+}
+
+/** USD a cobrar por período (mensual o anual) para un plan + empleados extra. */
+export function periodUsd(planUsd: number, extraSeats: number, interval: "monthly" | "annual"): number {
+  const monthly = planUsd + extraSeats * EXTRA_SEAT_USD;
+  return interval === "annual" ? monthly * ANNUAL_MULTIPLIER : monthly;
+}
+
 const TRIAL_DAYS = 14;
 
 /* ── POST /workspaces/:wid/billing/checkout ──────────────────────────── */
@@ -63,8 +77,8 @@ export async function handleBillingCheckout(workspaceId: string, req: Request, e
     return json({ error: "billing_unavailable" }, 503);
   }
 
-  let body: { plan?: unknown; extra_seats?: unknown };
-  try { body = (await req.json()) as { plan?: unknown; extra_seats?: unknown }; } catch { return json({ error: "invalid_body" }, 400); }
+  let body: { plan?: unknown; extra_seats?: unknown; interval?: unknown };
+  try { body = (await req.json()) as { plan?: unknown; extra_seats?: unknown; interval?: unknown }; } catch { return json({ error: "invalid_body" }, 400); }
   const plan = typeof body.plan === "string" ? body.plan : "";
   const cfg = PLAN_CONFIG[plan];
   if (!cfg) return json({ error: "invalid_plan", allowed: Object.keys(PLAN_CONFIG) }, 400);
@@ -76,14 +90,15 @@ export async function handleBillingCheckout(workspaceId: string, req: Request, e
     if (!Number.isInteger(n) || n < 0 || n > 100) return json({ error: "invalid_extra_seats" }, 400);
     extraSeats = n;
   }
+  const interval = normInterval(body.interval);
 
   // Confirmar que el workspace existe (y de paso traer su nombre no hace falta).
   const ws = await tursoFirst(env, `SELECT id FROM cloud_workspaces WHERE id = ?`, [workspaceId]);
   if (!ws) return json({ error: "not_found" }, 404);
 
-  // Precio en USD (fuente de verdad), con descuento del workspace si aplica,
-  // → ARS al blue del momento.
-  const baseUsd = cfg.usd + extraSeats * EXTRA_SEAT_USD;
+  // Precio en USD (fuente de verdad), por período (mensual/anual), con descuento
+  // del workspace si aplica, → ARS al blue del momento.
+  const baseUsd = periodUsd(cfg.usd, extraSeats, interval);
   const totalUsd = await applyWorkspaceDiscount(env, workspaceId, baseUsd, "plan", plan);
   let amountArs: number;
   try {
@@ -93,13 +108,14 @@ export async function handleBillingCheckout(workspaceId: string, req: Request, e
     return json({ error: "exchange_unavailable" }, 503);
   }
 
+  const periodLabel = interval === "annual" ? "anual" : "mensual";
   const preapproval = {
-    reason: extraSeats > 0 ? `${cfg.label} + ${extraSeats} empleado(s)` : cfg.label,
-    external_reference: `${workspaceId}:${plan}:${extraSeats}`,
+    reason: `${cfg.label}${extraSeats > 0 ? ` + ${extraSeats} empleado(s)` : ""} (${periodLabel})`,
+    external_reference: `${workspaceId}:${plan}:${extraSeats}:${interval}`,
     payer_email: auth.email,
     back_url: "https://clozr.online/app",
     auto_recurring: {
-      frequency: 1,
+      frequency: interval === "annual" ? 12 : 1,
       frequency_type: "months",
       transaction_amount: amountArs,
       currency_id: "ARS",
@@ -157,7 +173,7 @@ export async function handleUpdateSeats(workspaceId: string, req: Request, env: 
 
   const ws = await tursoFirst(
     env,
-    `SELECT plan, plan_status, mp_preapproval_id FROM cloud_workspaces WHERE id = ?`,
+    `SELECT plan, plan_status, mp_preapproval_id, billing_interval FROM cloud_workspaces WHERE id = ?`,
     [workspaceId],
   );
   if (!ws) return json({ error: "not_found" }, 404);
@@ -169,12 +185,13 @@ export async function handleUpdateSeats(workspaceId: string, req: Request, env: 
   if (!preId) return json({ error: "no_subscription" }, 409);
   if (!env.MP_ACCESS_TOKEN) return json({ error: "billing_unavailable" }, 503);
 
-  const baseUsd = cfg.usd + extra * EXTRA_SEAT_USD;
+  const interval = normInterval(ws.billing_interval);
+  const baseUsd = periodUsd(cfg.usd, extra, interval);
   const totalUsd = await applyWorkspaceDiscount(env, workspaceId, baseUsd, "plan", plan);
   let amountArs: number;
   try { amountArs = await usdToArs(totalUsd); } catch { return json({ error: "exchange_unavailable" }, 503); }
 
-  const reason = extra > 0 ? `${cfg.label} + ${extra} empleado(s)` : cfg.label;
+  const reason = `${cfg.label}${extra > 0 ? ` + ${extra} empleado(s)` : ""} (${interval === "annual" ? "anual" : "mensual"})`;
   let upd: { ok: boolean; status: number };
   try {
     upd = await updatePreapprovalAmount(env, preId, amountArs, reason);
@@ -335,13 +352,15 @@ export async function handleBillingWebhook(req: Request, env: Env): Promise<Resp
     return json({ ok: true, retry_later: true });
   }
 
-  // external_reference = "wid:plan[:extraSeats]". El wid es un UUID (sin ':'),
-  // así que split directo. Las suscripciones viejas no traen extraSeats → 0.
+  // external_reference = "wid:plan[:extraSeats[:interval]]". El wid es un UUID
+  // (sin ':'), split directo. Las suscripciones viejas traen menos partes →
+  // defaults (extraSeats 0, interval monthly).
   const ref = pre.external_reference ?? "";
   const parts = ref.split(":");
   const wid = parts[0] ?? "";
   const plan = parts[1] ?? "";
   const extraSeats = parts[2] != null ? Math.max(0, parseInt(parts[2], 10) || 0) : 0;
+  const interval = normInterval(parts[3]);
   const cfg = PLAN_CONFIG[plan];
   if (!wid || !cfg) {
     console.warn("[billing] external_reference inesperado:", ref);
@@ -368,10 +387,10 @@ export async function handleBillingWebhook(req: Request, env: Env): Promise<Resp
     await tursoExec(
       env,
       `UPDATE cloud_workspaces
-         SET plan = ?, seats = ?, extra_seats = ?, plan_status = 'active', mp_preapproval_id = ?,
-             plan_status_changed_at = NULL, updated_at = datetime('now')
+         SET plan = ?, seats = ?, extra_seats = ?, billing_interval = ?, plan_status = 'active',
+             mp_preapproval_id = ?, plan_status_changed_at = NULL, updated_at = datetime('now')
          WHERE id = ?`,
-      [plan, cfg.baseSeats + effectiveExtra, effectiveExtra, dataId, wid],
+      [plan, cfg.baseSeats + effectiveExtra, effectiveExtra, interval, dataId, wid],
     );
   } else if (planStatus === "cancelled" || planStatus === "past_due") {
     // Baja/pago atrasado: marcamos el estado + el momento del cambio, pero NO

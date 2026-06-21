@@ -111,7 +111,7 @@ import { handleClientError } from "./routes/errors";
 import { handleBillingCheckout, handleBillingWebhook, handleUpdateSeats, handleCatalogCheckout } from "./routes/billing";
 import {
   handleListCodes, handleCreateCode, handleUpdateCode, handleRedeemCode,
-  handleListConsoleWorkspaces,
+  handleListConsoleWorkspaces, handleGetReferralCode,
 } from "./routes/console";
 import { runAiTriage } from "./cron/aiTriage";
 import { runPlanDowngrade } from "./cron/planDowngrade";
@@ -407,6 +407,12 @@ export default {
       const wsRedeemMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/redeem-code\/?$/);
       if (wsRedeemMatch && req.method === "POST") {
         return cors(req, env, await handleRedeemCode(wsRedeemMatch[1]!, req, env));
+      }
+
+      // Referidos — código self-serve del workspace (lo comparte el dueño).
+      const wsReferralMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/referral\/?$/);
+      if (wsReferralMatch && req.method === "POST") {
+        return cors(req, env, await handleGetReferralCode(wsReferralMatch[1]!, req, env));
       }
 
       // G/A4 — PATCH workspace (daily_goal, industry, name, etc).

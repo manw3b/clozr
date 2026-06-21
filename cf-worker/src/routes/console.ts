@@ -273,7 +273,7 @@ export async function handleRedeemCode(workspaceId: string, req: Request, env: E
   const row = await tursoFirst(
     env,
     `SELECT id, code, kind, plan, duration_days, discount_type, discount_value, target,
-            max_uses, uses, expires_at, disabled_at
+            referrer_workspace_id, max_uses, uses, expires_at, disabled_at
        FROM console_codes WHERE code = ?`,
     [code],
   );
@@ -357,27 +357,81 @@ export async function handleRedeemCode(workspaceId: string, req: Request, env: E
   const discountType = String(row.discount_type ?? "");
   const discountValue = Number(row.discount_value ?? 0);
   const discountTarget = row.target ? String(row.target) : "all";
+  // Referidos: si el código pertenece a otro workspace, lo recompensamos con el
+  // mismo descuento. No podés usar tu propio código de referido.
+  const referrerWid = row.referrer_workspace_id ? String(row.referrer_workspace_id) : null;
+  if (referrerWid && referrerWid === workspaceId) return json({ error: "self_referral" }, 409);
+
   await ensureWorkspaceColumns(env);
   const redemptionId = crypto.randomUUID();
-  await tursoTransaction(
-    env,
+  const stmts = [
     {
       sql: `UPDATE cloud_workspaces
                SET discount_type = ?, discount_value = ?, discount_target = ?, updated_at = datetime('now')
              WHERE id = ?`,
-      args: [discountType, discountValue, discountTarget, workspaceId],
+      args: [discountType, discountValue, discountTarget, workspaceId] as TursoArg[],
     },
     {
       sql: `UPDATE console_codes SET uses = uses + 1
               WHERE id = ? AND (max_uses IS NULL OR uses < max_uses)`,
-      args: [codeId],
+      args: [codeId] as TursoArg[],
     },
     {
       sql: `INSERT INTO console_code_redemptions (id, code_id, code, kind, workspace_id, user_id)
             VALUES (?, ?, ?, 'discount', ?, ?)`,
-      args: [redemptionId, codeId, code, workspaceId, auth.userId],
+      args: [redemptionId, codeId, code, workspaceId, auth.userId] as TursoArg[],
     },
-  );
+  ];
+  if (referrerWid) {
+    stmts.push({
+      sql: `UPDATE cloud_workspaces
+               SET discount_type = ?, discount_value = ?, discount_target = ?, updated_at = datetime('now')
+             WHERE id = ?`,
+      args: [discountType, discountValue, discountTarget, referrerWid] as TursoArg[],
+    });
+  }
+  await tursoTransaction(env, ...stmts);
 
-  return json({ ok: true, kind: "discount", discount_type: discountType, discount_value: discountValue, target: discountTarget });
+  return json({
+    ok: true, kind: "discount", discount_type: discountType, discount_value: discountValue,
+    target: discountTarget, referral: !!referrerWid,
+  });
+}
+
+/* ── POST /workspaces/:wid/referral ──────────────────────────────────────
+ * Código de referido self-serve del workspace (lo comparte el dueño). Es un
+ * código de descuento (kind 'discount', percent) con referrer_workspace_id =
+ * este workspace; al canjearlo, el referido Y el referidor reciben el descuento.
+ * Idempotente: un código por workspace. */
+const REFERRAL_PCT = 20;
+
+export async function handleGetReferralCode(workspaceId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+  const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "billing.manage");
+  if (denied) return denied;
+  await ensureConsoleSchema(env);
+
+  const existing = await tursoFirst(
+    env,
+    `SELECT code FROM console_codes WHERE referrer_workspace_id = ? LIMIT 1`,
+    [workspaceId],
+  );
+  if (existing?.code) {
+    return json({ ok: true, code: String(existing.code), discount_pct: REFERRAL_PCT });
+  }
+
+  const id = crypto.randomUUID();
+  const code = generateCode();
+  await tursoExec(
+    env,
+    `INSERT INTO console_codes
+       (id, code, kind, discount_type, discount_value, target, referrer_workspace_id, uses, created_by, created_at)
+     VALUES (?, ?, 'discount', 'percent', ?, 'plan:any', ?, 0, ?, datetime('now'))`,
+    [id, code, REFERRAL_PCT, workspaceId, auth.userId],
+  );
+  return json({ ok: true, code, discount_pct: REFERRAL_PCT });
 }

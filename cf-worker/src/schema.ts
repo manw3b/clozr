@@ -921,6 +921,9 @@ export async function ensureConsoleSchema(env: Env): Promise<void> {
   // F4/F5: objetivo del código (ej "catalog:apple" para kind 'unlock', o el
   // plan/función al que apunta un descuento). NULL para los códigos previos.
   await safeAddColumn(env, "console_codes", "target", "TEXT");
+  // Referidos: si el código es de referido, el workspace que lo generó (para
+  // recompensarlo cuando alguien lo canjea). NULL = código de la Consola.
+  await safeAddColumn(env, "console_codes", "referrer_workspace_id", "TEXT");
   consoleSchemaReady = true;
 }
 

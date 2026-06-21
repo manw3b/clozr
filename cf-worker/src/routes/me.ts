@@ -37,6 +37,8 @@ interface WorkspaceForUser {
   icon: string | null;
   /** F4: catálogos premium desbloqueados (keys, ej ["apple"]). */
   unlocked_catalogs: string[];
+  /** F5: descuento activo del workspace (otorgado por código), o null. */
+  discount: { type: string; value: number; target: string } | null;
   /** T3: plan/asientos/estado de suscripción del workspace (billing MP). */
   plan: string;
   seats: number;
@@ -86,7 +88,9 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
     },
     {
       sql: `SELECT w.id, w.name, w.industry, w.daily_goal, w.daily_goal_currency, w.daily_goal_count,
-                   w.logo_key, w.banner_key, w.icon, w.unlocked_catalogs, w.plan, w.seats, w.plan_status,
+                   w.logo_key, w.banner_key, w.icon, w.unlocked_catalogs,
+                   w.discount_type, w.discount_value, w.discount_target,
+                   w.plan, w.seats, w.plan_status,
                    m.role, m.status
               FROM memberships m
               INNER JOIN cloud_workspaces w ON w.id = m.workspace_id
@@ -131,6 +135,9 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
       banner_key: r.banner_key === null ? null : String(r.banner_key),
       icon: r.icon === null || r.icon === undefined ? null : String(r.icon),
       unlocked_catalogs: parseCatalogs(r.unlocked_catalogs),
+      discount: r.discount_type
+        ? { type: String(r.discount_type), value: Number(r.discount_value ?? 0), target: String(r.discount_target ?? "all") }
+        : null,
       plan: String(r.plan ?? "free"),
       seats: Number(r.seats ?? 1),
       plan_status: String(r.plan_status ?? "active"),

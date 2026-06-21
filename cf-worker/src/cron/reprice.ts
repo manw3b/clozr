@@ -20,6 +20,7 @@ import type { Env } from "../index";
 import { ensureSchema, ensureBillingSchema } from "../schema";
 import { tursoQuery } from "../turso";
 import { getBlueRate } from "../dolar";
+import { applyWorkspaceDiscount } from "../discounts";
 import { PLAN_CONFIG, EXTRA_SEAT_USD, updatePreapprovalAmount } from "../routes/billing";
 
 /** Umbral de desvío para re-precificar (5%). Evita updates por cambios chicos. */
@@ -70,7 +71,11 @@ export async function runRepricing(env: Env): Promise<RepriceResult> {
     const extra = w.extra_seats != null
       ? Number(w.extra_seats)
       : Math.max(0, Number(w.seats ?? cfg.baseSeats) - cfg.baseSeats);
-    const targetArs = Math.round((cfg.usd + extra * EXTRA_SEAT_USD) * rate);
+    const baseUsd = cfg.usd + extra * EXTRA_SEAT_USD;
+    // Re-aplicamos el descuento del workspace (si lo tiene) para no "perderlo"
+    // al re-precificar.
+    const effUsd = await applyWorkspaceDiscount(env, String(w.id), baseUsd, "plan", plan);
+    const targetArs = Math.round(effUsd * rate);
 
     try {
       // Monto actual del preapproval (para medir el desvío).

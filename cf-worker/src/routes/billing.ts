@@ -28,6 +28,7 @@ import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst } from "../turso";
 import { usdToArs } from "../dolar";
 import { CATALOG_PACKS, unlockCatalog } from "../catalog";
+import { applyWorkspaceDiscount } from "../discounts";
 import { getRoleInWorkspace, json } from "./_generic";
 import { requirePerm } from "../permissions";
 
@@ -80,8 +81,10 @@ export async function handleBillingCheckout(workspaceId: string, req: Request, e
   const ws = await tursoFirst(env, `SELECT id FROM cloud_workspaces WHERE id = ?`, [workspaceId]);
   if (!ws) return json({ error: "not_found" }, 404);
 
-  // Precio en USD (fuente de verdad) → ARS al blue del momento.
-  const totalUsd = cfg.usd + extraSeats * EXTRA_SEAT_USD;
+  // Precio en USD (fuente de verdad), con descuento del workspace si aplica,
+  // → ARS al blue del momento.
+  const baseUsd = cfg.usd + extraSeats * EXTRA_SEAT_USD;
+  const totalUsd = await applyWorkspaceDiscount(env, workspaceId, baseUsd, "plan", plan);
   let amountArs: number;
   try {
     amountArs = await usdToArs(totalUsd);
@@ -166,7 +169,8 @@ export async function handleUpdateSeats(workspaceId: string, req: Request, env: 
   if (!preId) return json({ error: "no_subscription" }, 409);
   if (!env.MP_ACCESS_TOKEN) return json({ error: "billing_unavailable" }, 503);
 
-  const totalUsd = cfg.usd + extra * EXTRA_SEAT_USD;
+  const baseUsd = cfg.usd + extra * EXTRA_SEAT_USD;
+  const totalUsd = await applyWorkspaceDiscount(env, workspaceId, baseUsd, "plan", plan);
   let amountArs: number;
   try { amountArs = await usdToArs(totalUsd); } catch { return json({ error: "exchange_unavailable" }, 503); }
 
@@ -213,8 +217,9 @@ export async function handleCatalogCheckout(workspaceId: string, req: Request, e
 
   if (!env.MP_ACCESS_TOKEN) return json({ error: "billing_unavailable" }, 503);
 
+  const totalUsd = await applyWorkspaceDiscount(env, workspaceId, pack.usd, "catalog", catalog);
   let amountArs: number;
-  try { amountArs = await usdToArs(pack.usd); } catch { return json({ error: "exchange_unavailable" }, 503); }
+  try { amountArs = await usdToArs(totalUsd); } catch { return json({ error: "exchange_unavailable" }, 503); }
 
   const preference = {
     items: [{ title: pack.label, quantity: 1, unit_price: amountArs, currency_id: "ARS" }],

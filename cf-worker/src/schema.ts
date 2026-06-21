@@ -952,6 +952,13 @@ export async function ensureWorkspaceColumns(env: Env): Promise<void> {
   await safeAddColumn(env, "cloud_workspaces", "icon", "TEXT");
   // F4: catálogos premium desbloqueados (JSON array de keys, ej ["apple"]).
   await safeAddColumn(env, "cloud_workspaces", "unlocked_catalogs", "TEXT");
+  // F5: descuento activo del workspace (otorgado por un código de la Consola).
+  //   discount_type: 'percent' | 'amount' (USD) ; discount_target: "all" |
+  //   "plan:any|pro|team" | "catalog:any|apple". Se aplica en cada checkout
+  //   cuyo target matchee (y en el re-pricing).
+  await safeAddColumn(env, "cloud_workspaces", "discount_type", "TEXT");
+  await safeAddColumn(env, "cloud_workspaces", "discount_value", "INTEGER");
+  await safeAddColumn(env, "cloud_workspaces", "discount_target", "TEXT");
   workspaceColsReady = true;
 }
 

@@ -17,7 +17,7 @@
  */
 
 import type { Env } from "../index";
-import { ensureSchema, ensureConsoleSchema } from "../schema";
+import { ensureSchema, ensureConsoleSchema, ensureWorkspaceColumns } from "../schema";
 import { requireAuth } from "../auth";
 import { requireSuperAdmin } from "../superadmin";
 import { tursoQuery, tursoFirst, tursoExec, tursoTransaction, type TursoArg } from "../turso";
@@ -127,6 +127,10 @@ export async function handleCreateCode(req: Request, env: Env): Promise<Response
     discountValue = asPosInt(body.discount_value);
     if (discountValue == null) return json({ error: "invalid_discount_value" }, 400);
     if (discountType === "percent" && discountValue > 100) return json({ error: "invalid_discount_value", max: 100 }, 400);
+    // A qué apunta el descuento (default: todo).
+    const allowedTargets = ["all", "plan:any", "plan:pro", "plan:team", "catalog:any", "catalog:apple"];
+    target = typeof body.target === "string" && body.target.trim() ? body.target.trim() : "all";
+    if (!allowedTargets.includes(target)) return json({ error: "invalid_target", allowed: allowedTargets }, 400);
   } else {
     // unlock: target = "catalog:<key>" (ej "catalog:apple").
     target = typeof body.target === "string" ? body.target.trim().toLowerCase() : "";
@@ -348,13 +352,21 @@ export async function handleRedeemCode(workspaceId: string, req: Request, env: E
     return json({ ok: true, kind: "unlock", target, catalog: catalogKey });
   }
 
-  // Descuento: registramos el canje y devolvemos el beneficio. La aplicación
-  // al precio del checkout MP es de una fase posterior (billing integration).
+  // Descuento (F5): lo GUARDAMOS en el workspace — se aplica en cada checkout
+  // cuyo target matchee (plan, empleados, catálogo) y en el re-pricing.
   const discountType = String(row.discount_type ?? "");
   const discountValue = Number(row.discount_value ?? 0);
+  const discountTarget = row.target ? String(row.target) : "all";
+  await ensureWorkspaceColumns(env);
   const redemptionId = crypto.randomUUID();
   await tursoTransaction(
     env,
+    {
+      sql: `UPDATE cloud_workspaces
+               SET discount_type = ?, discount_value = ?, discount_target = ?, updated_at = datetime('now')
+             WHERE id = ?`,
+      args: [discountType, discountValue, discountTarget, workspaceId],
+    },
     {
       sql: `UPDATE console_codes SET uses = uses + 1
               WHERE id = ? AND (max_uses IS NULL OR uses < max_uses)`,
@@ -367,5 +379,5 @@ export async function handleRedeemCode(workspaceId: string, req: Request, env: E
     },
   );
 
-  return json({ ok: true, kind: "discount", discount_type: discountType, discount_value: discountValue });
+  return json({ ok: true, kind: "discount", discount_type: discountType, discount_value: discountValue, target: discountTarget });
 }

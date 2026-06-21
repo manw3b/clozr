@@ -130,8 +130,10 @@ export async function handleGenericCreate(spec: TableSpec, workspaceId: string, 
     if (msg.includes("unique") || msg.includes("primary key")) {
       return json({ error: "duplicate_id", id }, 409);
     }
-    // Si la tabla no tiene created_by, retry sin ese col.
-    if (msg.includes("no column named created_by") || msg.includes("has no column named created_by")) {
+    // Si la tabla no tiene created_by, retry sin ese col. Match amplio: cubre
+    // cualquier variante del mensaje de Turso (con/sin comillas) que mencione
+    // la columna ausente.
+    if (msg.includes("created_by")) {
       const cols2 = ["id", "workspace_id", ...Object.keys(fields)];
       const vals2: TursoArg[] = [id, workspaceId, ...Object.values(fields)];
       await tursoExec(
@@ -269,8 +271,8 @@ export async function handleGenericImport(spec: TableSpec, workspaceId: string, 
       imported++;
     } catch (e) {
       const msg = e instanceof Error ? e.message.toLowerCase() : String(e);
-      if (msg.includes("no column named created_by") || msg.includes("has no column named created_by")) {
-        // Retry sin created_by.
+      if (msg.includes("created_by")) {
+        // Retry sin created_by (match amplio ante variantes del mensaje).
         const cols2 = ["id", "workspace_id", ...Object.keys(fields)];
         const vals2: TursoArg[] = [id, workspaceId, ...Object.values(fields)];
         if (createdAt) { cols2.push("created_at"); vals2.push(createdAt); }

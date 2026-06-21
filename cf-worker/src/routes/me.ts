@@ -14,7 +14,7 @@
  */
 
 import type { Env } from "../index";
-import { ensureSchema } from "../schema";
+import { ensureSchema, ensureWorkspaceColumns } from "../schema";
 import { requireAuth } from "../auth";
 import { isSuperAdmin } from "../superadmin";
 import { tursoExec, tursoQuery } from "../turso";
@@ -33,6 +33,8 @@ interface WorkspaceForUser {
   /** I: keys del R2 bucket (relativas — el cliente arma /assets/{key}). */
   logo_key: string | null;
   banner_key: string | null;
+  /** F3: emoji/miniatura del espacio (fallback cuando no hay logo). */
+  icon: string | null;
   /** T3: plan/asientos/estado de suscripción del workspace (billing MP). */
   plan: string;
   seats: number;
@@ -56,6 +58,7 @@ interface MeResponse {
 
 export async function handleMe(req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureWorkspaceColumns(env); // garantiza la columna icon antes del SELECT
 
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
@@ -81,7 +84,7 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
     },
     {
       sql: `SELECT w.id, w.name, w.industry, w.daily_goal, w.daily_goal_currency, w.daily_goal_count,
-                   w.logo_key, w.banner_key, w.plan, w.seats, w.plan_status,
+                   w.logo_key, w.banner_key, w.icon, w.plan, w.seats, w.plan_status,
                    m.role, m.status
               FROM memberships m
               INNER JOIN cloud_workspaces w ON w.id = m.workspace_id
@@ -124,6 +127,7 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
       daily_goal_count: Number(r.daily_goal_count ?? 0),
       logo_key: r.logo_key === null ? null : String(r.logo_key),
       banner_key: r.banner_key === null ? null : String(r.banner_key),
+      icon: r.icon === null || r.icon === undefined ? null : String(r.icon),
       plan: String(r.plan ?? "free"),
       seats: Number(r.seats ?? 1),
       plan_status: String(r.plan_status ?? "active"),

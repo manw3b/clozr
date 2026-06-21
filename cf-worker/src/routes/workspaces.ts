@@ -19,7 +19,7 @@
  */
 
 import type { Env } from "../index";
-import { ensureSchema } from "../schema";
+import { ensureSchema, ensureWorkspaceColumns } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, type Row, type TursoArg } from "../turso";
 import { sendInviteEmail } from "../email";
@@ -69,10 +69,11 @@ export async function handleCreateWorkspace(req: Request, env: Env): Promise<Res
  * daily_goal_count. (Otros campos del schema están fuera de scope —
  * created_at no se edita, owner_user_id requiere flow separado).
  */
-const WS_EDITABLE = ["name", "industry", "daily_goal", "daily_goal_currency", "daily_goal_count"] as const;
+const WS_EDITABLE = ["name", "industry", "icon", "daily_goal", "daily_goal_currency", "daily_goal_count"] as const;
 
 export async function handleUpdateWorkspace(workspaceId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureWorkspaceColumns(env); // garantiza la columna icon
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
 

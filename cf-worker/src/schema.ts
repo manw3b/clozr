@@ -936,6 +936,20 @@ export async function ensureBillingSchema(env: Env): Promise<void> {
   billingSchemaReady = true;
 }
 
+let workspaceColsReady = false;
+
+/**
+ * Columnas extra de cloud_workspaces fuera del applySchema versionado (F3):
+ *   icon — emoji/miniatura del espacio (cuando no hay logo subido).
+ * Lazy + memoizada (mismo criterio no-fatal). La llaman /me y el PATCH de
+ * workspace para garantizar la columna sin bumpear SCHEMA_VERSION.
+ */
+export async function ensureWorkspaceColumns(env: Env): Promise<void> {
+  if (workspaceColsReady) return;
+  await safeAddColumn(env, "cloud_workspaces", "icon", "TEXT");
+  workspaceColsReady = true;
+}
+
 /**
  * Ejecuta ALTER TABLE ADD COLUMN ignorando el error si la columna ya
  * existe. Cualquier otro error sí throwa.

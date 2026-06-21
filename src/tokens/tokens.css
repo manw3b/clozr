@@ -5,36 +5,44 @@
  */
 
 :root {
-  /* ===== COLORES — Superficies ===== */
-  --bg: #020617;            /* Fondo de la app */
-  --surface: #0F172A;       /* Cards, sidebar, topbar, drawer */
-  --surface-hover: #131F37; /* Hover sobre surface */
-  --surface-2: #1E293B;     /* Inputs, segments, badges neutros */
-  --border: #1E293B;        /* Bordes default */
-  --border-strong: #334155; /* Bordes en focus / hover */
+  /* ===== COLORES — Superficies (negro grafito neutro) ===== */
+  --bg: #0B0B0D;            /* Fondo de la app — grafito, hace brillar el rojo */
+  --surface: #141416;       /* Cards, sidebar, topbar, drawer */
+  --surface-hover: #1C1C1F; /* Hover sobre surface */
+  --surface-2: #222228;     /* Inputs, segments, badges neutros */
+  --border: #24242B;        /* Bordes default (muy sutiles) */
+  --border-strong: #34343C; /* Bordes en focus / hover */
 
   /* ===== COLORES — Texto ===== */
-  --text: #F8FAFC;          /* Principal */
-  --text-muted: #94A3B8;    /* Secundario / labels */
-  --text-dim: #64748B;      /* Terciario / placeholders */
-  --text-inverse: #020617;  /* Sobre fondos claros (botones primarios) */
+  --text: #F5F5F7;          /* Principal */
+  --text-muted: #A1A1AA;    /* Secundario / labels */
+  --text-dim: #71717A;      /* Terciario / placeholders */
+  --text-inverse: #0B0B0D;  /* Sobre fondos claros (botones primarios) */
 
   /* ===== COLORES — Marca / Acción ===== */
   --primary: #E11D48;       /* Acción principal, focus, activo */
-  --primary-hover: #F43F5E;
+  --primary-hover: #FF3B6B; /* Rojo iluminado (neón) — hover, CTA, gráficos */
   --primary-press: #BE123C;
   --primary-bg: rgba(225, 29, 72, 0.12);  /* Fondos suaves de acento (item activo del sidebar) */
   --primary-bg-strong: rgba(225, 29, 72, 0.2);
+  --primary-glow: rgba(225, 29, 72, 0.2); /* Nodos, partículas, sombras, IA */
 
   /* ===== COLORES — Semánticos ===== */
-  --success: #10B981;       /* Verde — solo confirmaciones puntuales y deltas positivos */
-  --success-bg: rgba(16, 185, 129, 0.12);
+  --success: #22C55E;       /* Verde — ventas cerradas, ingresos, deltas positivos */
+  --success-bg: rgba(34, 197, 94, 0.12);
   --warning: #F59E0B;       /* Amarillo — alertas */
   --warning-bg: rgba(245, 158, 11, 0.12);
   --danger: #EF4444;        /* Rojo error — distinto al primary, para errores destructivos */
   --danger-bg: rgba(239, 68, 68, 0.12);
   --info: #3B82F6;
   --info-bg: rgba(59, 130, 246, 0.12);
+
+  /* ===== COLORES — Acento por módulo (ADN visual: cada módulo su color) ===== */
+  --mod-clientes: #3B82F6;    /* azul */
+  --mod-pipeline: #E11D48;    /* rojo */
+  --mod-caja: #22C55E;        /* verde */
+  --mod-inventario: #F59E0B;  /* ámbar */
+  --mod-ia: #FF3B6B;          /* neón */
 
   /* ===== TIPOGRAFÍA ===== */
   --font-sans: "Inter Variable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

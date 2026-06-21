@@ -21,6 +21,9 @@ export interface Env {
   TURSO_AUTH_TOKEN: string;
   RESEND_API_KEY: string;
   JWT_SECRET: string;
+  // Secret dedicado para los endpoints /admin/* (diagnóstico/cron manual).
+  // Si no está, se acepta JWT_SECRET (legacy). Ver adminOk().
+  ADMIN_SECRET: string;
   // vars
   RESEND_FROM: string;
   MAGIC_LINK_TTL_MIN: string;
@@ -113,6 +116,7 @@ import {
 import { runAiTriage } from "./cron/aiTriage";
 import { runPlanDowngrade } from "./cron/planDowngrade";
 import { runRepricing } from "./cron/reprice";
+import { getBlueRate } from "./dolar";
 
 export default {
   // ── Cron: AI Triage matutino (PoC) ───────────────────────────────────
@@ -173,8 +177,7 @@ export default {
       // (reusamos JWT_SECRET — no es perfecto pero es lo único que ya
       // tenemos como secret arbitrario en el entorno).
       if (route === "POST /admin/migrations") {
-        const provided = req.headers.get("x-admin-secret");
-        if (!provided || provided !== env.JWT_SECRET) {
+        if (!adminOk(req, env)) {
           return cors(req, env, json({ error: "unauthorized" }, 401));
         }
         // Reset del initPromise no se expone — pero sí podemos forzar
@@ -187,8 +190,7 @@ export default {
       // Para testear en prod sin esperar al cron. Mismo gate shared-secret
       // que /admin/migrations (x-admin-secret == JWT_SECRET).
       if (route === "POST /admin/ai-triage") {
-        const provided = req.headers.get("x-admin-secret");
-        if (!provided || provided !== env.JWT_SECRET) {
+        if (!adminOk(req, env)) {
           return cors(req, env, json({ error: "unauthorized" }, 401));
         }
         const result = await runAiTriage(env);
@@ -199,20 +201,55 @@ export default {
       // Baja a Free los workspaces con la gracia vencida. Mismo gate
       // shared-secret (x-admin-secret == JWT_SECRET) que /admin/ai-triage.
       if (route === "POST /admin/plan-downgrade") {
-        const provided = req.headers.get("x-admin-secret");
-        if (!provided || provided !== env.JWT_SECRET) {
+        if (!adminOk(req, env)) {
           return cors(req, env, json({ error: "unauthorized" }, 401));
         }
         const result = await runPlanDowngrade(env);
         return cors(req, env, json({ ok: true, ...result }));
       }
 
+      // ── Admin: diagnóstico de billing (validación MP) ──────────────
+      // Reporta si MP está configurado y el token es válido, si el webhook
+      // secret está, y si el Worker llega al dólar. No expone secretos.
+      // Gate shared-secret (x-admin-secret == JWT_SECRET).
+      if (route === "GET /admin/billing-status") {
+        if (!adminOk(req, env)) {
+          return cors(req, env, json({ error: "unauthorized" }, 401));
+        }
+        const status: Record<string, unknown> = {
+          mp_access_token_set: !!env.MP_ACCESS_TOKEN,
+          mp_webhook_secret_set: !!env.MP_WEBHOOK_SECRET,
+          mp_token_valid: false,
+          mp_account: null,
+          blue_rate: null,
+          errors: [] as string[],
+        };
+        const errs = status.errors as string[];
+        try { status.blue_rate = await getBlueRate(); } catch (e) { errs.push(`dolar: ${e instanceof Error ? e.message : e}`); }
+        if (env.MP_ACCESS_TOKEN) {
+          try {
+            const r = await fetch("https://api.mercadopago.com/users/me", {
+              headers: { authorization: `Bearer ${env.MP_ACCESS_TOKEN}` },
+            });
+            if (r.ok) {
+              const u = (await r.json().catch(() => null)) as { nickname?: string; email?: string; id?: number } | null;
+              status.mp_token_valid = true;
+              status.mp_account = u?.nickname ?? u?.email ?? u?.id ?? "ok";
+            } else {
+              errs.push(`mp_token: HTTP ${r.status}`);
+            }
+          } catch (e) {
+            errs.push(`mp: ${e instanceof Error ? e.message : e}`);
+          }
+        }
+        return cors(req, env, json(status));
+      }
+
       // ── Admin: disparar el re-pricing (USD→ARS) a mano (testeo) ────
       // Actualiza el monto ARS de las suscripciones activas según el blue.
       // Mismo gate shared-secret (x-admin-secret == JWT_SECRET).
       if (route === "POST /admin/reprice") {
-        const provided = req.headers.get("x-admin-secret");
-        if (!provided || provided !== env.JWT_SECRET) {
+        if (!adminOk(req, env)) {
           return cors(req, env, json({ error: "unauthorized" }, 401));
         }
         const result = await runRepricing(env);
@@ -573,6 +610,18 @@ export default {
  * 5000 entries. En la práctica nunca llega — la auth la usan ~5 personas.
  */
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+/**
+ * Auth de los endpoints /admin/*. Acepta el secret dedicado ADMIN_SECRET y,
+ * por compatibilidad, JWT_SECRET (que era el gate original). Header:
+ * x-admin-secret.
+ */
+function adminOk(req: Request, env: Env): boolean {
+  const provided = req.headers.get("x-admin-secret");
+  if (!provided) return false;
+  if (env.ADMIN_SECRET && provided === env.ADMIN_SECRET) return true;
+  return provided === env.JWT_SECRET;
+}
 
 function checkRate(req: Request, key: string, limit: number, windowMs: number): boolean {
   const ip = req.headers.get("cf-connecting-ip") ?? "unknown";

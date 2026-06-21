@@ -22,13 +22,11 @@ import type { Env } from "../index";
 import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, type TursoArg } from "../turso";
+import { requirePerm } from "../permissions";
 
 /* ── permission helpers ──────────────────────────────────────────────── */
 
 const ROLES_READ = new Set(["owner", "admin", "vendedor", "viewer"]);
-const ROLES_CREATE = new Set(["owner", "admin", "vendedor"]);
-const ROLES_EDIT = new Set(["owner", "admin", "vendedor"]);
-const ROLES_DELETE = new Set(["owner", "admin"]);
 
 async function getMembershipRole(env: Env, workspaceId: string, userId: string): Promise<string | null> {
   const m = await tursoFirst(
@@ -38,6 +36,29 @@ async function getMembershipRole(env: Env, workspaceId: string, userId: string):
     [workspaceId, userId],
   );
   return m ? String(m.role) : null;
+}
+
+/**
+ * T2: si el rol es 'vendedor', verifica que el cliente le pertenezca antes de
+ * mutarlo. Devuelve una Response (404/403) si no aplica, o null si OK.
+ * managers (owner/admin) y viewer no se scopean (viewer no escribe igual).
+ */
+async function assertOwnsCustomer(
+  env: Env,
+  workspaceId: string,
+  customerId: string,
+  role: string,
+  userId: string,
+): Promise<Response | null> {
+  if (role !== "vendedor") return null;
+  const row = await tursoFirst(
+    env,
+    `SELECT owner_id FROM customers WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+    [customerId, workspaceId],
+  );
+  if (!row) return json({ error: "not_found" }, 404);
+  if (String(row.owner_id ?? "") !== userId) return json({ error: "forbidden" }, 403);
+  return null;
 }
 
 /* ── campos editables (whitelist) ────────────────────────────────────── */
@@ -75,15 +96,17 @@ export async function handleListCustomers(workspaceId: string, req: Request, env
   const role = await getMembershipRole(env, workspaceId, auth.userId);
   if (!role || !ROLES_READ.has(role)) return json({ error: "forbidden" }, 403);
 
+  // T2: el vendedor ve solo SUS clientes; managers (owner/admin) y viewer ven todo.
+  const scoped = role === "vendedor";
   const [rows] = await tursoQuery(env, {
     sql: `SELECT id, workspace_id, name, phone, email, type, status,
                  pricing_policy_json, barrio, address, notes, avatar_path,
                  instagram, facebook, tiktok, twitter,
-                 created_by, created_at, updated_at
+                 created_by, owner_id, created_at, updated_at
             FROM customers
-            WHERE workspace_id = ? AND deleted_at IS NULL
+            WHERE workspace_id = ? AND deleted_at IS NULL${scoped ? " AND owner_id = ?" : ""}
             ORDER BY name ASC`,
-    args: [workspaceId],
+    args: scoped ? [workspaceId, auth.userId] : [workspaceId],
   });
   return json({ customers: rows ?? [] });
 }
@@ -104,7 +127,9 @@ export async function handleCreateCustomer(workspaceId: string, req: Request, en
   if (!auth) return json({ error: "unauthorized" }, 401);
 
   const role = await getMembershipRole(env, workspaceId, auth.userId);
-  if (!role || !ROLES_CREATE.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "customers.write");
+  if (denied) return denied;
 
   let body: CreateBody;
   try { body = (await req.json()) as CreateBody; } catch { return json({ error: "invalid_body" }, 400); }
@@ -115,8 +140,9 @@ export async function handleCreateCustomer(workspaceId: string, req: Request, en
   // name ya validado arriba; asegurar que esté en fields.
   fields.name = body.name.trim();
 
-  const cols = ["id", "workspace_id", "created_by", ...Object.keys(fields)];
-  const vals: TursoArg[] = [id, workspaceId, auth.userId, ...Object.values(fields)];
+  // T2: owner_id = creador (sub del JWT) para el alcance del vendedor.
+  const cols = ["id", "workspace_id", "created_by", "owner_id", ...Object.keys(fields)];
+  const vals: TursoArg[] = [id, workspaceId, auth.userId, auth.userId, ...Object.values(fields)];
   const placeholders = cols.map(() => "?").join(", ");
 
   try {
@@ -149,7 +175,13 @@ export async function handleUpdateCustomer(
   if (!auth) return json({ error: "unauthorized" }, 401);
 
   const role = await getMembershipRole(env, workspaceId, auth.userId);
-  if (!role || !ROLES_EDIT.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "customers.write");
+  if (denied) return denied;
+
+  // T2: el vendedor solo edita SUS clientes.
+  const ownerErr = await assertOwnsCustomer(env, workspaceId, customerId, role, auth.userId);
+  if (ownerErr) return ownerErr;
 
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
@@ -183,7 +215,13 @@ export async function handleDeleteCustomer(
   if (!auth) return json({ error: "unauthorized" }, 401);
 
   const role = await getMembershipRole(env, workspaceId, auth.userId);
-  if (!role || !ROLES_DELETE.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "customers.write");
+  if (denied) return denied;
+
+  // T2: el vendedor solo borra SUS clientes.
+  const ownerErr = await assertOwnsCustomer(env, workspaceId, customerId, role, auth.userId);
+  if (ownerErr) return ownerErr;
 
   await tursoExec(
     env,
@@ -236,8 +274,9 @@ export async function handleImportCustomers(workspaceId: string, req: Request, e
     // Si el local tenía created_at, lo respetamos. Si no, default.
     const createdAt = typeof c.created_at === "string" ? c.created_at : null;
 
-    const cols = ["id", "workspace_id", "created_by", ...Object.keys(fields)];
-    const vals: TursoArg[] = [id, workspaceId, auth.userId, ...Object.values(fields)];
+    // Import es owner-only → owner_id = el owner que sube el bootstrap.
+    const cols = ["id", "workspace_id", "created_by", "owner_id", ...Object.keys(fields)];
+    const vals: TursoArg[] = [id, workspaceId, auth.userId, auth.userId, ...Object.values(fields)];
     if (createdAt) { cols.push("created_at"); vals.push(createdAt); }
     const placeholders = cols.map(() => "?").join(", ");
 

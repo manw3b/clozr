@@ -28,10 +28,18 @@ let initPromise: Promise<void> | null = null;
  *
  * Bump cuando agregues un CREATE TABLE / ALTER TABLE / safeAddColumn.
  */
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 11;
 
 export function ensureSchema(env: Env): Promise<void> {
-  if (!initPromise) initPromise = applySchemaIfNeeded(env);
+  if (!initPromise) {
+    initPromise = applySchemaIfNeeded(env).catch((e) => {
+      // Si la migración falla, NO cacheamos el rechazo: lo reseteamos para que
+      // la próxima request reintente, en vez de dejar el isolate "envenenado"
+      // devolviendo 500 a todo hasta que Cloudflare lo recicle.
+      initPromise = null;
+      throw e;
+    });
+  }
   return initPromise;
 }
 
@@ -726,6 +734,100 @@ async function applySchema(env: Env): Promise<void> {
             ON customer_tags(workspace_id, deleted_at)`,
     },
   );
+
+  // ── 011 (plan equipos T2) — owner_id: el vendedor ve solo lo suyo ──
+  //
+  // El vendedor solo ve/edita los registros que le pertenecen; owner/admin
+  // ven todo el workspace. Agregamos owner_id a las 3 tablas de datos
+  // operativos por-dueño (customers, sales, pipeline_items) y filtramos por
+  // él en los handlers cuando el rol es 'vendedor'. Caja, stages, catálogo,
+  // tareas y demás quedan COMPARTIDOS (no se scopean por dueño).
+  //
+  // pipeline_items YA tiene owner_id (era el "dueño/vendedor asignado" del
+  // lead) — safeAddColumn skipea el duplicate y reusamos esa columna como
+  // campo de alcance. customers/sales no lo tenían (usaban created_by).
+  await safeAddColumn(env, "customers", "owner_id", "TEXT");
+  await safeAddColumn(env, "sales", "owner_id", "TEXT");
+  await safeAddColumn(env, "pipeline_items", "owner_id", "TEXT");
+
+  // Backfill: los registros viejos sin dueño quedan asignados al owner del
+  // workspace (managers ven todo igual, así que no cambia su vista; pero deja
+  // los datos históricos con un dueño concreto en vez de NULL). Idempotente:
+  // solo toca filas con owner_id NULL. NO-fatal: si algo falla acá, logueamos
+  // pero no rompemos ensureSchema — las columnas ya están agregadas y los
+  // handlers funcionan; el backfill y los índices son optimizaciones.
+  try {
+  await tursoQuery(
+    env,
+    {
+      sql: `UPDATE customers SET owner_id = (
+              SELECT user_id FROM memberships
+                WHERE workspace_id = customers.workspace_id
+                  AND role = 'owner' AND status = 'active' AND user_id IS NOT NULL
+                LIMIT 1)
+            WHERE owner_id IS NULL`,
+    },
+    {
+      sql: `UPDATE sales SET owner_id = (
+              SELECT user_id FROM memberships
+                WHERE workspace_id = sales.workspace_id
+                  AND role = 'owner' AND status = 'active' AND user_id IS NOT NULL
+                LIMIT 1)
+            WHERE owner_id IS NULL`,
+    },
+    {
+      sql: `UPDATE pipeline_items SET owner_id = (
+              SELECT user_id FROM memberships
+                WHERE workspace_id = pipeline_items.workspace_id
+                  AND role = 'owner' AND status = 'active' AND user_id IS NOT NULL
+                LIMIT 1)
+            WHERE owner_id IS NULL`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_customers_owner
+            ON customers(workspace_id, owner_id)`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_sales_owner
+            ON sales(workspace_id, owner_id)`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_pipeline_items_owner
+            ON pipeline_items(workspace_id, owner_id)`,
+    },
+  );
+  } catch (e) {
+    console.error("[schema] backfill/índices owner_id fallaron (no-fatal):", e);
+  }
+
+  // ── 012 (plan equipos T3) — billing Mercado Pago + asientos ────────
+  //
+  // Estado de suscripción del workspace. Free = 1 asiento (invitar equipo es
+  // pago). El webhook de MP es la única fuente que escribe estas columnas
+  // tras un cobro/cancelación; el resto del backend solo las lee (seat-gate
+  // en invite, exposición en /me).
+  //   plan        : 'free' | 'pro' | 'team'
+  //   seats       : asientos permitidos (free=1, pro=3, team=9999 ~ ilimitado)
+  //   plan_status : 'active' | 'trialing' | 'past_due' | 'cancelled'
+  //   mp_preapproval_id : id de la suscripción (preapproval) en Mercado Pago
+  //
+  // OJO: sin NOT NULL en el ALTER. SQLite/libSQL puede rechazar
+  // `ADD COLUMN ... NOT NULL DEFAULT ...` sobre una tabla con filas; el resto
+  // del schema agrega columnas siempre con DEFAULT a secas. Los defaults
+  // cubren el valor inicial y el código lee con `?? 'free'` / `?? 1`.
+  await safeAddColumn(env, "cloud_workspaces", "plan", "TEXT DEFAULT 'free'");
+  await safeAddColumn(env, "cloud_workspaces", "seats", "INTEGER DEFAULT 1");
+  await safeAddColumn(env, "cloud_workspaces", "plan_status", "TEXT DEFAULT 'active'");
+  await safeAddColumn(env, "cloud_workspaces", "mp_preapproval_id", "TEXT");
+
+  // ── 013 (plan equipos T3) — timestamp del cambio de estado de billing ──
+  //
+  // Marca CUÁNDO el workspace entró en 'cancelled'/'past_due'. El cron de
+  // degradación (cron/planDowngrade.ts) cuenta los días de gracia desde acá —
+  // no desde updated_at, que cambia por cualquier edición (logo, nombre, meta).
+  // El webhook lo setea sólo en la transición a un estado no-activo y lo limpia
+  // (NULL) al reactivar. NULL ⇒ sin degradación pendiente.
+  await safeAddColumn(env, "cloud_workspaces", "plan_status_changed_at", "TEXT");
 }
 
 /**

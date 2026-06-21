@@ -28,14 +28,11 @@ import type { Env } from "../index";
 import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, type TursoArg } from "../turso";
+import { requirePerm } from "../permissions";
 
 /* ── permission helpers ──────────────────────────────────────────────── */
 
 const ROLES_READ = new Set(["owner", "admin", "vendedor", "viewer"]);
-const ROLES_MANAGE_STAGES = new Set(["owner", "admin"]);
-const ROLES_CREATE_LEAD = new Set(["owner", "admin", "vendedor"]);
-const ROLES_EDIT_LEAD = new Set(["owner", "admin", "vendedor"]);
-const ROLES_DELETE_LEAD = new Set(["owner", "admin"]);
 
 async function getRole(env: Env, workspaceId: string, userId: string): Promise<string | null> {
   const m = await tursoFirst(
@@ -45,6 +42,29 @@ async function getRole(env: Env, workspaceId: string, userId: string): Promise<s
     [workspaceId, userId],
   );
   return m ? String(m.role) : null;
+}
+
+/**
+ * T2: `owner_id` del pipeline_item es el dueño/vendedor del lead y a la vez
+ * el campo de alcance. Si el rol es 'vendedor', verifica que el lead le
+ * pertenezca antes de mutarlo. Devuelve Response (404/403) o null si OK.
+ */
+async function assertOwnsItem(
+  env: Env,
+  workspaceId: string,
+  itemId: string,
+  role: string,
+  userId: string,
+): Promise<Response | null> {
+  if (role !== "vendedor") return null;
+  const row = await tursoFirst(
+    env,
+    `SELECT owner_id FROM pipeline_items WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+    [itemId, workspaceId],
+  );
+  if (!row) return json({ error: "not_found" }, 404);
+  if (String(row.owner_id ?? "") !== userId) return json({ error: "forbidden" }, 403);
+  return null;
 }
 
 /* ── whitelist ───────────────────────────────────────────────────────── */
@@ -108,7 +128,9 @@ export async function handleCreateStage(workspaceId: string, req: Request, env: 
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRole(env, workspaceId, auth.userId);
-  if (!role || !ROLES_MANAGE_STAGES.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "settings.manage");
+  if (denied) return denied;
 
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
@@ -133,7 +155,9 @@ export async function handleUpdateStage(workspaceId: string, stageId: string, re
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRole(env, workspaceId, auth.userId);
-  if (!role || !ROLES_MANAGE_STAGES.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "settings.manage");
+  if (denied) return denied;
 
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
@@ -156,7 +180,9 @@ export async function handleDeleteStage(workspaceId: string, stageId: string, re
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRole(env, workspaceId, auth.userId);
-  if (!role || !ROLES_MANAGE_STAGES.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "settings.manage");
+  if (denied) return denied;
 
   await tursoExec(
     env,
@@ -211,11 +237,13 @@ export async function handleListItems(workspaceId: string, req: Request, env: En
   const role = await getRole(env, workspaceId, auth.userId);
   if (!role || !ROLES_READ.has(role)) return json({ error: "forbidden" }, 403);
 
+  // T2: el vendedor ve solo SUS leads; managers y viewer ven todo.
+  const scoped = role === "vendedor";
   const [rows] = await tursoQuery(env, {
     sql: `SELECT * FROM pipeline_items
-            WHERE workspace_id = ? AND deleted_at IS NULL
+            WHERE workspace_id = ? AND deleted_at IS NULL${scoped ? " AND owner_id = ?" : ""}
             ORDER BY stage_order ASC, position ASC, updated_at DESC`,
-    args: [workspaceId],
+    args: scoped ? [workspaceId, auth.userId] : [workspaceId],
   });
   return json({ items: rows ?? [] });
 }
@@ -225,7 +253,9 @@ export async function handleCreateItem(workspaceId: string, req: Request, env: E
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRole(env, workspaceId, auth.userId);
-  if (!role || !ROLES_CREATE_LEAD.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "pipeline.write");
+  if (denied) return denied;
 
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
@@ -235,6 +265,12 @@ export async function handleCreateItem(workspaceId: string, req: Request, env: E
 
   const id = (typeof body.id === "string" && body.id) ? body.id : crypto.randomUUID();
   const fields = pickItem(body);
+  // T2: owner_id = dueño del lead (alcance del vendedor). El vendedor solo
+  // crea leads suyos; managers pueden asignar (owner_id del body) o, si no lo
+  // mandan, default al creador.
+  if (role === "vendedor" || !fields.owner_id) {
+    fields.owner_id = auth.userId;
+  }
 
   const cols = ["id", "workspace_id", "created_by", ...Object.keys(fields)];
   const vals: TursoArg[] = [id, workspaceId, auth.userId, ...Object.values(fields)];
@@ -259,11 +295,20 @@ export async function handleUpdateItem(workspaceId: string, itemId: string, req:
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRole(env, workspaceId, auth.userId);
-  if (!role || !ROLES_EDIT_LEAD.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "pipeline.write");
+  if (denied) return denied;
+
+  // T2: el vendedor solo edita SUS leads.
+  const ownerErr = await assertOwnsItem(env, workspaceId, itemId, role, auth.userId);
+  if (ownerErr) return ownerErr;
 
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
   const fields = pickItem(body);
+  // El vendedor no puede reasignar el lead a otro dueño (reassign es de
+  // managers); ignoramos owner_id en su PATCH.
+  if (role === "vendedor") delete (fields as Record<string, TursoArg>).owner_id;
   if (Object.keys(fields).length === 0) return json({ error: "no_fields" }, 400);
 
   const set = Object.keys(fields).map((c) => `${c} = ?`).concat(["updated_at = datetime('now')"]);
@@ -282,7 +327,13 @@ export async function handleDeleteItem(workspaceId: string, itemId: string, req:
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRole(env, workspaceId, auth.userId);
-  if (!role || !ROLES_DELETE_LEAD.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "pipeline.write");
+  if (denied) return denied;
+
+  // T2: el vendedor solo borra SUS leads.
+  const ownerErr = await assertOwnsItem(env, workspaceId, itemId, role, auth.userId);
+  if (ownerErr) return ownerErr;
 
   await tursoExec(
     env,
@@ -318,6 +369,8 @@ export async function handleImportItems(workspaceId: string, req: Request, env: 
     const exists = await tursoFirst(env, `SELECT id FROM pipeline_items WHERE id = ?`, [id]);
     if (exists) { skipped++; continue; }
     const fields = pickItem(it as Record<string, unknown>);
+    // T2: si el lead viejo no traía dueño, lo asignamos al owner que importa.
+    if (!fields.owner_id) fields.owner_id = auth.userId;
     const createdAt = typeof it.created_at === "string" ? it.created_at : null;
     const cols = ["id", "workspace_id", "created_by", ...Object.keys(fields)];
     const vals: TursoArg[] = [id, workspaceId, auth.userId, ...Object.values(fields)];

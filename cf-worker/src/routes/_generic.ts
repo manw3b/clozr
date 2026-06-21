@@ -11,6 +11,7 @@ import type { Env } from "../index";
 import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, type TursoArg } from "../turso";
+import { requirePerm, type Permission } from "../permissions";
 
 export interface TableSpec {
   /** SQL table name. */
@@ -27,6 +28,15 @@ export interface TableSpec {
   rolesEdit: Set<string>;
   /** Roles que pueden delete. */
   rolesDelete: Set<string>;
+  /**
+   * Permiso de escritura (matriz del frontend). Si está seteado, las
+   * operaciones create/update/delete se gatean con `requirePerm(role, perm)`
+   * en vez de los Sets `rolesCreate/Edit/Delete` — para las tablas mapeadas
+   * en el plan de equipos (tasks→tasks.write, cash→cash.write,
+   * catalog→inventory.write). Las tablas sin `permission` conservan el
+   * gateo por Sets de antes.
+   */
+  permission?: Permission;
   /** ORDER BY clause (sin "ORDER BY"). */
   orderBy?: string;
   /** Soft-delete via deleted_at (default true). */
@@ -88,7 +98,13 @@ export async function handleGenericCreate(spec: TableSpec, workspaceId: string, 
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
-  if (!role || !spec.rolesCreate.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  if (spec.permission) {
+    const denied = requirePerm(role, spec.permission);
+    if (denied) return denied;
+  } else if (!spec.rolesCreate.has(role)) {
+    return json({ error: "forbidden" }, 403);
+  }
 
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
@@ -137,7 +153,13 @@ export async function handleGenericUpdate(spec: TableSpec, workspaceId: string, 
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
-  if (!role || !spec.rolesEdit.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  if (spec.permission) {
+    const denied = requirePerm(role, spec.permission);
+    if (denied) return denied;
+  } else if (!spec.rolesEdit.has(role)) {
+    return json({ error: "forbidden" }, 403);
+  }
 
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
@@ -178,7 +200,13 @@ export async function handleGenericDelete(spec: TableSpec, workspaceId: string, 
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
-  if (!role || !spec.rolesDelete.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  if (spec.permission) {
+    const denied = requirePerm(role, spec.permission);
+    if (denied) return denied;
+  } else if (!spec.rolesDelete.has(role)) {
+    return json({ error: "forbidden" }, 403);
+  }
 
   if (spec.softDelete === false) {
     await tursoExec(

@@ -23,7 +23,7 @@
  */
 
 import type { Env } from "../index";
-import { ensureSchema } from "../schema";
+import { ensureSchema, ensureBillingSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst } from "../turso";
 import { usdToArs } from "../dolar";
@@ -130,10 +130,72 @@ export async function handleBillingCheckout(workspaceId: string, req: Request, e
   return json({ init_point: data.init_point, preapproval_id: data.id ?? null });
 }
 
+/* ── POST /workspaces/:wid/billing/seats ─────────────────────────────────
+ * Cambia los empleados extra de una suscripción ACTIVA sin re-checkout:
+ * actualiza el monto del preapproval en MP (USD→ARS al blue) y, si MP lo
+ * acepta, persiste extra_seats + seats. Si MP rechaza el cambio de monto
+ * (p.ej. requiere re-autorización del pagador), devuelve needs_recheckout y
+ * el front ofrece re-suscribir. */
+export async function handleUpdateSeats(workspaceId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  await ensureBillingSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+  const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "billing.manage");
+  if (denied) return denied;
+
+  let body: { extra_seats?: unknown };
+  try { body = (await req.json()) as { extra_seats?: unknown }; } catch { return json({ error: "invalid_body" }, 400); }
+  const extra = Number(body.extra_seats);
+  if (!Number.isInteger(extra) || extra < 0 || extra > 100) return json({ error: "invalid_extra_seats" }, 400);
+
+  const ws = await tursoFirst(
+    env,
+    `SELECT plan, plan_status, mp_preapproval_id FROM cloud_workspaces WHERE id = ?`,
+    [workspaceId],
+  );
+  if (!ws) return json({ error: "not_found" }, 404);
+  const plan = String(ws.plan ?? "free");
+  const cfg = PLAN_CONFIG[plan];
+  if (!cfg) return json({ error: "not_a_paid_plan" }, 409);
+  if (ws.plan_status !== "active") return json({ error: "plan_not_active" }, 409);
+  const preId = ws.mp_preapproval_id ? String(ws.mp_preapproval_id) : "";
+  if (!preId) return json({ error: "no_subscription" }, 409);
+  if (!env.MP_ACCESS_TOKEN) return json({ error: "billing_unavailable" }, 503);
+
+  const totalUsd = cfg.usd + extra * EXTRA_SEAT_USD;
+  let amountArs: number;
+  try { amountArs = await usdToArs(totalUsd); } catch { return json({ error: "exchange_unavailable" }, 503); }
+
+  const reason = extra > 0 ? `${cfg.label} + ${extra} empleado(s)` : cfg.label;
+  let upd: { ok: boolean; status: number };
+  try {
+    upd = await updatePreapprovalAmount(env, preId, amountArs, reason);
+  } catch (e) {
+    console.error("[billing] update preapproval (seats) falló:", e);
+    return json({ error: "billing_upstream" }, 502);
+  }
+  if (!upd.ok) {
+    console.warn("[billing] MP rechazó el update de monto (seats):", upd.status);
+    return json({ error: "needs_recheckout", status: upd.status }, 409);
+  }
+
+  const seats = cfg.baseSeats + extra;
+  await tursoExec(
+    env,
+    `UPDATE cloud_workspaces SET extra_seats = ?, seats = ?, updated_at = datetime('now') WHERE id = ?`,
+    [extra, seats, workspaceId],
+  );
+  return json({ ok: true, seats, extra_seats: extra });
+}
+
 /* ── POST /billing/webhook ───────────────────────────────────────────── */
 
 export async function handleBillingWebhook(req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureBillingSchema(env);
 
   const url = new URL(req.url);
 
@@ -207,14 +269,24 @@ export async function handleBillingWebhook(req: Request, env: Env): Promise<Resp
     // Alta/renovación OK (incluye el período de trial: MP deja el preapproval
     // en 'authorized'). Activamos el plan + asientos y limpiamos el reloj de
     // gracia (plan_status_changed_at = NULL ⇒ sin degradación pendiente).
-    // Idempotente.
+    //
+    // Empleados extra: en el PRIMER link usamos el del external_reference; en
+    // re-autorizaciones (mismo preapproval ya guardado) PRESERVAMOS el de la DB
+    // —que pudo cambiar por el endpoint de asientos— para no pisarlo.
+    const existing = await tursoFirst(
+      env,
+      `SELECT mp_preapproval_id, extra_seats FROM cloud_workspaces WHERE id = ?`,
+      [wid],
+    );
+    const firstLink = !existing?.mp_preapproval_id || existing.mp_preapproval_id !== dataId;
+    const effectiveExtra = firstLink ? extraSeats : Number(existing?.extra_seats ?? 0);
     await tursoExec(
       env,
       `UPDATE cloud_workspaces
-         SET plan = ?, seats = ?, plan_status = 'active', mp_preapproval_id = ?,
+         SET plan = ?, seats = ?, extra_seats = ?, plan_status = 'active', mp_preapproval_id = ?,
              plan_status_changed_at = NULL, updated_at = datetime('now')
          WHERE id = ?`,
-      [plan, cfg.baseSeats + extraSeats, dataId, wid],
+      [plan, cfg.baseSeats + effectiveExtra, effectiveExtra, dataId, wid],
     );
   } else if (planStatus === "cancelled" || planStatus === "past_due") {
     // Baja/pago atrasado: marcamos el estado + el momento del cambio, pero NO
@@ -235,6 +307,32 @@ export async function handleBillingWebhook(req: Request, env: Env): Promise<Resp
   // 'pending' u otros: no tocamos nada (esperamos el evento de autorización).
 
   return json({ ok: true, workspace: wid, plan_status: planStatus });
+}
+
+/**
+ * Actualiza el monto (ARS) de un preapproval activo en MP. Lo usan el endpoint
+ * de asientos y el cron de re-pricing. Devuelve ok + status HTTP (no lanza por
+ * status != 2xx; sí lanza si la red falla). MP puede rechazar aumentos que
+ * requieran re-autorización del pagador — el caller decide qué hacer.
+ */
+export async function updatePreapprovalAmount(
+  env: Env,
+  preapprovalId: string,
+  amountArs: number,
+  reason: string,
+): Promise<{ ok: boolean; status: number }> {
+  const res = await fetch(`${MP_API}/preapproval/${encodeURIComponent(preapprovalId)}`, {
+    method: "PUT",
+    headers: {
+      authorization: `Bearer ${env.MP_ACCESS_TOKEN}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      reason,
+      auto_recurring: { transaction_amount: amountArs, currency_id: "ARS" },
+    }),
+  });
+  return { ok: res.ok, status: res.status };
 }
 
 /** Mapea el status del preapproval de MP a nuestro plan_status. */

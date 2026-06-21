@@ -921,6 +921,21 @@ export async function ensureConsoleSchema(env: Env): Promise<void> {
   consoleSchemaReady = true;
 }
 
+let billingSchemaReady = false;
+
+/**
+ * Columna `extra_seats` (empleados extra comprados, además de los del plan).
+ * Es la AUTORIDAD de los extras: el webhook la usa para no pisar cambios de
+ * empleados al renovar, y el re-pricing la lee para recalcular el monto USD.
+ * Lazy + memoizada, sin bumpear SCHEMA_VERSION (mismo criterio no-fatal que
+ * ensureConsoleSchema). La llaman el webhook, el endpoint de asientos y el cron.
+ */
+export async function ensureBillingSchema(env: Env): Promise<void> {
+  if (billingSchemaReady) return;
+  await safeAddColumn(env, "cloud_workspaces", "extra_seats", "INTEGER DEFAULT 0");
+  billingSchemaReady = true;
+}
+
 /**
  * Ejecuta ALTER TABLE ADD COLUMN ignorando el error si la columna ya
  * existe. Cualquier otro error sí throwa.

@@ -105,13 +105,14 @@ import {
   handleCloseCashSession,
 } from "./routes/cash-sessions";
 import { handleClientError } from "./routes/errors";
-import { handleBillingCheckout, handleBillingWebhook } from "./routes/billing";
+import { handleBillingCheckout, handleBillingWebhook, handleUpdateSeats } from "./routes/billing";
 import {
   handleListCodes, handleCreateCode, handleUpdateCode, handleRedeemCode,
   handleListConsoleWorkspaces,
 } from "./routes/console";
 import { runAiTriage } from "./cron/aiTriage";
 import { runPlanDowngrade } from "./cron/planDowngrade";
+import { runRepricing } from "./cron/reprice";
 
 export default {
   // ── Cron: AI Triage matutino (PoC) ───────────────────────────────────
@@ -122,6 +123,7 @@ export default {
     // para que un fallo (o un reject) de uno no impida el otro.
     ctx.waitUntil(runAiTriage(env).catch((e) => console.error("[cron] ai-triage:", e)));
     ctx.waitUntil(runPlanDowngrade(env).catch((e) => console.error("[cron] plan-downgrade:", e)));
+    ctx.waitUntil(runRepricing(env).catch((e) => console.error("[cron] reprice:", e)));
   },
 
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -202,6 +204,18 @@ export default {
           return cors(req, env, json({ error: "unauthorized" }, 401));
         }
         const result = await runPlanDowngrade(env);
+        return cors(req, env, json({ ok: true, ...result }));
+      }
+
+      // ── Admin: disparar el re-pricing (USD→ARS) a mano (testeo) ────
+      // Actualiza el monto ARS de las suscripciones activas según el blue.
+      // Mismo gate shared-secret (x-admin-secret == JWT_SECRET).
+      if (route === "POST /admin/reprice") {
+        const provided = req.headers.get("x-admin-secret");
+        if (!provided || provided !== env.JWT_SECRET) {
+          return cors(req, env, json({ error: "unauthorized" }, 401));
+        }
+        const result = await runRepricing(env);
         return cors(req, env, json({ ok: true, ...result }));
       }
 
@@ -337,6 +351,12 @@ export default {
       const wsBillingCheckoutMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/billing\/checkout\/?$/);
       if (wsBillingCheckoutMatch && req.method === "POST") {
         return cors(req, env, await handleBillingCheckout(wsBillingCheckoutMatch[1]!, req, env));
+      }
+
+      // F2 — gestión de empleados extra sobre una suscripción activa.
+      const wsBillingSeatsMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/billing\/seats\/?$/);
+      if (wsBillingSeatsMatch && req.method === "POST") {
+        return cors(req, env, await handleUpdateSeats(wsBillingSeatsMatch[1]!, req, env));
       }
 
       // Consola Clozr — canje de código (lo pega el owner del workspace).

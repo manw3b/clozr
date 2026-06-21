@@ -21,12 +21,18 @@ export interface Env {
   TURSO_AUTH_TOKEN: string;
   RESEND_API_KEY: string;
   JWT_SECRET: string;
+  // Secret dedicado para los endpoints /admin/* (diagnóstico/cron manual).
+  // Si no está, se acepta JWT_SECRET (legacy). Ver adminOk().
+  ADMIN_SECRET: string;
   // vars
   RESEND_FROM: string;
   MAGIC_LINK_TTL_MIN: string;
   SESSION_TTL_DAYS: string;
   DEEP_LINK_SCHEME: string;
   ALLOWED_ORIGINS: string;
+  // Consola Clozr: lista de emails super-admin (separada por comas). Gate
+  // server-side de las rutas /console/*. Ver superadmin.ts.
+  SUPERADMIN_EMAILS: string;
   // Google OAuth (F: login con Google). client_id puede ser var; el secret
   // se setea con `wrangler secret put GOOGLE_CLIENT_SECRET`.
   GOOGLE_CLIENT_ID: string;
@@ -35,6 +41,13 @@ export interface Env {
   // redacta follow-ups de leads estancados. Se setea con
   // `wrangler secret put ANTHROPIC_API_KEY`. Si falta, el cron hace skip.
   ANTHROPIC_API_KEY: string;
+  // Billing (T3) — Mercado Pago suscripciones (preapproval). Se setean con
+  // `wrangler secret put MP_ACCESS_TOKEN` y `wrangler secret put
+  // MP_WEBHOOK_SECRET`. Si MP_ACCESS_TOKEN falta, /billing/checkout devuelve
+  // 503. MP_WEBHOOK_SECRET valida la firma del webhook (si falta, se loguea
+  // y se procesa igual — solo recomendado para dev).
+  MP_ACCESS_TOKEN: string;
+  MP_WEBHOOK_SECRET: string;
   // R2 bucket binding (I) — para logos/banners del workspace.
   ASSETS: R2Bucket;
 }
@@ -95,14 +108,29 @@ import {
   handleCloseCashSession,
 } from "./routes/cash-sessions";
 import { handleClientError } from "./routes/errors";
+import {
+  handleBillingCheckout, handleBillingWebhook, handleUpdateSeats, handleCatalogCheckout,
+  handleCoverSpace, handleUncoverSpace,
+} from "./routes/billing";
+import {
+  handleListCodes, handleCreateCode, handleUpdateCode, handleRedeemCode,
+  handleListConsoleWorkspaces, handleGetReferralCode,
+} from "./routes/console";
 import { runAiTriage } from "./cron/aiTriage";
+import { runPlanDowngrade } from "./cron/planDowngrade";
+import { runRepricing } from "./cron/reprice";
+import { getBlueRate } from "./dolar";
 
 export default {
   // ── Cron: AI Triage matutino (PoC) ───────────────────────────────────
   // Lo dispara Cloudflare según wrangler.toml [triggers]. ctx.waitUntil
   // mantiene vivo el isolate hasta que termina el barrido de workspaces.
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(runAiTriage(env));
+    // Dos jobs independientes en el mismo trigger diario. Cada uno con su catch
+    // para que un fallo (o un reject) de uno no impida el otro.
+    ctx.waitUntil(runAiTriage(env).catch((e) => console.error("[cron] ai-triage:", e)));
+    ctx.waitUntil(runPlanDowngrade(env).catch((e) => console.error("[cron] plan-downgrade:", e)));
+    ctx.waitUntil(runRepricing(env).catch((e) => console.error("[cron] reprice:", e)));
   },
 
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -152,8 +180,7 @@ export default {
       // (reusamos JWT_SECRET — no es perfecto pero es lo único que ya
       // tenemos como secret arbitrario en el entorno).
       if (route === "POST /admin/migrations") {
-        const provided = req.headers.get("x-admin-secret");
-        if (!provided || provided !== env.JWT_SECRET) {
+        if (!adminOk(req, env)) {
           return cors(req, env, json({ error: "unauthorized" }, 401));
         }
         // Reset del initPromise no se expone — pero sí podemos forzar
@@ -166,12 +193,85 @@ export default {
       // Para testear en prod sin esperar al cron. Mismo gate shared-secret
       // que /admin/migrations (x-admin-secret == JWT_SECRET).
       if (route === "POST /admin/ai-triage") {
-        const provided = req.headers.get("x-admin-secret");
-        if (!provided || provided !== env.JWT_SECRET) {
+        if (!adminOk(req, env)) {
           return cors(req, env, json({ error: "unauthorized" }, 401));
         }
         const result = await runAiTriage(env);
         return cors(req, env, json({ ok: true, ...result }));
+      }
+
+      // ── Admin: disparar la degradación de plan a mano (testeo) ─────
+      // Baja a Free los workspaces con la gracia vencida. Mismo gate
+      // shared-secret (x-admin-secret == JWT_SECRET) que /admin/ai-triage.
+      if (route === "POST /admin/plan-downgrade") {
+        if (!adminOk(req, env)) {
+          return cors(req, env, json({ error: "unauthorized" }, 401));
+        }
+        const result = await runPlanDowngrade(env);
+        return cors(req, env, json({ ok: true, ...result }));
+      }
+
+      // ── Admin: diagnóstico de billing (validación MP) ──────────────
+      // Reporta si MP está configurado y el token es válido, si el webhook
+      // secret está, y si el Worker llega al dólar. No expone secretos.
+      // Gate shared-secret (x-admin-secret == JWT_SECRET).
+      if (route === "GET /admin/billing-status") {
+        if (!adminOk(req, env)) {
+          return cors(req, env, json({ error: "unauthorized" }, 401));
+        }
+        const status: Record<string, unknown> = {
+          mp_access_token_set: !!env.MP_ACCESS_TOKEN,
+          mp_webhook_secret_set: !!env.MP_WEBHOOK_SECRET,
+          mp_token_valid: false,
+          mp_account: null,
+          blue_rate: null,
+          errors: [] as string[],
+        };
+        const errs = status.errors as string[];
+        try { status.blue_rate = await getBlueRate(); } catch (e) { errs.push(`dolar: ${e instanceof Error ? e.message : e}`); }
+        if (env.MP_ACCESS_TOKEN) {
+          try {
+            const r = await fetch("https://api.mercadopago.com/users/me", {
+              headers: { authorization: `Bearer ${env.MP_ACCESS_TOKEN}` },
+            });
+            if (r.ok) {
+              const u = (await r.json().catch(() => null)) as { nickname?: string; email?: string; id?: number } | null;
+              status.mp_token_valid = true;
+              status.mp_account = u?.nickname ?? u?.email ?? u?.id ?? "ok";
+            } else {
+              errs.push(`mp_token: HTTP ${r.status}`);
+            }
+          } catch (e) {
+            errs.push(`mp: ${e instanceof Error ? e.message : e}`);
+          }
+        }
+        return cors(req, env, json(status));
+      }
+
+      // ── Admin: disparar el re-pricing (USD→ARS) a mano (testeo) ────
+      // Actualiza el monto ARS de las suscripciones activas según el blue.
+      // Mismo gate shared-secret (x-admin-secret == JWT_SECRET).
+      if (route === "POST /admin/reprice") {
+        if (!adminOk(req, env)) {
+          return cors(req, env, json({ error: "unauthorized" }, 401));
+        }
+        const result = await runRepricing(env);
+        return cors(req, env, json({ ok: true, ...result }));
+      }
+
+      // ── Consola Clozr (super-admin) ───────────────────────────────
+      // GET /console/workspaces (panel de cuentas).
+      if (url.pathname === "/console/workspaces" && req.method === "GET") {
+        return cors(req, env, await handleListConsoleWorkspaces(req, env));
+      }
+      // GET/POST /console/codes ; PATCH /console/codes/:id. El gate
+      // super-admin (por email) se chequea dentro de cada handler.
+      const consoleCodeMatch = url.pathname.match(/^\/console\/codes(?:\/([^/]+))?\/?$/);
+      if (consoleCodeMatch) {
+        const codeId = consoleCodeMatch[1];
+        if (!codeId && req.method === "GET")   return cors(req, env, await handleListCodes(req, env));
+        if (!codeId && req.method === "POST")  return cors(req, env, await handleCreateCode(req, env));
+        if (codeId && req.method === "PATCH")  return cors(req, env, await handleUpdateCode(codeId, req, env));
       }
 
       // ── Rutas con path dinámico (/workspaces/:id/...) ─────────────
@@ -284,6 +384,49 @@ export default {
         if (sId && req.method === "GET")     return cors(req, env, await handleGetSale(wsId, sId, req, env));
         if (sId && req.method === "PATCH")   return cors(req, env, await handleUpdateSale(wsId, sId, req, env));
         if (sId && req.method === "DELETE")  return cors(req, env, await handleDeleteSale(wsId, sId, req, env));
+      }
+
+      // T3 — Billing checkout (crea preapproval MP). Va antes del PATCH
+      // workspace genérico; su path es más específico (.../billing/checkout).
+      const wsBillingCheckoutMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/billing\/checkout\/?$/);
+      if (wsBillingCheckoutMatch && req.method === "POST") {
+        return cors(req, env, await handleBillingCheckout(wsBillingCheckoutMatch[1]!, req, env));
+      }
+
+      // F2 — gestión de empleados extra sobre una suscripción activa.
+      const wsBillingSeatsMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/billing\/seats\/?$/);
+      if (wsBillingSeatsMatch && req.method === "POST") {
+        return cors(req, env, await handleUpdateSeats(wsBillingSeatsMatch[1]!, req, env));
+      }
+
+      // F4 — pago único para desbloquear un catálogo premium. Va ANTES del
+      // dispatcher genérico de /catalog para no colisionar con /catalog/:id.
+      const wsCatalogCheckoutMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/catalog\/checkout\/?$/);
+      if (wsCatalogCheckoutMatch && req.method === "POST") {
+        return cors(req, env, await handleCatalogCheckout(wsCatalogCheckoutMatch[1]!, req, env));
+      }
+
+      // Consola Clozr — canje de código (lo pega el owner del workspace).
+      const wsRedeemMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/redeem-code\/?$/);
+      if (wsRedeemMatch && req.method === "POST") {
+        return cors(req, env, await handleRedeemCode(wsRedeemMatch[1]!, req, env));
+      }
+
+      // Referidos — código self-serve del workspace (lo comparte el dueño).
+      const wsReferralMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/referral\/?$/);
+      if (wsReferralMatch && req.method === "POST") {
+        return cors(req, env, await handleGetReferralCode(wsReferralMatch[1]!, req, env));
+      }
+
+      // Espacios/sucursales — sumar/quitar un espacio cubierto al plan del
+      // principal (:wid es el que paga; el target va en el body).
+      const wsCoverMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/cover\/?$/);
+      if (wsCoverMatch && req.method === "POST") {
+        return cors(req, env, await handleCoverSpace(wsCoverMatch[1]!, req, env));
+      }
+      const wsUncoverMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/uncover\/?$/);
+      if (wsUncoverMatch && req.method === "POST") {
+        return cors(req, env, await handleUncoverSpace(wsUncoverMatch[1]!, req, env));
       }
 
       // G/A4 — PATCH workspace (daily_goal, industry, name, etc).
@@ -448,6 +591,11 @@ export default {
         case "GET /auth/google/callback":
           return handleGoogleCallback(req, env);
 
+        // T3 — Webhook de Mercado Pago. Público (sin auth de sesión): MP lo
+        // llama server-to-server. La firma se valida dentro del handler.
+        case "POST /billing/webhook":
+          return cors(req, env, await handleBillingWebhook(req, env));
+
         case "GET /me":
           return cors(req, env, await handleMe(req, env));
 
@@ -482,6 +630,18 @@ export default {
  * 5000 entries. En la práctica nunca llega — la auth la usan ~5 personas.
  */
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+/**
+ * Auth de los endpoints /admin/*. Acepta el secret dedicado ADMIN_SECRET y,
+ * por compatibilidad, JWT_SECRET (que era el gate original). Header:
+ * x-admin-secret.
+ */
+function adminOk(req: Request, env: Env): boolean {
+  const provided = req.headers.get("x-admin-secret");
+  if (!provided) return false;
+  if (env.ADMIN_SECRET && provided === env.ADMIN_SECRET) return true;
+  return provided === env.JWT_SECRET;
+}
 
 function checkRate(req: Request, key: string, limit: number, windowMs: number): boolean {
   const ip = req.headers.get("cf-connecting-ip") ?? "unknown";

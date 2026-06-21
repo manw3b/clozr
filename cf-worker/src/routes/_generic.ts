@@ -11,6 +11,7 @@ import type { Env } from "../index";
 import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, type TursoArg } from "../turso";
+import { requirePerm, type Permission } from "../permissions";
 
 export interface TableSpec {
   /** SQL table name. */
@@ -27,6 +28,15 @@ export interface TableSpec {
   rolesEdit: Set<string>;
   /** Roles que pueden delete. */
   rolesDelete: Set<string>;
+  /**
+   * Permiso de escritura (matriz del frontend). Si está seteado, las
+   * operaciones create/update/delete se gatean con `requirePerm(role, perm)`
+   * en vez de los Sets `rolesCreate/Edit/Delete` — para las tablas mapeadas
+   * en el plan de equipos (tasks→tasks.write, cash→cash.write,
+   * catalog→inventory.write). Las tablas sin `permission` conservan el
+   * gateo por Sets de antes.
+   */
+  permission?: Permission;
   /** ORDER BY clause (sin "ORDER BY"). */
   orderBy?: string;
   /** Soft-delete via deleted_at (default true). */
@@ -88,7 +98,13 @@ export async function handleGenericCreate(spec: TableSpec, workspaceId: string, 
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
-  if (!role || !spec.rolesCreate.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  if (spec.permission) {
+    const denied = requirePerm(role, spec.permission);
+    if (denied) return denied;
+  } else if (!spec.rolesCreate.has(role)) {
+    return json({ error: "forbidden" }, 403);
+  }
 
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
@@ -114,8 +130,10 @@ export async function handleGenericCreate(spec: TableSpec, workspaceId: string, 
     if (msg.includes("unique") || msg.includes("primary key")) {
       return json({ error: "duplicate_id", id }, 409);
     }
-    // Si la tabla no tiene created_by, retry sin ese col.
-    if (msg.includes("no column named created_by") || msg.includes("has no column named created_by")) {
+    // Si la tabla no tiene created_by, retry sin ese col. Match amplio: cubre
+    // cualquier variante del mensaje de Turso (con/sin comillas) que mencione
+    // la columna ausente.
+    if (msg.includes("created_by")) {
       const cols2 = ["id", "workspace_id", ...Object.keys(fields)];
       const vals2: TursoArg[] = [id, workspaceId, ...Object.values(fields)];
       await tursoExec(
@@ -137,7 +155,13 @@ export async function handleGenericUpdate(spec: TableSpec, workspaceId: string, 
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
-  if (!role || !spec.rolesEdit.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  if (spec.permission) {
+    const denied = requirePerm(role, spec.permission);
+    if (denied) return denied;
+  } else if (!spec.rolesEdit.has(role)) {
+    return json({ error: "forbidden" }, 403);
+  }
 
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
@@ -178,7 +202,13 @@ export async function handleGenericDelete(spec: TableSpec, workspaceId: string, 
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
-  if (!role || !spec.rolesDelete.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  if (spec.permission) {
+    const denied = requirePerm(role, spec.permission);
+    if (denied) return denied;
+  } else if (!spec.rolesDelete.has(role)) {
+    return json({ error: "forbidden" }, 403);
+  }
 
   if (spec.softDelete === false) {
     await tursoExec(
@@ -241,8 +271,8 @@ export async function handleGenericImport(spec: TableSpec, workspaceId: string, 
       imported++;
     } catch (e) {
       const msg = e instanceof Error ? e.message.toLowerCase() : String(e);
-      if (msg.includes("no column named created_by") || msg.includes("has no column named created_by")) {
-        // Retry sin created_by.
+      if (msg.includes("created_by")) {
+        // Retry sin created_by (match amplio ante variantes del mensaje).
         const cols2 = ["id", "workspace_id", ...Object.keys(fields)];
         const vals2: TursoArg[] = [id, workspaceId, ...Object.values(fields)];
         if (createdAt) { cols2.push("created_at"); vals2.push(createdAt); }

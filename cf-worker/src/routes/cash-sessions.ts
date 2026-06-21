@@ -18,9 +18,12 @@ import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoQuery, tursoExec, tursoFirst } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
+import { requirePerm } from "../permissions";
 
-const ALL_ROLES = new Set(["owner", "admin", "vendedor", "viewer"]);
-const STAFF_ROLES = new Set(["owner", "admin", "vendedor"]);
+// Caja restringida a managers (decisión de producto): el vendedor no ve los
+// totales/sesiones de caja del negocio. Apertura/cierre siguen gateados por
+// cash.write más abajo.
+const CAJA_READ_ROLES = new Set(["owner", "admin"]);
 
 function num(v: unknown, fallback = 0): number {
   const n = Number(v);
@@ -32,7 +35,7 @@ export async function handleListCashSessions(wsId: string, req: Request, env: En
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
-  if (!role || !ALL_ROLES.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role || !CAJA_READ_ROLES.has(role)) return json({ error: "forbidden" }, 403);
 
   const [rows] = await tursoQuery(env, {
     sql: `SELECT * FROM cash_sessions
@@ -48,7 +51,9 @@ export async function handleOpenCashSession(wsId: string, req: Request, env: Env
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
-  if (!role || !STAFF_ROLES.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "cash.write");
+  if (denied) return denied;
 
   let body: Record<string, unknown>;
   try {
@@ -119,7 +124,9 @@ export async function handleCloseCashSession(
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
-  if (!role || !STAFF_ROLES.has(role)) return json({ error: "forbidden" }, 403);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "cash.write");
+  if (denied) return denied;
 
   let body: Record<string, unknown>;
   try {

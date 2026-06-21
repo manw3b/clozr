@@ -28,10 +28,25 @@ let initPromise: Promise<void> | null = null;
  *
  * Bump cuando agregues un CREATE TABLE / ALTER TABLE / safeAddColumn.
  */
-const SCHEMA_VERSION = 8;
+// NOTA: la Consola (migración 014) NO bumpea esta versión a propósito. Bumpear
+// fuerza a TODOS los cold-starts a re-correr applySchema completo — justo lo que
+// rompió prod en el intento "v12" anterior. En cambio, las tablas de la Consola
+// se crean de forma lazy y auto-curativa vía ensureConsoleSchema(), que llaman
+// los handlers /console/* y el canje. Para una DB fresca, el bloque 014 dentro
+// de applySchema igual las crea. Sólo bumpear si agregás una migración que el
+// resto del backend necesite leer en frío.
+const SCHEMA_VERSION = 11;
 
 export function ensureSchema(env: Env): Promise<void> {
-  if (!initPromise) initPromise = applySchemaIfNeeded(env);
+  if (!initPromise) {
+    initPromise = applySchemaIfNeeded(env).catch((e) => {
+      // Si la migración falla, NO cacheamos el rechazo: lo reseteamos para que
+      // la próxima request reintente, en vez de dejar el isolate "envenenado"
+      // devolviendo 500 a todo hasta que Cloudflare lo recicle.
+      initPromise = null;
+      throw e;
+    });
+  }
   return initPromise;
 }
 
@@ -726,6 +741,237 @@ async function applySchema(env: Env): Promise<void> {
             ON customer_tags(workspace_id, deleted_at)`,
     },
   );
+
+  // ── 011 (plan equipos T2) — owner_id: el vendedor ve solo lo suyo ──
+  //
+  // El vendedor solo ve/edita los registros que le pertenecen; owner/admin
+  // ven todo el workspace. Agregamos owner_id a las 3 tablas de datos
+  // operativos por-dueño (customers, sales, pipeline_items) y filtramos por
+  // él en los handlers cuando el rol es 'vendedor'. Caja, stages, catálogo,
+  // tareas y demás quedan COMPARTIDOS (no se scopean por dueño).
+  //
+  // pipeline_items YA tiene owner_id (era el "dueño/vendedor asignado" del
+  // lead) — safeAddColumn skipea el duplicate y reusamos esa columna como
+  // campo de alcance. customers/sales no lo tenían (usaban created_by).
+  await safeAddColumn(env, "customers", "owner_id", "TEXT");
+  await safeAddColumn(env, "sales", "owner_id", "TEXT");
+  await safeAddColumn(env, "pipeline_items", "owner_id", "TEXT");
+
+  // Backfill: los registros viejos sin dueño quedan asignados al owner del
+  // workspace (managers ven todo igual, así que no cambia su vista; pero deja
+  // los datos históricos con un dueño concreto en vez de NULL). Idempotente:
+  // solo toca filas con owner_id NULL. NO-fatal: si algo falla acá, logueamos
+  // pero no rompemos ensureSchema — las columnas ya están agregadas y los
+  // handlers funcionan; el backfill y los índices son optimizaciones.
+  try {
+  await tursoQuery(
+    env,
+    {
+      sql: `UPDATE customers SET owner_id = (
+              SELECT user_id FROM memberships
+                WHERE workspace_id = customers.workspace_id
+                  AND role = 'owner' AND status = 'active' AND user_id IS NOT NULL
+                LIMIT 1)
+            WHERE owner_id IS NULL`,
+    },
+    {
+      sql: `UPDATE sales SET owner_id = (
+              SELECT user_id FROM memberships
+                WHERE workspace_id = sales.workspace_id
+                  AND role = 'owner' AND status = 'active' AND user_id IS NOT NULL
+                LIMIT 1)
+            WHERE owner_id IS NULL`,
+    },
+    {
+      sql: `UPDATE pipeline_items SET owner_id = (
+              SELECT user_id FROM memberships
+                WHERE workspace_id = pipeline_items.workspace_id
+                  AND role = 'owner' AND status = 'active' AND user_id IS NOT NULL
+                LIMIT 1)
+            WHERE owner_id IS NULL`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_customers_owner
+            ON customers(workspace_id, owner_id)`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_sales_owner
+            ON sales(workspace_id, owner_id)`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_pipeline_items_owner
+            ON pipeline_items(workspace_id, owner_id)`,
+    },
+  );
+  } catch (e) {
+    console.error("[schema] backfill/índices owner_id fallaron (no-fatal):", e);
+  }
+
+  // ── 012 (plan equipos T3) — billing Mercado Pago + asientos ────────
+  //
+  // Estado de suscripción del workspace. Free = 1 asiento (invitar equipo es
+  // pago). El webhook de MP es la única fuente que escribe estas columnas
+  // tras un cobro/cancelación; el resto del backend solo las lee (seat-gate
+  // en invite, exposición en /me).
+  //   plan        : 'free' | 'pro' | 'team'
+  //   seats       : asientos permitidos (free=1, pro=3, team=9999 ~ ilimitado)
+  //   plan_status : 'active' | 'trialing' | 'past_due' | 'cancelled'
+  //   mp_preapproval_id : id de la suscripción (preapproval) en Mercado Pago
+  //
+  // OJO: sin NOT NULL en el ALTER. SQLite/libSQL puede rechazar
+  // `ADD COLUMN ... NOT NULL DEFAULT ...` sobre una tabla con filas; el resto
+  // del schema agrega columnas siempre con DEFAULT a secas. Los defaults
+  // cubren el valor inicial y el código lee con `?? 'free'` / `?? 1`.
+  await safeAddColumn(env, "cloud_workspaces", "plan", "TEXT DEFAULT 'free'");
+  await safeAddColumn(env, "cloud_workspaces", "seats", "INTEGER DEFAULT 1");
+  await safeAddColumn(env, "cloud_workspaces", "plan_status", "TEXT DEFAULT 'active'");
+  await safeAddColumn(env, "cloud_workspaces", "mp_preapproval_id", "TEXT");
+
+  // ── 013 (plan equipos T3) — timestamp del cambio de estado de billing ──
+  //
+  // Marca CUÁNDO el workspace entró en 'cancelled'/'past_due'. El cron de
+  // degradación (cron/planDowngrade.ts) cuenta los días de gracia desde acá —
+  // no desde updated_at, que cambia por cualquier edición (logo, nombre, meta).
+  // El webhook lo setea sólo en la transición a un estado no-activo y lo limpia
+  // (NULL) al reactivar. NULL ⇒ sin degradación pendiente.
+  await safeAddColumn(env, "cloud_workspaces", "plan_status_changed_at", "TEXT");
+
+  // ── 014 (Consola Clozr — Fase 1) — códigos de licencia/descuento ───────
+  //
+  // Tablas para la Consola super-admin: códigos canjeables (licencia o
+  // descuento) + log de canjes. La columna `license_expires_at` marca hasta
+  // cuándo un workspace tiene un plan activado por licencia gratuita; el cron
+  // de degradación lo baja a Free cuando vence (sin pisar suscripciones MP,
+  // que tienen mp_preapproval_id != NULL).
+  //
+  // NO-FATAL: todo el bloque va en try/catch. Si algo de acá falla, NO debe
+  // tumbar ensureSchema (lección del break v12 en prod) — los handlers de la
+  // Consola se auto-curan llamando a ensureConsoleSchema(), que reintenta de
+  // forma idempotente (CREATE IF NOT EXISTS + safeAddColumn).
+  try {
+    await ensureConsoleSchema(env);
+  } catch (e) {
+    console.error("[schema] migración 014 (consola) falló (no-fatal):", e);
+  }
+}
+
+/**
+ * DDL de la Consola (Fase 1). Idempotente (CREATE IF NOT EXISTS). Se aplica
+ * tanto en el applySchema global como, defensivamente, al entrar a cualquier
+ * handler de la Consola — así la disponibilidad de la Consola no depende de
+ * que la migración global haya corrido sin error.
+ *
+ * console_codes.kind:
+ *   'license'  → activa plan (pro/team) gratis en un workspace, con expiry.
+ *   'discount' → % o monto fijo; se canjea y queda registrado (la aplicación
+ *                al checkout MP es de una fase posterior).
+ */
+const CONSOLE_DDL: ReadonlyArray<{ sql: string }> = [
+  {
+    sql: `CREATE TABLE IF NOT EXISTS console_codes (
+      id TEXT PRIMARY KEY,
+      code TEXT NOT NULL UNIQUE,
+      kind TEXT NOT NULL,                 -- 'license' | 'discount'
+      -- licencia:
+      plan TEXT,                          -- 'pro' | 'team'
+      duration_days INTEGER,              -- vigencia desde el canje (NULL = usa expires_at)
+      -- descuento:
+      discount_type TEXT,                 -- 'percent' | 'amount'
+      discount_value INTEGER,             -- % (1-100) o monto ARS
+      -- comunes:
+      max_uses INTEGER,                   -- NULL = ilimitado
+      uses INTEGER NOT NULL DEFAULT 0,
+      expires_at TEXT,                    -- el código no se puede canjear pasada esta fecha
+      note TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      disabled_at TEXT
+    )`,
+  },
+  { sql: `CREATE INDEX IF NOT EXISTS idx_console_codes_kind ON console_codes(kind, disabled_at)` },
+  {
+    sql: `CREATE TABLE IF NOT EXISTS console_code_redemptions (
+      id TEXT PRIMARY KEY,
+      code_id TEXT NOT NULL,
+      code TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      workspace_id TEXT,
+      user_id TEXT,
+      redeemed_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  },
+  { sql: `CREATE INDEX IF NOT EXISTS idx_console_redemptions_code ON console_code_redemptions(code_id)` },
+];
+
+let consoleSchemaReady = false;
+
+/**
+ * Garantiza las tablas de la Consola. Memoizado por isolate; reintenta si
+ * falló (deja consoleSchemaReady en false). Lo llaman los handlers de la
+ * Consola (y el applySchema global) — barato e idempotente.
+ */
+export async function ensureConsoleSchema(env: Env): Promise<void> {
+  if (consoleSchemaReady) return;
+  await tursoQuery(env, ...CONSOLE_DDL);
+  // Columna en cloud_workspaces: hasta cuándo vale un plan activado por
+  // licencia gratuita. La agregamos acá (no solo en applySchema) para que el
+  // handler de canje la tenga garantizada aunque la migración global se
+  // hubiese salteado. safeAddColumn es idempotente (ignora duplicate column).
+  await safeAddColumn(env, "cloud_workspaces", "license_expires_at", "TEXT");
+  // F4/F5: objetivo del código (ej "catalog:apple" para kind 'unlock', o el
+  // plan/función al que apunta un descuento). NULL para los códigos previos.
+  await safeAddColumn(env, "console_codes", "target", "TEXT");
+  // Referidos: si el código es de referido, el workspace que lo generó (para
+  // recompensarlo cuando alguien lo canjea). NULL = código de la Consola.
+  await safeAddColumn(env, "console_codes", "referrer_workspace_id", "TEXT");
+  consoleSchemaReady = true;
+}
+
+let billingSchemaReady = false;
+
+/**
+ * Columna `extra_seats` (empleados extra comprados, además de los del plan).
+ * Es la AUTORIDAD de los extras: el webhook la usa para no pisar cambios de
+ * empleados al renovar, y el re-pricing la lee para recalcular el monto USD.
+ * Lazy + memoizada, sin bumpear SCHEMA_VERSION (mismo criterio no-fatal que
+ * ensureConsoleSchema). La llaman el webhook, el endpoint de asientos y el cron.
+ */
+export async function ensureBillingSchema(env: Env): Promise<void> {
+  if (billingSchemaReady) return;
+  await safeAddColumn(env, "cloud_workspaces", "extra_seats", "INTEGER DEFAULT 0");
+  // Crecimiento: intervalo de cobro ('monthly' | 'annual'). El anual = 10×
+  // mensual (2 meses gratis); lo leen checkout, seats y el re-pricing.
+  await safeAddColumn(env, "cloud_workspaces", "billing_interval", "TEXT DEFAULT 'monthly'");
+  // Crecimiento (espacios/sucursales adicionales): si este workspace está
+  // cubierto por el plan de OTRO (el "principal" que paga), guardamos acá el id
+  // del pagador. NULL = espacio independiente (paga su propio plan o es Free).
+  // El espacio cubierto copia el plan del principal y suma ESPACIO_USD/mes a esa
+  // única suscripción (ver routes/billing.ts cover/uncover + cron de degradación).
+  await safeAddColumn(env, "cloud_workspaces", "covered_by_workspace_id", "TEXT");
+  billingSchemaReady = true;
+}
+
+let workspaceColsReady = false;
+
+/**
+ * Columnas extra de cloud_workspaces fuera del applySchema versionado (F3):
+ *   icon — emoji/miniatura del espacio (cuando no hay logo subido).
+ * Lazy + memoizada (mismo criterio no-fatal). La llaman /me y el PATCH de
+ * workspace para garantizar la columna sin bumpear SCHEMA_VERSION.
+ */
+export async function ensureWorkspaceColumns(env: Env): Promise<void> {
+  if (workspaceColsReady) return;
+  await safeAddColumn(env, "cloud_workspaces", "icon", "TEXT");
+  // F4: catálogos premium desbloqueados (JSON array de keys, ej ["apple"]).
+  await safeAddColumn(env, "cloud_workspaces", "unlocked_catalogs", "TEXT");
+  // F5: descuento activo del workspace (otorgado por un código de la Consola).
+  //   discount_type: 'percent' | 'amount' (USD) ; discount_target: "all" |
+  //   "plan:any|pro|team" | "catalog:any|apple". Se aplica en cada checkout
+  //   cuyo target matchee (y en el re-pricing).
+  await safeAddColumn(env, "cloud_workspaces", "discount_type", "TEXT");
+  await safeAddColumn(env, "cloud_workspaces", "discount_value", "INTEGER");
+  await safeAddColumn(env, "cloud_workspaces", "discount_target", "TEXT");
+  workspaceColsReady = true;
 }
 
 /**

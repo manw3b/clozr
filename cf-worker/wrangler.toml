@@ -50,6 +50,9 @@ RESEND_FROM = "Clozr <acceso@clozr.online>"
 MAGIC_LINK_TTL_MIN = "15"
 SESSION_TTL_DAYS = "30"
 DEEP_LINK_SCHEME = "clozr"
+# Consola Clozr — super-admins de la plataforma (lista separada por comas).
+# Gate server-side de /console/*. Configurable sin tocar código.
+SUPERADMIN_EMAILS = "pyter.import@gmail.com"
 # NOTA: CORS está abierto (reflejamos el origin que venga) — la lista
 # ALLOWED_ORIGINS que estaba acá ya no se usa runtime. La saqué en
 # v1.3.38 cuando el WebView2 de Tauri 2 Windows nos dio "Failed to

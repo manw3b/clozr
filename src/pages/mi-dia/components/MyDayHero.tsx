@@ -715,7 +715,7 @@ function ProgressBar({ value }: { value: number }) {
           height: '100%',
           background:
             value >= 100
-              ? `linear-gradient(90deg, ${color.success} 0%, #34D399 100%)`
+              ? `linear-gradient(90deg, ${color.success} 0%, #4ADE80 100%)`
               : `linear-gradient(90deg, ${color.primary} 0%, ${color.primaryHover} 100%)`,
           borderRadius: radius.full,
           transition: 'width 800ms cubic-bezier(0.4, 0, 0.2, 1)',

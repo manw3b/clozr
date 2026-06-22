@@ -16,7 +16,8 @@ import { json, getRoleInWorkspace } from "./_generic";
 import { tursoFirst } from "../turso";
 import { getWallet, consume, canAfford, hasAiAccess, AI_ACTION_COSTS } from "../aiWallet";
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-sonnet-4-6"; // preferido: el más capaz para el chat
+const FALLBACK_MODEL = "claude-haiku-4-5-20251001"; // respaldo probado (el que usa el triage)
 const MAX_TOKENS = 800; // acota el costo por mensaje
 const MAX_HISTORY = 12; // últimos N turnos que mandamos al modelo
 const MAX_CHARS = 4000; // recorte por mensaje
@@ -66,6 +67,69 @@ async function businessSnapshot(env: Env, wid: string): Promise<string> {
   }
 }
 
+interface ClaudeCall {
+  system: string;
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  maxTokens: number;
+}
+
+/**
+ * Una llamada a la API de Claude con respaldo de modelo. Probamos primero el
+ * modelo preferido (Sonnet, más capaz) y, si esta cuenta lo rechaza por tema
+ * de modelo (404 no encontrado / 400 inválido / 403 sin acceso), reintentamos
+ * UNA vez con Haiku — el mismo modelo que ya usa el triage y que sabemos que
+ * responde acá. Así la IA funciona aunque la cuenta no tenga Sonnet habilitado.
+ * Devuelve { ok, text, status }: ok=false ⇒ el upstream falló de verdad.
+ */
+async function callClaude(env: Env, opts: ClaudeCall): Promise<{ ok: boolean; text: string; status: number }> {
+  const attempt = (model: string) =>
+    fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ model, max_tokens: opts.maxTokens, system: opts.system, messages: opts.messages }),
+    });
+
+  let res: Response;
+  try {
+    res = await attempt(MODEL);
+  } catch (e) {
+    console.error("[ai] fetch a Anthropic falló:", e);
+    return { ok: false, text: "", status: 0 };
+  }
+
+  // El modelo preferido puede no estar habilitado en esta cuenta → caemos a Haiku.
+  if (!res.ok && (res.status === 404 || res.status === 400 || res.status === 403)) {
+    const detail = await res.text().catch(() => "");
+    console.error(`[ai] modelo ${MODEL} rechazado (${res.status}): ${detail.slice(0, 300)} — reintento con ${FALLBACK_MODEL}`);
+    try {
+      res = await attempt(FALLBACK_MODEL);
+    } catch (e) {
+      console.error("[ai] fetch (fallback) a Anthropic falló:", e);
+      return { ok: false, text: "", status: 0 };
+    }
+  }
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    console.error(`[ai] Anthropic rechazó (${res.status}): ${detail.slice(0, 300)}`);
+    return { ok: false, text: "", status: res.status };
+  }
+
+  const data = (await res.json().catch(() => null)) as
+    | { content?: Array<{ type?: string; text?: string }> }
+    | null;
+  const text = (data?.content ?? [])
+    .filter((b) => b.type === "text" && typeof b.text === "string")
+    .map((b) => b.text)
+    .join("")
+    .trim();
+  return { ok: true, text, status: res.status };
+}
+
 export async function handleAiStatus(workspaceId: string, req: Request, env: Env): Promise<Response> {
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
@@ -105,38 +169,13 @@ export async function handleAiChat(workspaceId: string, req: Request, env: Env):
 
   const system = `${SYSTEM_BASE}\n\n${await businessSnapshot(env, workspaceId)}`;
 
-  let aiRes: Response;
-  try {
-    aiRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ model: MODEL, max_tokens: MAX_TOKENS, system, messages }),
-    });
-  } catch (e) {
-    console.error("[ai-chat] fetch a Anthropic falló:", e);
-    return json({ error: "ai_upstream" }, 502);
-  }
-  if (!aiRes.ok) {
-    console.error("[ai-chat] Anthropic rechazó:", aiRes.status);
-    return json({ error: "ai_upstream", status: aiRes.status }, 502);
-  }
-  const data = (await aiRes.json().catch(() => null)) as
-    | { content?: Array<{ type?: string; text?: string }> }
-    | null;
-  const reply = (data?.content ?? [])
-    .filter((b) => b.type === "text" && typeof b.text === "string")
-    .map((b) => b.text)
-    .join("")
-    .trim();
-  if (!reply) return json({ error: "ai_empty" }, 502);
+  const r = await callClaude(env, { system, messages, maxTokens: MAX_TOKENS });
+  if (!r.ok) return json({ error: "ai_upstream", status: r.status }, 502);
+  if (!r.text) return json({ error: "ai_empty" }, 502);
 
   // Recién ahora descontamos (no cobramos errores del modelo).
   const updated = (await consume(env, workspaceId, 1)) ?? wallet;
-  return json({ reply, wallet: updated });
+  return json({ reply: r.text, wallet: updated });
 }
 
 /* ── POST /workspaces/:wid/ai/action ──────────────────────────────────────
@@ -255,37 +294,10 @@ export async function handleAiAction(workspaceId: string, req: Request, env: Env
   const wallet = await getWallet(env, workspaceId);
   if (!canAfford(wallet, cost)) return json({ error: "no_credits", wallet, cost }, 402);
 
-  let aiRes: Response;
-  try {
-    aiRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 500,
-        system,
-        messages: [{ role: "user", content: userContent }],
-      }),
-    });
-  } catch (e) {
-    console.error("[ai-action] fetch a Anthropic falló:", e);
-    return json({ error: "ai_upstream" }, 502);
-  }
-  if (!aiRes.ok) return json({ error: "ai_upstream", status: aiRes.status }, 502);
-  const data = (await aiRes.json().catch(() => null)) as
-    | { content?: Array<{ type?: string; text?: string }> }
-    | null;
-  const out = (data?.content ?? [])
-    .filter((b) => b.type === "text" && typeof b.text === "string")
-    .map((b) => b.text)
-    .join("")
-    .trim();
-  if (!out) return json({ error: "ai_empty" }, 502);
+  const r = await callClaude(env, { system, messages: [{ role: "user", content: userContent }], maxTokens: 500 });
+  if (!r.ok) return json({ error: "ai_upstream", status: r.status }, 502);
+  if (!r.text) return json({ error: "ai_empty" }, 502);
 
   const updated = (await consume(env, workspaceId, cost)) ?? wallet;
-  return json({ text: out, wallet: updated });
+  return json({ text: r.text, wallet: updated });
 }

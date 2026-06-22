@@ -461,12 +461,37 @@ export async function handleDeleteSale(workspaceId: string, saleId: string, req:
   const ownerErr = await assertOwnsSale(env, workspaceId, saleId, role, auth.userId);
   if (ownerErr) return ownerErr;
 
-  await tursoExec(
-    env,
-    `UPDATE sales SET deleted_at = datetime('now')
-       WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
-    [saleId, workspaceId],
-  );
+  // Unidades serializadas que esta venta había marcado vendidas → vuelven al
+  // stock al borrar (sold_at/sale_id → NULL). Si la venta no tenía IMEIs, la
+  // lista queda vacía y sólo se hace el soft-delete.
+  const [affected] = await tursoQuery(env, {
+    sql: `SELECT DISTINCT catalog_item_id FROM catalog_imei WHERE workspace_id = ? AND sale_id = ?`,
+    args: [workspaceId, saleId],
+  });
+  const affectedIds = (affected ?? []).map((r) => String(r.catalog_item_id));
+
+  const stmts: Array<{ sql: string; args: TursoArg[] }> = [
+    {
+      sql: `UPDATE sales SET deleted_at = datetime('now')
+              WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+      args: [saleId, workspaceId],
+    },
+  ];
+  if (affectedIds.length > 0) {
+    stmts.push({
+      sql: `UPDATE catalog_imei SET sold_at = NULL, sale_id = NULL WHERE workspace_id = ? AND sale_id = ?`,
+      args: [workspaceId, saleId],
+    });
+    for (const cii of affectedIds) {
+      stmts.push({
+        sql: `UPDATE catalog_items
+                SET stock = (SELECT COUNT(*) FROM catalog_imei WHERE catalog_item_id = ? AND sold_at IS NULL)
+                WHERE id = ? AND workspace_id = ?`,
+        args: [cii, cii, workspaceId],
+      });
+    }
+  }
+  await tursoTransaction(env, ...stmts);
   return json({ ok: true });
 }
 

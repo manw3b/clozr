@@ -20,6 +20,7 @@ export const AI_ACTION_COSTS: Record<string, number> = {
   chat: 1,
   generate: 1,
   rewrite: 1,
+  daybrief: 1,
   email: 2,
   summary: 2,
   insights: 3,

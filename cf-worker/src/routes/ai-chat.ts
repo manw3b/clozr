@@ -227,8 +227,25 @@ export async function handleAiAction(workspaceId: string, req: Request, env: Env
       "su interés/historial, el estado actual, y cerrá con una recomendación concreta de próximo paso. " +
       "Usá SOLO los datos provistos; no inventes. Devolvé solo los bullets, cada uno empezando con '• '.";
     userContent = `Datos del cliente:\n${ctx || "(sin datos)"}`;
+  } else if (action === "daybrief") {
+    const c = body.context && typeof body.context === "object" ? (body.context as Record<string, unknown>) : {};
+    const num = (v: unknown) => (v == null ? 0 : Number(v) || 0);
+    const parts: string[] = [];
+    if (num(c.seguimientos)) parts.push(`${num(c.seguimientos)} seguimientos pendientes`);
+    if (num(c.cobros)) parts.push(`${num(c.cobros)} cobros pendientes${c.cobrosMonto ? ` (${String(c.cobrosMonto)})` : ""}`);
+    if (num(c.inactivos)) parts.push(`${num(c.inactivos)} clientes inactivos`);
+    if (num(c.tareas)) parts.push(`${num(c.tareas)} tareas pendientes`);
+    if (num(c.ventasHoy)) parts.push(`${num(c.ventasHoy)} ventas hoy`);
+    const cand = Array.isArray(c.candidatos)
+      ? (c.candidatos as unknown[]).filter((x) => typeof x === "string").slice(0, 4).join(", ")
+      : "";
+    system =
+      "Sos la IA de Clozr. Escribí un saludo brevísimo y UNA recomendación concreta del día para un " +
+      "vendedor argentino, en 2-3 líneas como máximo, tono cercano. Usá SOLO los datos provistos; no " +
+      "inventes. Nada de listas largas ni relleno.";
+    userContent = `Números del día: ${parts.join("; ") || "sin pendientes"}.${cand ? ` Clientes a priorizar: ${cand}.` : ""}`;
   } else {
-    return json({ error: "invalid_action", allowed: ["generate", "rewrite", "summary"] }, 400);
+    return json({ error: "invalid_action", allowed: ["generate", "rewrite", "summary", "daybrief"] }, 400);
   }
 
   const cost = AI_ACTION_COSTS[action] ?? 1;

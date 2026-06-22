@@ -178,6 +178,9 @@ function formatContext(c: unknown): string {
   add("Fuente del lead", o.fuente);
   add("Vendedor asignado", o.vendedor);
   if (o.ultimoContactoDias != null && o.ultimoContactoDias !== "") add("Días sin contacto", o.ultimoContactoDias);
+  add("Compras", o.compras);
+  add("Deuda", o.deuda);
+  add("Historial / actividad", o.historial);
   add("Notas", o.notas);
   return lines.join("\n");
 }
@@ -217,8 +220,15 @@ export async function handleAiAction(workspaceId: string, req: Request, env: Env
       "No agregues ni inventes información, no cambies los datos. Mantené el idioma. " +
       "Devolvé SOLO el mensaje reescrito, sin comillas ni explicaciones.";
     userContent = original;
+  } else if (action === "summary") {
+    const ctx = formatContext(body.context);
+    system =
+      "Sos la IA de Clozr. Hacé un briefing comercial del cliente en 4-6 bullets MUY cortos: quién es, " +
+      "su interés/historial, el estado actual, y cerrá con una recomendación concreta de próximo paso. " +
+      "Usá SOLO los datos provistos; no inventes. Devolvé solo los bullets, cada uno empezando con '• '.";
+    userContent = `Datos del cliente:\n${ctx || "(sin datos)"}`;
   } else {
-    return json({ error: "invalid_action", allowed: ["generate", "rewrite"] }, 400);
+    return json({ error: "invalid_action", allowed: ["generate", "rewrite", "summary"] }, 400);
   }
 
   const cost = AI_ACTION_COSTS[action] ?? 1;

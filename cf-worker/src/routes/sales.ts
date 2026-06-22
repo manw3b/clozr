@@ -214,6 +214,9 @@ interface CreateSaleBody {
    */
   cash_movements?: Array<Record<string, unknown>>;
   stock_decrements?: Array<{ catalog_item_id?: unknown; quantity?: unknown }>;
+  /** Plan canje: equipo usado recibido como parte de pago. Se crea como unidad
+   *  de catálogo (costo = valor de toma) dentro de la misma tx que la venta. */
+  trade_in?: Record<string, unknown>;
   [k: string]: unknown;
 }
 
@@ -290,6 +293,35 @@ export async function handleCreateSale(workspaceId: string, req: Request, env: E
                 SET stock = (SELECT COUNT(*) FROM catalog_imei WHERE catalog_item_id = ? AND sold_at IS NULL)
                 WHERE id = ? AND workspace_id = ?`,
         args: [cii, cii, workspaceId],
+      });
+    }
+  }
+
+  // Plan canje: el equipo recibido entra al stock como una unidad de catálogo
+  // (costo = valor de toma; price = mismo valor como placeholder editable) en la
+  // misma tx. El crédito al cliente viaja aparte, como un pago "canje" en
+  // `payments` (lo arma el cliente para mantener el cálculo de totales ahí).
+  if (body.trade_in && typeof body.trade_in === "object") {
+    const ti = body.trade_in as Record<string, unknown>;
+    const desc = typeof ti.description === "string" ? ti.description.trim() : "";
+    const value = Number(ti.value);
+    if (!desc || !Number.isFinite(value) || value <= 0) {
+      return json({ error: "invalid_trade_in", needed: ["description", "value>0"] }, 400);
+    }
+    const tiImei = typeof ti.imei === "string" ? ti.imei.trim() : "";
+    const tiCond = typeof ti.condition === "string" && ti.condition.trim() ? ti.condition.trim() : "used";
+    const tiCat = typeof ti.category === "string" && ti.category.trim() ? ti.category.trim() : "Plan canje";
+    const tradeItemId = crypto.randomUUID();
+    stmts.push({
+      sql: `INSERT INTO catalog_items
+              (id, workspace_id, name, category, price, currency, cost, condition, notes, track_stock, stock)
+              VALUES (?, ?, ?, ?, ?, 'ARS', ?, ?, ?, 1, 1)`,
+      args: [tradeItemId, workspaceId, desc, tiCat, value, value, tiCond, "Recibido en plan canje"],
+    });
+    if (tiImei) {
+      stmts.push({
+        sql: `INSERT INTO catalog_imei (id, workspace_id, catalog_item_id, imei) VALUES (?, ?, ?, ?)`,
+        args: [crypto.randomUUID(), workspaceId, tradeItemId, tiImei],
       });
     }
   }

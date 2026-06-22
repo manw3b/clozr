@@ -994,6 +994,10 @@ export async function ensureWorkspaceColumns(env: Env): Promise<void> {
   await safeAddColumn(env, "cloud_workspaces", "discount_type", "TEXT");
   await safeAddColumn(env, "cloud_workspaces", "discount_value", "INTEGER");
   await safeAddColumn(env, "cloud_workspaces", "discount_target", "TEXT");
+  // IA de Clozr (microtransacciones): créditos pagos disponibles (1 crédito =
+  // 1 mensaje) y nº de mensajes gratis ya consumidos (cap = AI_FREE_LIMIT).
+  await safeAddColumn(env, "cloud_workspaces", "ai_credits", "INTEGER");
+  await safeAddColumn(env, "cloud_workspaces", "ai_msgs_used", "INTEGER");
   workspaceColsReady = true;
 }
 

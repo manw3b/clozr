@@ -28,6 +28,7 @@ import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst } from "../turso";
 import { usdToArs } from "../dolar";
 import { CATALOG_PACKS, unlockCatalog } from "../catalog";
+import { AI_PACKS, addAiCredits } from "../aiWallet";
 import { applyWorkspaceDiscount } from "../discounts";
 import { getRoleInWorkspace, json } from "./_generic";
 import { requirePerm } from "../permissions";
@@ -463,6 +464,60 @@ export async function handleCatalogCheckout(workspaceId: string, req: Request, e
   return json({ init_point: data.init_point });
 }
 
+/* ── POST /workspaces/:wid/ai/checkout ───────────────────────────────────
+ * Pago único de un pack de mensajes de IA. Mismo flujo que el catálogo: arma
+ * la preference (USD→ARS al blue), y los créditos los acredita el webhook. */
+export async function handleAiCheckout(workspaceId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+  const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = requirePerm(role, "billing.manage");
+  if (denied) return denied;
+
+  let body: { pack?: unknown };
+  try { body = (await req.json()) as { pack?: unknown }; } catch { return json({ error: "invalid_body" }, 400); }
+  const packKey = typeof body.pack === "string" ? body.pack : "";
+  const pack = AI_PACKS[packKey];
+  if (!pack) return json({ error: "invalid_pack", allowed: Object.keys(AI_PACKS) }, 400);
+
+  if (!env.MP_ACCESS_TOKEN) return json({ error: "billing_unavailable" }, 503);
+
+  let amountArs: number;
+  try { amountArs = await usdToArs(pack.usd); } catch { return json({ error: "exchange_unavailable" }, 503); }
+
+  const preference = {
+    items: [{ title: pack.label, quantity: 1, unit_price: amountArs, currency_id: "ARS" }],
+    external_reference: `ai:${workspaceId}:${packKey}`,
+    payer: { email: auth.email },
+    back_urls: {
+      success: "https://clozr.online/app",
+      pending: "https://clozr.online/app",
+      failure: "https://clozr.online/app",
+    },
+    auto_return: "approved",
+  };
+
+  let mpRes: Response;
+  try {
+    mpRes = await fetch(`${MP_API}/checkout/preferences`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${env.MP_ACCESS_TOKEN}`, "content-type": "application/json" },
+      body: JSON.stringify(preference),
+    });
+  } catch (e) {
+    console.error("[ai] fetch preference falló:", e);
+    return json({ error: "billing_upstream" }, 502);
+  }
+  const data = (await mpRes.json().catch(() => null)) as { init_point?: string } | null;
+  if (!mpRes.ok || !data?.init_point) {
+    console.error("[ai] MP rechazó la preference:", mpRes.status);
+    return json({ error: "billing_upstream", status: mpRes.status }, 502);
+  }
+  return json({ init_point: data.init_point });
+}
+
 /* ── POST /billing/webhook ───────────────────────────────────────────── */
 
 export async function handleBillingWebhook(req: Request, env: Env): Promise<Response> {
@@ -512,11 +567,15 @@ export async function handleBillingWebhook(req: Request, env: Env): Promise<Resp
     if (!payRes.ok || !pay) return json({ ok: true, retry_later: true });
     if (pay.status !== "approved") return json({ ok: true, payment_status: pay.status ?? "unknown" });
     const parts = (pay.external_reference ?? "").split(":");
-    if (parts[0] !== "catalog" || !parts[1] || !parts[2]) {
-      return json({ ok: true, ignored: "bad_reference" });
+    if (parts[0] === "catalog" && parts[1] && parts[2]) {
+      await unlockCatalog(env, parts[1], parts[2]);
+      return json({ ok: true, unlocked: parts[2], workspace: parts[1] });
     }
-    await unlockCatalog(env, parts[1], parts[2]);
-    return json({ ok: true, unlocked: parts[2], workspace: parts[1] });
+    if (parts[0] === "ai" && parts[1] && parts[2]) {
+      await addAiCredits(env, parts[1], parts[2]);
+      return json({ ok: true, ai_pack: parts[2], workspace: parts[1] });
+    }
+    return json({ ok: true, ignored: "bad_reference" });
   }
 
   // Suscripciones (preapproval). Otros tipos → ignorar.

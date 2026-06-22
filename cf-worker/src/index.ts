@@ -112,8 +112,9 @@ import {
 import { handleClientError } from "./routes/errors";
 import {
   handleBillingCheckout, handleBillingWebhook, handleUpdateSeats, handleCatalogCheckout,
-  handleCoverSpace, handleUncoverSpace,
+  handleCoverSpace, handleUncoverSpace, handleAiCheckout,
 } from "./routes/billing";
+import { handleAiStatus, handleAiChat } from "./routes/ai-chat";
 import {
   handleListCodes, handleCreateCode, handleUpdateCode, handleRedeemCode,
   handleListConsoleWorkspaces, handleGetReferralCode,
@@ -430,6 +431,20 @@ export default {
       const wsCatalogCheckoutMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/catalog\/checkout\/?$/);
       if (wsCatalogCheckoutMatch && req.method === "POST") {
         return cors(req, env, await handleCatalogCheckout(wsCatalogCheckoutMatch[1]!, req, env));
+      }
+
+      // IA de Clozr — estado de billetera, chat (microtransacción) y compra de packs.
+      const wsAiCheckoutMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/ai\/checkout\/?$/);
+      if (wsAiCheckoutMatch && req.method === "POST") {
+        return cors(req, env, await handleAiCheckout(wsAiCheckoutMatch[1]!, req, env));
+      }
+      const wsAiChatMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/ai\/chat\/?$/);
+      if (wsAiChatMatch && req.method === "POST") {
+        return cors(req, env, await handleAiChat(wsAiChatMatch[1]!, req, env));
+      }
+      const wsAiMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/ai\/?$/);
+      if (wsAiMatch && req.method === "GET") {
+        return cors(req, env, await handleAiStatus(wsAiMatch[1]!, req, env));
       }
 
       // Consola Clozr — canje de código (lo pega el owner del workspace).

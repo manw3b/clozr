@@ -114,7 +114,7 @@ import {
   handleBillingCheckout, handleBillingWebhook, handleUpdateSeats, handleCatalogCheckout,
   handleCoverSpace, handleUncoverSpace, handleAiCheckout,
 } from "./routes/billing";
-import { handleAiStatus, handleAiChat } from "./routes/ai-chat";
+import { handleAiStatus, handleAiChat, handleAiAction } from "./routes/ai-chat";
 import {
   handleListCodes, handleCreateCode, handleUpdateCode, handleRedeemCode,
   handleListConsoleWorkspaces, handleGetReferralCode,
@@ -441,6 +441,10 @@ export default {
       const wsAiChatMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/ai\/chat\/?$/);
       if (wsAiChatMatch && req.method === "POST") {
         return cors(req, env, await handleAiChat(wsAiChatMatch[1]!, req, env));
+      }
+      const wsAiActionMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/ai\/action\/?$/);
+      if (wsAiActionMatch && req.method === "POST") {
+        return cors(req, env, await handleAiAction(wsAiActionMatch[1]!, req, env));
       }
       const wsAiMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/ai\/?$/);
       if (wsAiMatch && req.method === "GET") {

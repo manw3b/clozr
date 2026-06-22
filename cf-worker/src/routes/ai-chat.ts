@@ -14,7 +14,7 @@ import type { Env } from "../index";
 import { requireAuth } from "../auth";
 import { json, getRoleInWorkspace } from "./_generic";
 import { tursoFirst } from "../turso";
-import { getWallet, consumeMessage, canSend } from "../aiWallet";
+import { getWallet, consume, canAfford, AI_ACTION_COSTS } from "../aiWallet";
 
 const MODEL = "claude-sonnet-4-6";
 const MAX_TOKENS = 800; // acota el costo por mensaje
@@ -97,7 +97,7 @@ export async function handleAiChat(workspaceId: string, req: Request, env: Env):
 
   // Gate: ¿le queda gratis o tiene créditos?
   const wallet = await getWallet(env, workspaceId);
-  if (!canSend(wallet)) {
+  if (!canAfford(wallet, 1)) {
     return json({ error: "no_credits", wallet }, 402);
   }
 
@@ -133,6 +133,129 @@ export async function handleAiChat(workspaceId: string, req: Request, env: Env):
   if (!reply) return json({ error: "ai_empty" }, 502);
 
   // Recién ahora descontamos (no cobramos errores del modelo).
-  const updated = (await consumeMessage(env, workspaceId)) ?? wallet;
+  const updated = (await consume(env, workspaceId, 1)) ?? wallet;
   return json({ reply, wallet: updated });
+}
+
+/* ── POST /workspaces/:wid/ai/action ──────────────────────────────────────
+ * Acciones contextuales "Pro AI": generar un mensaje a partir del contexto del
+ * cliente, o reescribir un texto cambiando el tono. El contexto llega del CRM
+ * (la app lo arma), nunca se le pide al usuario. Cobra según AI_ACTION_COSTS. */
+
+const GEN_KINDS: Record<string, string> = {
+  primer_contacto: "primer contacto / presentación",
+  seguimiento: "seguimiento de una conversación previa",
+  reactivacion: "reactivar a un cliente que dejó de responder",
+  agradecimiento: "agradecer una compra o el interés",
+  cobranza: "recordar de forma amable un pago pendiente",
+  confirmacion: "confirmar una compra, turno o envío",
+  recordatorio: "recordar algo acordado",
+  upselling: "ofrecer un producto o servicio adicional",
+};
+
+const TONES: Record<string, string> = {
+  mas_corto: "más corto y al grano",
+  mas_profesional: "más profesional",
+  mas_vendedor: "más persuasivo y orientado a la venta",
+  mas_amigable: "más amigable y cercano",
+  mas_formal: "más formal",
+  mas_argentino: "más coloquial argentino (rioplatense)",
+  mas_directo: "más directo",
+};
+
+function formatContext(c: unknown): string {
+  if (!c || typeof c !== "object") return "";
+  const o = c as Record<string, unknown>;
+  const lines: string[] = [];
+  const add = (label: string, v: unknown) => {
+    if (v != null && String(v).trim()) lines.push(`- ${label}: ${String(v).slice(0, 500)}`);
+  };
+  add("Cliente", o.cliente);
+  add("Producto / interés", o.producto);
+  add("Etapa del pipeline", o.etapa);
+  add("Tipo de cliente", o.tipo);
+  add("Presupuesto / monto", o.monto);
+  add("Fuente del lead", o.fuente);
+  add("Vendedor asignado", o.vendedor);
+  if (o.ultimoContactoDias != null && o.ultimoContactoDias !== "") add("Días sin contacto", o.ultimoContactoDias);
+  add("Notas", o.notas);
+  return lines.join("\n");
+}
+
+export async function handleAiAction(workspaceId: string, req: Request, env: Env): Promise<Response> {
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+  const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
+  if (!role) return json({ error: "forbidden" }, 403);
+  if (!env.ANTHROPIC_API_KEY) return json({ error: "ai_unavailable" }, 503);
+
+  let body: { action?: unknown; kind?: unknown; tone?: unknown; text?: unknown; context?: unknown };
+  try { body = (await req.json()) as typeof body; } catch { return json({ error: "invalid_body" }, 400); }
+  const action = typeof body.action === "string" ? body.action : "";
+
+  let system: string;
+  let userContent: string;
+  if (action === "generate") {
+    const kind = typeof body.kind === "string" ? body.kind : "";
+    const intent = GEN_KINDS[kind];
+    if (!intent) return json({ error: "invalid_kind", allowed: Object.keys(GEN_KINDS) }, 400);
+    const ctx = formatContext(body.context);
+    system =
+      "Sos la IA de Clozr, asistente comercial. Redactás mensajes de WhatsApp para vendedores argentinos. " +
+      "Tono rioplatense, cercano y profesional; breve (2-4 frases). NUNCA inventes datos que no te den " +
+      "(precios, fechas, plazos): si no los tenés, no los menciones. Devolvé SOLO el mensaje, sin comillas " +
+      "ni encabezados ni explicaciones.";
+    userContent = `Escribí un mensaje de ${intent} para este cliente.\n\n${ctx || "(sin datos extra)"}`;
+  } else if (action === "rewrite") {
+    const tone = typeof body.tone === "string" ? body.tone : "";
+    const toneLabel = TONES[tone];
+    const original = typeof body.text === "string" ? body.text.slice(0, MAX_CHARS) : "";
+    if (!toneLabel) return json({ error: "invalid_tone", allowed: Object.keys(TONES) }, 400);
+    if (!original.trim()) return json({ error: "no_text" }, 400);
+    system =
+      "Reescribí el mensaje que te paso cambiando SOLO el tono a: " + toneLabel + ". " +
+      "No agregues ni inventes información, no cambies los datos. Mantené el idioma. " +
+      "Devolvé SOLO el mensaje reescrito, sin comillas ni explicaciones.";
+    userContent = original;
+  } else {
+    return json({ error: "invalid_action", allowed: ["generate", "rewrite"] }, 400);
+  }
+
+  const cost = AI_ACTION_COSTS[action] ?? 1;
+  const wallet = await getWallet(env, workspaceId);
+  if (!canAfford(wallet, cost)) return json({ error: "no_credits", wallet, cost }, 402);
+
+  let aiRes: Response;
+  try {
+    aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 500,
+        system,
+        messages: [{ role: "user", content: userContent }],
+      }),
+    });
+  } catch (e) {
+    console.error("[ai-action] fetch a Anthropic falló:", e);
+    return json({ error: "ai_upstream" }, 502);
+  }
+  if (!aiRes.ok) return json({ error: "ai_upstream", status: aiRes.status }, 502);
+  const data = (await aiRes.json().catch(() => null)) as
+    | { content?: Array<{ type?: string; text?: string }> }
+    | null;
+  const out = (data?.content ?? [])
+    .filter((b) => b.type === "text" && typeof b.text === "string")
+    .map((b) => b.text)
+    .join("")
+    .trim();
+  if (!out) return json({ error: "ai_empty" }, 502);
+
+  const updated = (await consume(env, workspaceId, cost)) ?? wallet;
+  return json({ text: out, wallet: updated });
 }

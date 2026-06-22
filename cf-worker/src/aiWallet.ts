@@ -12,8 +12,20 @@ import type { Env } from "./index";
 import { ensureWorkspaceColumns } from "./schema";
 import { tursoFirst, tursoExec } from "./turso";
 
-/** Mensajes gratis por workspace antes de tener que pagar. */
-export const AI_FREE_LIMIT = 1;
+/** Acciones de IA gratis por workspace (trial) antes de tener que pagar. */
+export const AI_FREE_LIMIT = 3;
+
+/** Costo en créditos por tipo de acción (1 crédito ≈ 1 acción simple). */
+export const AI_ACTION_COSTS: Record<string, number> = {
+  chat: 1,
+  generate: 1,
+  rewrite: 1,
+  email: 2,
+  summary: 2,
+  insights: 3,
+  report: 5,
+  prediction: 10,
+};
 
 /**
  * Packs de mensajes (pago único). Precio en USD (se cobra en ARS al blue en el
@@ -46,16 +58,17 @@ export async function getWallet(env: Env, workspaceId: string): Promise<AiWallet
   };
 }
 
-/** ¿Puede mandar un mensaje? (le queda gratis o tiene créditos). */
-export function canSend(w: AiWallet): boolean {
-  return w.freeUsed < w.freeLimit || w.credits > 0;
+/** ¿Puede pagar una acción de `cost` créditos? (le queda trial o saldo). */
+export function canAfford(w: AiWallet, cost = 1): boolean {
+  return w.freeUsed < w.freeLimit || w.credits >= cost;
 }
 
 /**
- * Descuenta un mensaje: primero gasta el cupo gratis, después un crédito.
- * Devuelve la billetera actualizada, o null si no le quedaba nada.
+ * Descuenta una acción: durante el trial gasta 1 del cupo gratis (sin importar
+ * el costo, para que prueben cualquier cosa); agotado el trial, descuenta
+ * `cost` créditos. Devuelve la billetera actualizada, o null si no alcanza.
  */
-export async function consumeMessage(env: Env, workspaceId: string): Promise<AiWallet | null> {
+export async function consume(env: Env, workspaceId: string, cost = 1): Promise<AiWallet | null> {
   const w = await getWallet(env, workspaceId);
   if (w.freeUsed < w.freeLimit) {
     await tursoExec(
@@ -65,13 +78,13 @@ export async function consumeMessage(env: Env, workspaceId: string): Promise<AiW
     );
     return { ...w, freeUsed: w.freeUsed + 1 };
   }
-  if (w.credits > 0) {
+  if (w.credits >= cost) {
     await tursoExec(
       env,
-      `UPDATE cloud_workspaces SET ai_credits = MAX(0, COALESCE(ai_credits, 0) - 1), updated_at = datetime('now') WHERE id = ?`,
-      [workspaceId],
+      `UPDATE cloud_workspaces SET ai_credits = MAX(0, COALESCE(ai_credits, 0) - ?), updated_at = datetime('now') WHERE id = ?`,
+      [cost, workspaceId],
     );
-    return { ...w, credits: w.credits - 1 };
+    return { ...w, credits: w.credits - cost };
   }
   return null;
 }

@@ -240,6 +240,10 @@ export async function handleCreateSale(workspaceId: string, req: Request, env: E
   // via tursoTransaction (BEGIN/COMMIT en la misma pipeline). Si CUALQUIER
   // insert falla, ROLLBACK — no queda una sale a medio crear con items
   // sin payments o viceversa.
+  // Unidades serializadas vendidas en esta venta (catalog_item_id + IMEI),
+  // recolectadas al recorrer los ítems y marcadas como vendidas en la misma tx.
+  const imeiSales: Array<{ catalogItemId: string; imei: string }> = [];
+
   const stmts: Array<{ sql: string; args: TursoArg[] }> = [
     {
       sql: `INSERT INTO sales (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`,
@@ -260,6 +264,32 @@ export async function handleCreateSale(workspaceId: string, req: Request, env: E
       stmts.push({
         sql: `INSERT INTO sale_items (${icols.join(", ")}) VALUES (${icols.map(() => "?").join(", ")})`,
         args: ivals,
+      });
+      // Si la línea es una unidad serializada (catálogo + IMEI elegido en la
+      // venta), la marcamos para vender más abajo, en la misma transacción.
+      const cii = typeof it.catalog_item_id === "string" ? it.catalog_item_id : "";
+      const imei = typeof it.imei === "string" ? it.imei.trim() : "";
+      if (cii && imei) imeiSales.push({ catalogItemId: cii, imei });
+    }
+  }
+
+  // IMEIs vendidos: marcar la unidad (sold_at + sale_id) y recalcular el stock
+  // del producto (= unidades sin vender) DENTRO de la misma tx. El guard
+  // `sold_at IS NULL` evita re-vender una unidad ya entregada (idempotente).
+  if (imeiSales.length > 0) {
+    for (const s of imeiSales) {
+      stmts.push({
+        sql: `UPDATE catalog_imei SET sold_at = datetime('now'), sale_id = ?
+                WHERE workspace_id = ? AND catalog_item_id = ? AND imei = ? AND sold_at IS NULL`,
+        args: [id, workspaceId, s.catalogItemId, s.imei],
+      });
+    }
+    for (const cii of Array.from(new Set(imeiSales.map((s) => s.catalogItemId)))) {
+      stmts.push({
+        sql: `UPDATE catalog_items
+                SET stock = (SELECT COUNT(*) FROM catalog_imei WHERE catalog_item_id = ? AND sold_at IS NULL)
+                WHERE id = ? AND workspace_id = ?`,
+        args: [cii, cii, workspaceId],
       });
     }
   }

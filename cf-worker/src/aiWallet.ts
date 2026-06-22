@@ -101,3 +101,19 @@ export async function addAiCredits(env: Env, workspaceId: string, packKey: strin
     [pack.credits, workspaceId],
   );
 }
+
+/**
+ * ¿El workspace tiene acceso a la IA? Es una feature de suscripción: requiere
+ * un plan pago (Pro o Team) con la suscripción activa. Las 3 acciones de regalo
+ * y los packs de créditos solo aplican a estos workspaces.
+ */
+export async function hasAiAccess(env: Env, workspaceId: string): Promise<boolean> {
+  const row = await tursoFirst(
+    env,
+    `SELECT plan, plan_status FROM cloud_workspaces WHERE id = ?`,
+    [workspaceId],
+  );
+  const plan = String(row?.plan ?? "free");
+  const status = String(row?.plan_status ?? "");
+  return (plan === "pro" || plan === "team") && status === "active";
+}

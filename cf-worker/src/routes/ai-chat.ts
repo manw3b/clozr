@@ -14,7 +14,7 @@ import type { Env } from "../index";
 import { requireAuth } from "../auth";
 import { json, getRoleInWorkspace } from "./_generic";
 import { tursoFirst } from "../turso";
-import { getWallet, consume, canAfford, AI_ACTION_COSTS } from "../aiWallet";
+import { getWallet, consume, canAfford, hasAiAccess, AI_ACTION_COSTS } from "../aiWallet";
 
 const MODEL = "claude-sonnet-4-6";
 const MAX_TOKENS = 800; // acota el costo por mensaje
@@ -72,7 +72,8 @@ export async function handleAiStatus(workspaceId: string, req: Request, env: Env
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
   const wallet = await getWallet(env, workspaceId);
-  return json({ ...wallet, enabled: !!env.ANTHROPIC_API_KEY });
+  const hasPlan = await hasAiAccess(env, workspaceId);
+  return json({ ...wallet, enabled: !!env.ANTHROPIC_API_KEY, hasPlan });
 }
 
 export async function handleAiChat(workspaceId: string, req: Request, env: Env): Promise<Response> {
@@ -81,6 +82,7 @@ export async function handleAiChat(workspaceId: string, req: Request, env: Env):
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
 
+  if (!(await hasAiAccess(env, workspaceId))) return json({ error: "ai_requires_plan" }, 403);
   if (!env.ANTHROPIC_API_KEY) return json({ error: "ai_unavailable" }, 503);
 
   let body: { messages?: unknown };
@@ -190,6 +192,7 @@ export async function handleAiAction(workspaceId: string, req: Request, env: Env
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
+  if (!(await hasAiAccess(env, workspaceId))) return json({ error: "ai_requires_plan" }, 403);
   if (!env.ANTHROPIC_API_KEY) return json({ error: "ai_unavailable" }, 503);
 
   let body: { action?: unknown; kind?: unknown; tone?: unknown; text?: unknown; context?: unknown };

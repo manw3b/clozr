@@ -28,7 +28,7 @@ import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst } from "../turso";
 import { usdToArs } from "../dolar";
 import { CATALOG_PACKS, unlockCatalog } from "../catalog";
-import { AI_PACKS, addAiCredits } from "../aiWallet";
+import { AI_PACKS, addAiCredits, hasAiAccess } from "../aiWallet";
 import { applyWorkspaceDiscount } from "../discounts";
 import { getRoleInWorkspace, json } from "./_generic";
 import { requirePerm } from "../permissions";
@@ -475,6 +475,7 @@ export async function handleAiCheckout(workspaceId: string, req: Request, env: E
   if (!role) return json({ error: "forbidden" }, 403);
   const denied = requirePerm(role, "billing.manage");
   if (denied) return denied;
+  if (!(await hasAiAccess(env, workspaceId))) return json({ error: "ai_requires_plan" }, 403);
 
   let body: { pack?: unknown };
   try { body = (await req.json()) as { pack?: unknown }; } catch { return json({ error: "invalid_body" }, 400); }

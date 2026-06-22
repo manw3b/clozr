@@ -224,12 +224,11 @@ export async function handleInviteMember(workspaceId: string, req: Request, env:
     ],
   );
 
-  // Cargar workspace name + inviter name para el email.
+  // Cargar workspace name para el email.
   const ws = await tursoFirst(env, `SELECT name FROM cloud_workspaces WHERE id = ?`, [workspaceId]);
   await sendInviteEmail({
     to: email,
     workspaceName: ws ? String(ws.name) : "tu equipo",
-    inviterEmail: auth.email,
     role: body.role,
     apiKey: env.RESEND_API_KEY,
     from: env.RESEND_FROM,

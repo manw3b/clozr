@@ -102,7 +102,7 @@ import {
   handleGenericDelete, handleGenericImport,
 } from "./routes/_generic";
 import { SIMPLE_TABLE_SPECS } from "./routes/simpleTables";
-import { handleDecrementStock } from "./routes/catalog-stock";
+import { handleDecrementStock, handleListImeis, handleAddImeis, handleDeleteImei } from "./routes/catalog-stock";
 import {
   handleListCashSessions,
   handleOpenCashSession,
@@ -512,6 +512,23 @@ export default {
         return cors(req, env, await handleDecrementStock(
           wsDecrementStockMatch[1]!, wsDecrementStockMatch[2]!, req, env,
         ));
+      }
+
+      // IMEIs por producto (unidades serializadas) — antes del loop generic.
+      const wsImeiDeleteMatch = url.pathname.match(
+        /^\/workspaces\/([^/]+)\/catalog\/([^/]+)\/imeis\/([^/]+)\/?$/,
+      );
+      if (wsImeiDeleteMatch && req.method === "DELETE") {
+        return cors(req, env, await handleDeleteImei(
+          wsImeiDeleteMatch[1]!, wsImeiDeleteMatch[2]!, wsImeiDeleteMatch[3]!, req, env,
+        ));
+      }
+      const wsImeisMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/catalog\/([^/]+)\/imeis\/?$/);
+      if (wsImeisMatch) {
+        const w = wsImeisMatch[1]!;
+        const it = wsImeisMatch[2]!;
+        if (req.method === "GET") return cors(req, env, await handleListImeis(w, it, req, env));
+        if (req.method === "POST") return cors(req, env, await handleAddImeis(w, it, req, env));
       }
 
       // R6 — Sesiones de caja (open/close/list). DEBE ir antes del loop generic

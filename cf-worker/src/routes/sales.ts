@@ -214,6 +214,9 @@ interface CreateSaleBody {
    */
   cash_movements?: Array<Record<string, unknown>>;
   stock_decrements?: Array<{ catalog_item_id?: unknown; quantity?: unknown }>;
+  /** Plan canje: equipo usado recibido como parte de pago. Se crea como unidad
+   *  de catálogo (costo = valor de toma) dentro de la misma tx que la venta. */
+  trade_in?: Record<string, unknown>;
   [k: string]: unknown;
 }
 
@@ -240,6 +243,10 @@ export async function handleCreateSale(workspaceId: string, req: Request, env: E
   // via tursoTransaction (BEGIN/COMMIT en la misma pipeline). Si CUALQUIER
   // insert falla, ROLLBACK — no queda una sale a medio crear con items
   // sin payments o viceversa.
+  // Unidades serializadas vendidas en esta venta (catalog_item_id + IMEI),
+  // recolectadas al recorrer los ítems y marcadas como vendidas en la misma tx.
+  const imeiSales: Array<{ catalogItemId: string; imei: string }> = [];
+
   const stmts: Array<{ sql: string; args: TursoArg[] }> = [
     {
       sql: `INSERT INTO sales (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`,
@@ -260,6 +267,61 @@ export async function handleCreateSale(workspaceId: string, req: Request, env: E
       stmts.push({
         sql: `INSERT INTO sale_items (${icols.join(", ")}) VALUES (${icols.map(() => "?").join(", ")})`,
         args: ivals,
+      });
+      // Si la línea es una unidad serializada (catálogo + IMEI elegido en la
+      // venta), la marcamos para vender más abajo, en la misma transacción.
+      const cii = typeof it.catalog_item_id === "string" ? it.catalog_item_id : "";
+      const imei = typeof it.imei === "string" ? it.imei.trim() : "";
+      if (cii && imei) imeiSales.push({ catalogItemId: cii, imei });
+    }
+  }
+
+  // IMEIs vendidos: marcar la unidad (sold_at + sale_id) y recalcular el stock
+  // del producto (= unidades sin vender) DENTRO de la misma tx. El guard
+  // `sold_at IS NULL` evita re-vender una unidad ya entregada (idempotente).
+  if (imeiSales.length > 0) {
+    for (const s of imeiSales) {
+      stmts.push({
+        sql: `UPDATE catalog_imei SET sold_at = datetime('now'), sale_id = ?
+                WHERE workspace_id = ? AND catalog_item_id = ? AND imei = ? AND sold_at IS NULL`,
+        args: [id, workspaceId, s.catalogItemId, s.imei],
+      });
+    }
+    for (const cii of Array.from(new Set(imeiSales.map((s) => s.catalogItemId)))) {
+      stmts.push({
+        sql: `UPDATE catalog_items
+                SET stock = (SELECT COUNT(*) FROM catalog_imei WHERE catalog_item_id = ? AND sold_at IS NULL)
+                WHERE id = ? AND workspace_id = ?`,
+        args: [cii, cii, workspaceId],
+      });
+    }
+  }
+
+  // Plan canje: el equipo recibido entra al stock como una unidad de catálogo
+  // (costo = valor de toma; price = mismo valor como placeholder editable) en la
+  // misma tx. El crédito al cliente viaja aparte, como un pago "canje" en
+  // `payments` (lo arma el cliente para mantener el cálculo de totales ahí).
+  if (body.trade_in && typeof body.trade_in === "object") {
+    const ti = body.trade_in as Record<string, unknown>;
+    const desc = typeof ti.description === "string" ? ti.description.trim() : "";
+    const value = Number(ti.value);
+    if (!desc || !Number.isFinite(value) || value <= 0) {
+      return json({ error: "invalid_trade_in", needed: ["description", "value>0"] }, 400);
+    }
+    const tiImei = typeof ti.imei === "string" ? ti.imei.trim() : "";
+    const tiCond = typeof ti.condition === "string" && ti.condition.trim() ? ti.condition.trim() : "used";
+    const tiCat = typeof ti.category === "string" && ti.category.trim() ? ti.category.trim() : "Plan canje";
+    const tradeItemId = crypto.randomUUID();
+    stmts.push({
+      sql: `INSERT INTO catalog_items
+              (id, workspace_id, name, category, price, currency, cost, condition, notes, track_stock, stock)
+              VALUES (?, ?, ?, ?, ?, 'ARS', ?, ?, ?, 1, 1)`,
+      args: [tradeItemId, workspaceId, desc, tiCat, value, value, tiCond, "Recibido en plan canje"],
+    });
+    if (tiImei) {
+      stmts.push({
+        sql: `INSERT INTO catalog_imei (id, workspace_id, catalog_item_id, imei) VALUES (?, ?, ?, ?)`,
+        args: [crypto.randomUUID(), workspaceId, tradeItemId, tiImei],
       });
     }
   }
@@ -431,12 +493,37 @@ export async function handleDeleteSale(workspaceId: string, saleId: string, req:
   const ownerErr = await assertOwnsSale(env, workspaceId, saleId, role, auth.userId);
   if (ownerErr) return ownerErr;
 
-  await tursoExec(
-    env,
-    `UPDATE sales SET deleted_at = datetime('now')
-       WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
-    [saleId, workspaceId],
-  );
+  // Unidades serializadas que esta venta había marcado vendidas → vuelven al
+  // stock al borrar (sold_at/sale_id → NULL). Si la venta no tenía IMEIs, la
+  // lista queda vacía y sólo se hace el soft-delete.
+  const [affected] = await tursoQuery(env, {
+    sql: `SELECT DISTINCT catalog_item_id FROM catalog_imei WHERE workspace_id = ? AND sale_id = ?`,
+    args: [workspaceId, saleId],
+  });
+  const affectedIds = (affected ?? []).map((r) => String(r.catalog_item_id));
+
+  const stmts: Array<{ sql: string; args: TursoArg[] }> = [
+    {
+      sql: `UPDATE sales SET deleted_at = datetime('now')
+              WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+      args: [saleId, workspaceId],
+    },
+  ];
+  if (affectedIds.length > 0) {
+    stmts.push({
+      sql: `UPDATE catalog_imei SET sold_at = NULL, sale_id = NULL WHERE workspace_id = ? AND sale_id = ?`,
+      args: [workspaceId, saleId],
+    });
+    for (const cii of affectedIds) {
+      stmts.push({
+        sql: `UPDATE catalog_items
+                SET stock = (SELECT COUNT(*) FROM catalog_imei WHERE catalog_item_id = ? AND sold_at IS NULL)
+                WHERE id = ? AND workspace_id = ?`,
+        args: [cii, cii, workspaceId],
+      });
+    }
+  }
+  await tursoTransaction(env, ...stmts);
   return json({ ok: true });
 }
 

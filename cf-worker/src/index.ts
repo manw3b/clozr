@@ -102,7 +102,8 @@ import {
   handleGenericDelete, handleGenericImport,
 } from "./routes/_generic";
 import { SIMPLE_TABLE_SPECS } from "./routes/simpleTables";
-import { handleDecrementStock } from "./routes/catalog-stock";
+import { handleDecrementStock, handleListImeis, handleAddImeis, handleDeleteImei } from "./routes/catalog-stock";
+import { handleListRepairs, handleAddRepair, handleDeleteRepair } from "./routes/catalog-repairs";
 import {
   handleListCashSessions,
   handleOpenCashSession,
@@ -111,8 +112,9 @@ import {
 import { handleClientError } from "./routes/errors";
 import {
   handleBillingCheckout, handleBillingWebhook, handleUpdateSeats, handleCatalogCheckout,
-  handleCoverSpace, handleUncoverSpace,
+  handleCoverSpace, handleUncoverSpace, handleAiCheckout,
 } from "./routes/billing";
+import { handleAiStatus, handleAiChat, handleAiAction } from "./routes/ai-chat";
 import {
   handleListCodes, handleCreateCode, handleUpdateCode, handleRedeemCode,
   handleListConsoleWorkspaces, handleGetReferralCode,
@@ -431,6 +433,24 @@ export default {
         return cors(req, env, await handleCatalogCheckout(wsCatalogCheckoutMatch[1]!, req, env));
       }
 
+      // IA de Clozr — estado de billetera, chat (microtransacción) y compra de packs.
+      const wsAiCheckoutMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/ai\/checkout\/?$/);
+      if (wsAiCheckoutMatch && req.method === "POST") {
+        return cors(req, env, await handleAiCheckout(wsAiCheckoutMatch[1]!, req, env));
+      }
+      const wsAiChatMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/ai\/chat\/?$/);
+      if (wsAiChatMatch && req.method === "POST") {
+        return cors(req, env, await handleAiChat(wsAiChatMatch[1]!, req, env));
+      }
+      const wsAiActionMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/ai\/action\/?$/);
+      if (wsAiActionMatch && req.method === "POST") {
+        return cors(req, env, await handleAiAction(wsAiActionMatch[1]!, req, env));
+      }
+      const wsAiMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/ai\/?$/);
+      if (wsAiMatch && req.method === "GET") {
+        return cors(req, env, await handleAiStatus(wsAiMatch[1]!, req, env));
+      }
+
       // Consola Clozr — canje de código (lo pega el owner del workspace).
       const wsRedeemMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/redeem-code\/?$/);
       if (wsRedeemMatch && req.method === "POST") {
@@ -512,6 +532,40 @@ export default {
         return cors(req, env, await handleDecrementStock(
           wsDecrementStockMatch[1]!, wsDecrementStockMatch[2]!, req, env,
         ));
+      }
+
+      // IMEIs por producto (unidades serializadas) — antes del loop generic.
+      const wsImeiDeleteMatch = url.pathname.match(
+        /^\/workspaces\/([^/]+)\/catalog\/([^/]+)\/imeis\/([^/]+)\/?$/,
+      );
+      if (wsImeiDeleteMatch && req.method === "DELETE") {
+        return cors(req, env, await handleDeleteImei(
+          wsImeiDeleteMatch[1]!, wsImeiDeleteMatch[2]!, wsImeiDeleteMatch[3]!, req, env,
+        ));
+      }
+      const wsImeisMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/catalog\/([^/]+)\/imeis\/?$/);
+      if (wsImeisMatch) {
+        const w = wsImeisMatch[1]!;
+        const it = wsImeisMatch[2]!;
+        if (req.method === "GET") return cors(req, env, await handleListImeis(w, it, req, env));
+        if (req.method === "POST") return cors(req, env, await handleAddImeis(w, it, req, env));
+      }
+
+      // Reparaciones / refurbish por producto — antes del loop generic.
+      const wsRepairDeleteMatch = url.pathname.match(
+        /^\/workspaces\/([^/]+)\/catalog\/([^/]+)\/repairs\/([^/]+)\/?$/,
+      );
+      if (wsRepairDeleteMatch && req.method === "DELETE") {
+        return cors(req, env, await handleDeleteRepair(
+          wsRepairDeleteMatch[1]!, wsRepairDeleteMatch[2]!, wsRepairDeleteMatch[3]!, req, env,
+        ));
+      }
+      const wsRepairsMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/catalog\/([^/]+)\/repairs\/?$/);
+      if (wsRepairsMatch) {
+        const w = wsRepairsMatch[1]!;
+        const it = wsRepairsMatch[2]!;
+        if (req.method === "GET") return cors(req, env, await handleListRepairs(w, it, req, env));
+        if (req.method === "POST") return cors(req, env, await handleAddRepair(w, it, req, env));
       }
 
       // R6 — Sesiones de caja (open/close/list). DEBE ir antes del loop generic

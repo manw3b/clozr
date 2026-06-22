@@ -1,0 +1,29 @@
+name: Deploy Worker
+
+# Deploy del Cloudflare Worker desde CI (con el token guardado en GitHub
+# Secrets), para poder deployar sin una compu: se dispara a mano desde la app
+# de GitHub (Actions → Deploy Worker → Run workflow) o solo al mergear a main
+# cambios de cf-worker.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["cf-worker/**"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cf-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - name: Deploy
+        run: npm run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

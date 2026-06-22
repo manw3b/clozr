@@ -694,6 +694,24 @@ async function applySchema(env: Env): Promise<void> {
       sql: `CREATE INDEX IF NOT EXISTS idx_catalog_imei_workspace
             ON catalog_imei(workspace_id, catalog_item_id, sold_at)`,
     },
+    // catalog_repairs — refurbish interno: reparaciones/repuestos cargados a una
+    // unidad. Cada reparación se SUMA al `cost` del catalog_item (costo real del
+    // equipo), y acá queda el desglose para auditoría.
+    {
+      sql: `CREATE TABLE IF NOT EXISTS catalog_repairs (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+        catalog_item_id TEXT NOT NULL,
+        description TEXT NOT NULL,
+        cost REAL NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        created_by TEXT
+      )`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_catalog_repairs_item
+            ON catalog_repairs(workspace_id, catalog_item_id)`,
+    },
     {
       sql: `CREATE TABLE IF NOT EXISTS payment_methods (
         id TEXT PRIMARY KEY,
@@ -976,6 +994,10 @@ export async function ensureWorkspaceColumns(env: Env): Promise<void> {
   await safeAddColumn(env, "cloud_workspaces", "discount_type", "TEXT");
   await safeAddColumn(env, "cloud_workspaces", "discount_value", "INTEGER");
   await safeAddColumn(env, "cloud_workspaces", "discount_target", "TEXT");
+  // IA de Clozr (microtransacciones): créditos pagos disponibles (1 crédito =
+  // 1 mensaje) y nº de mensajes gratis ya consumidos (cap = AI_FREE_LIMIT).
+  await safeAddColumn(env, "cloud_workspaces", "ai_credits", "INTEGER");
+  await safeAddColumn(env, "cloud_workspaces", "ai_msgs_used", "INTEGER");
   workspaceColsReady = true;
 }
 

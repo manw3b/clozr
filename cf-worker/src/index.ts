@@ -101,6 +101,7 @@ import {
   handleSendWarranty,
 } from "./routes/sales";
 import { handleListOrigins, handleCreateOrigin, handleDeleteOrigin } from "./routes/origins";
+import { handleGetSettings, handlePutSettings } from "./routes/settings";
 import { handleListCatalogPrices, handleSetCatalogPrice } from "./routes/catalogPrices";
 import {
   handleGenericList, handleGenericCreate, handleGenericUpdate,
@@ -427,6 +428,14 @@ export default {
         if (!oId && req.method === "GET")    return cors(req, env, await handleListOrigins(wsId, req, env));
         if (!oId && req.method === "POST")   return cors(req, env, await handleCreateOrigin(wsId, req, env));
         if (oId && req.method === "DELETE")  return cors(req, env, await handleDeleteOrigin(wsId, oId, req, env));
+      }
+
+      // Config KV por workspace (plantillas de turno editables, etc). Fase ②.
+      const wsSettingsMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/settings\/?$/);
+      if (wsSettingsMatch) {
+        const wsId = wsSettingsMatch[1]!;
+        if (req.method === "GET") return cors(req, env, await handleGetSettings(wsId, req, env));
+        if (req.method === "PUT") return cors(req, env, await handlePutSettings(wsId, req, env));
       }
 
       // T3 — Billing checkout (crea preapproval MP). Va antes del PATCH

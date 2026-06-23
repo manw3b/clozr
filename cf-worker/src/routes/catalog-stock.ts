@@ -23,7 +23,7 @@ import { getRoleInWorkspace, json } from "./_generic";
 // Enforcement con la matriz del Worker (espejo del frontend web), igual que el
 // resto de las rutas. decrement-stock = sales.write (el vendedor descuenta al
 // vender); alta/baja de IMEIs = inventory.write (gestión de inventario).
-import { requirePerm } from "../permissions";
+import { requirePermWs } from "../permissionsWs";
 
 export async function handleDecrementStock(
   wsId: string,
@@ -38,7 +38,7 @@ export async function handleDecrementStock(
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
   if (!role) return json({ error: "not_a_member" }, 403);
   {
-    const denied = requirePerm(role, "sales.write");
+    const denied = await requirePermWs(env, wsId, role, "sales.write");
     if (denied) return denied;
   }
 
@@ -115,7 +115,7 @@ export async function handleAddImeis(wsId: string, itemId: string, req: Request,
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
   if (!role) return json({ error: "not_a_member" }, 403);
   {
-    const denied = requirePerm(role, "inventory.write");
+    const denied = await requirePermWs(env, wsId, role, "inventory.write");
     if (denied) return denied;
   }
 
@@ -175,7 +175,7 @@ export async function handleDeleteImei(wsId: string, itemId: string, imeiId: str
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
   if (!role) return json({ error: "not_a_member" }, 403);
   {
-    const denied = requirePerm(role, "inventory.write");
+    const denied = await requirePermWs(env, wsId, role, "inventory.write");
     if (denied) return denied;
   }
 

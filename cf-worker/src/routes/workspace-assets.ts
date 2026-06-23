@@ -26,7 +26,7 @@ import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoFirst, tursoExec } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
-import { requirePerm } from "../permissions";
+import { requirePermWs } from "../permissionsWs";
 
 const MAX_BYTES = 2 * 1024 * 1024; // 2MB — logos no necesitan ser HD
 const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp"]);
@@ -52,7 +52,7 @@ async function uploadAssetForKind(
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "settings.manage");
+  const denied = await requirePermWs(env, wsId, role, "settings.manage");
   if (denied) return denied;
 
   const contentType = req.headers.get("content-type") ?? "";
@@ -114,7 +114,7 @@ async function deleteAssetForKind(
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "settings.manage");
+  const denied = await requirePermWs(env, wsId, role, "settings.manage");
   if (denied) return denied;
 
   const existing = await tursoFirst(

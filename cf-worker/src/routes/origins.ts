@@ -15,7 +15,7 @@ import { ensureSchema, ensureOrigins } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
-import { requirePerm } from "../permissions";
+import { requirePermWs } from "../permissionsWs";
 
 const ROLES_READ = new Set(["owner", "admin", "vendedor", "viewer"]);
 
@@ -43,7 +43,7 @@ export async function handleCreateOrigin(workspaceId: string, req: Request, env:
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "sales.write");
+  const denied = await requirePermWs(env, workspaceId, role, "sales.write");
   if (denied) return denied;
 
   let body: { id?: unknown; name?: unknown };
@@ -73,7 +73,7 @@ export async function handleDeleteOrigin(workspaceId: string, originId: string, 
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "settings.manage");
+  const denied = await requirePermWs(env, workspaceId, role, "settings.manage");
   if (denied) return denied;
 
   await tursoExec(

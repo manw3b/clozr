@@ -18,7 +18,7 @@ import { ensureSchema, ensureCashSessionBuckets } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoQuery, tursoExec, tursoFirst } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
-import { requirePerm } from "../permissions";
+import { requirePermWs } from "../permissionsWs";
 
 // Caja restringida a managers (decisión de producto): el vendedor no ve los
 // totales/sesiones de caja del negocio. Apertura/cierre siguen gateados por
@@ -61,7 +61,7 @@ export async function handleOpenCashSession(wsId: string, req: Request, env: Env
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "cash.write");
+  const denied = await requirePermWs(env, wsId, role, "cash.write");
   if (denied) return denied;
 
   let body: Record<string, unknown>;
@@ -136,7 +136,7 @@ export async function handleCloseCashSession(
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "cash.write");
+  const denied = await requirePermWs(env, wsId, role, "cash.write");
   if (denied) return denied;
 
   let body: Record<string, unknown>;

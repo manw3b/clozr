@@ -31,7 +31,7 @@ import { CATALOG_PACKS, unlockCatalog } from "../catalog";
 import { AI_PACKS, addAiCredits, hasAiAccess } from "../aiWallet";
 import { applyWorkspaceDiscount } from "../discounts";
 import { getRoleInWorkspace, json } from "./_generic";
-import { requirePerm } from "../permissions";
+import { requirePermWs } from "../permissionsWs";
 
 const MP_API = "https://api.mercadopago.com";
 
@@ -103,7 +103,7 @@ export async function handleBillingCheckout(workspaceId: string, req: Request, e
 
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "billing.manage");
+  const denied = await requirePermWs(env, workspaceId, role, "billing.manage");
   if (denied) return denied;
 
   if (!env.MP_ACCESS_TOKEN) {
@@ -198,7 +198,7 @@ export async function handleUpdateSeats(workspaceId: string, req: Request, env: 
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "billing.manage");
+  const denied = await requirePermWs(env, workspaceId, role, "billing.manage");
   if (denied) return denied;
 
   let body: { extra_seats?: unknown };
@@ -264,7 +264,7 @@ export async function handleCoverSpace(payerWorkspaceId: string, req: Request, e
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, payerWorkspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "billing.manage");
+  const denied = await requirePermWs(env, payerWorkspaceId, role, "billing.manage");
   if (denied) return denied;
 
   let body: { target_workspace_id?: unknown };
@@ -352,7 +352,7 @@ export async function handleUncoverSpace(payerWorkspaceId: string, req: Request,
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, payerWorkspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "billing.manage");
+  const denied = await requirePermWs(env, payerWorkspaceId, role, "billing.manage");
   if (denied) return denied;
 
   let body: { target_workspace_id?: unknown };
@@ -418,7 +418,7 @@ export async function handleCatalogCheckout(workspaceId: string, req: Request, e
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "billing.manage");
+  const denied = await requirePermWs(env, workspaceId, role, "billing.manage");
   if (denied) return denied;
 
   let body: { catalog?: unknown };
@@ -473,7 +473,7 @@ export async function handleAiCheckout(workspaceId: string, req: Request, env: E
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "billing.manage");
+  const denied = await requirePermWs(env, workspaceId, role, "billing.manage");
   if (denied) return denied;
   if (!(await hasAiAccess(env, workspaceId))) return json({ error: "ai_requires_plan" }, 403);
 

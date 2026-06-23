@@ -22,7 +22,7 @@ import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoQuery, type TursoArg } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
-import { requirePerm } from "../permissions";
+import { requirePermWs } from "../permissionsWs";
 
 const ROLES_READ = new Set(["owner", "admin", "vendedor", "viewer"]);
 
@@ -66,7 +66,7 @@ export async function handleCreateAssignedTaskTemplate(workspaceId: string, req:
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
   {
-    const denied = requirePerm(role, "settings.manage");
+    const denied = await requirePermWs(env, workspaceId, role, "settings.manage");
     if (denied) return denied;
   }
 
@@ -105,7 +105,7 @@ export async function handleUpdateAssignedTaskTemplate(workspaceId: string, temp
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
   {
-    const denied = requirePerm(role, "settings.manage");
+    const denied = await requirePermWs(env, workspaceId, role, "settings.manage");
     if (denied) return denied;
   }
 
@@ -132,7 +132,7 @@ export async function handleDeleteAssignedTaskTemplate(workspaceId: string, temp
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
   {
-    const denied = requirePerm(role, "settings.manage");
+    const denied = await requirePermWs(env, workspaceId, role, "settings.manage");
     if (denied) return denied;
   }
 

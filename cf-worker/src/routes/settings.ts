@@ -13,7 +13,7 @@ import { ensureSchema, ensureWorkspaceSettings } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoQuery } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
-import { requirePerm } from "../permissions";
+import { requirePermWs } from "../permissionsWs";
 
 const ROLES_READ = new Set(["owner", "admin", "vendedor", "viewer"]);
 const MAX_KEY = 64;
@@ -46,7 +46,7 @@ export async function handlePutSettings(workspaceId: string, req: Request, env: 
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "settings.manage");
+  const denied = await requirePermWs(env, workspaceId, role, "settings.manage");
   if (denied) return denied;
 
   let body: { settings?: unknown };
@@ -58,6 +58,8 @@ export async function handlePutSettings(workspaceId: string, req: Request, env: 
   const entries = Object.entries(incoming as Record<string, unknown>);
   if (entries.length === 0) return json({ ok: true });
   if (entries.length > MAX_KEYS) return json({ error: "too_many_keys" }, 400);
+  // role_permissions es reservada: solo se edita por el endpoint owner-only.
+  if (entries.some(([k]) => k === "role_permissions")) return json({ error: "reserved_key" }, 400);
 
   for (const [k, v] of entries) {
     if (typeof k !== "string" || !k || k.length > MAX_KEY) return json({ error: "invalid_key" }, 400);

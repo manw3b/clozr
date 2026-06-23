@@ -28,7 +28,7 @@ import type { Env } from "../index";
 import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, type TursoArg } from "../turso";
-import { requirePerm } from "../permissions";
+import { requirePermWs } from "../permissionsWs";
 
 /* ── permission helpers ──────────────────────────────────────────────── */
 
@@ -129,7 +129,7 @@ export async function handleCreateStage(workspaceId: string, req: Request, env: 
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRole(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "settings.manage");
+  const denied = await requirePermWs(env, workspaceId, role, "settings.manage");
   if (denied) return denied;
 
   let body: Record<string, unknown>;
@@ -166,7 +166,7 @@ export async function handleUpdateStage(workspaceId: string, stageId: string, re
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRole(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "settings.manage");
+  const denied = await requirePermWs(env, workspaceId, role, "settings.manage");
   if (denied) return denied;
 
   let body: Record<string, unknown>;
@@ -191,7 +191,7 @@ export async function handleDeleteStage(workspaceId: string, stageId: string, re
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRole(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "settings.manage");
+  const denied = await requirePermWs(env, workspaceId, role, "settings.manage");
   if (denied) return denied;
 
   await tursoExec(
@@ -264,7 +264,7 @@ export async function handleCreateItem(workspaceId: string, req: Request, env: E
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRole(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "pipeline.write");
+  const denied = await requirePermWs(env, workspaceId, role, "pipeline.write");
   if (denied) return denied;
 
   let body: Record<string, unknown>;
@@ -306,7 +306,7 @@ export async function handleUpdateItem(workspaceId: string, itemId: string, req:
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRole(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "pipeline.write");
+  const denied = await requirePermWs(env, workspaceId, role, "pipeline.write");
   if (denied) return denied;
 
   // T2: el vendedor solo edita SUS leads.
@@ -338,7 +338,7 @@ export async function handleDeleteItem(workspaceId: string, itemId: string, req:
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRole(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "pipeline.write");
+  const denied = await requirePermWs(env, workspaceId, role, "pipeline.write");
   if (denied) return denied;
 
   // T2: el vendedor solo borra SUS leads.

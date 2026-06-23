@@ -660,6 +660,13 @@ async function applySchema(env: Env): Promise<void> {
   await safeAddColumn(env, "cash_sessions", "opened_buckets", "TEXT");
   await safeAddColumn(env, "cash_sessions", "closed_buckets", "TEXT");
 
+  // Código de orden por venta: número diario por vendedor (order_seq) + día local
+  // AR del comprobante (order_day, YYYY-MM-DD) para reiniciar el contador. El
+  // string visible (ej "G230601") lo arma la UI. En prod lo aplica el lazy
+  // ensureSalesOrderSeq().
+  await safeAddColumn(env, "sales", "order_seq", "INTEGER");
+  await safeAddColumn(env, "sales", "order_day", "TEXT");
+
   // ── F2-B R5: Catálogo + payment_methods + customer_types/tags ────
   await tursoQuery(
     env,
@@ -1065,6 +1072,20 @@ export async function ensureCashSessionBuckets(env: Env): Promise<void> {
   await safeAddColumn(env, "cash_sessions", "opened_buckets", "TEXT");
   await safeAddColumn(env, "cash_sessions", "closed_buckets", "TEXT");
   cashBucketsReady = true;
+}
+
+let salesOrderSeqReady = false;
+
+/**
+ * Código de orden por venta: order_seq (Nº diario por vendedor) + order_day
+ * (día local AR del comprobante). Lazy/auto-curativo, sin bumpear SCHEMA_VERSION
+ * (solo los handlers de sales las usan).
+ */
+export async function ensureSalesOrderSeq(env: Env): Promise<void> {
+  if (salesOrderSeqReady) return;
+  await safeAddColumn(env, "sales", "order_seq", "INTEGER");
+  await safeAddColumn(env, "sales", "order_day", "TEXT");
+  salesOrderSeqReady = true;
 }
 
 /**

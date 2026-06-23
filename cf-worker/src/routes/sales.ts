@@ -18,7 +18,7 @@
  */
 
 import type { Env } from "../index";
-import { ensureSchema } from "../schema";
+import { ensureSchema, ensureSalesOrderSeq } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, tursoTransaction, type TursoArg } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
@@ -26,6 +26,15 @@ import { requirePerm } from "../permissions";
 import { sendWarrantyEmail } from "../email";
 
 const ROLES_READ = new Set(["owner", "admin", "vendedor", "viewer"]);
+
+/** Día local de Argentina (YYYY-MM-DD) de un timestamp ISO, para reiniciar el
+ *  contador diario de ventas por vendedor sin depender del parseo de tz de
+ *  SQLite. Intl con timeZone es confiable en Cloudflare Workers. */
+function arLocalDay(iso: string): string {
+  const d = new Date(iso);
+  const base = isNaN(d.getTime()) ? new Date() : d;
+  return base.toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" });
+}
 
 const SALE_EDITABLE = [
   "customer_id", "customer_name", "seller_id", "seller_name",
@@ -127,6 +136,7 @@ export async function handleSendWarranty(
 
 export async function handleListSales(workspaceId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureSalesOrderSeq(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
@@ -177,6 +187,7 @@ export async function handleListSaleItems(workspaceId: string, req: Request, env
 
 export async function handleGetSale(workspaceId: string, saleId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureSalesOrderSeq(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
@@ -222,6 +233,7 @@ interface CreateSaleBody {
 
 export async function handleCreateSale(workspaceId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureSalesOrderSeq(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
@@ -235,9 +247,25 @@ export async function handleCreateSale(workspaceId: string, req: Request, env: E
   const id = (typeof body.id === "string" && body.id) ? body.id : crypto.randomUUID();
   const saleFields = pick(body as Record<string, unknown>, SALE_EDITABLE);
 
+  // Código de orden: Nº diario por vendedor (estable ante borrados → MAX+1, no
+  // COUNT) sobre el día local AR. La inicial + fecha del string las arma la UI.
+  const sellerName = typeof body.seller_name === "string" && body.seller_name.trim() ? body.seller_name.trim() : null;
+  const saleDateRaw = typeof body.sale_date === "string" && body.sale_date ? body.sale_date : new Date().toISOString();
+  const orderDay = arLocalDay(saleDateRaw);
+  let orderSeq = 1;
+  if (sellerName) {
+    const row = await tursoFirst(
+      env,
+      `SELECT COALESCE(MAX(order_seq), 0) + 1 AS next FROM sales
+         WHERE workspace_id = ? AND seller_name = ? AND order_day = ?`,
+      [workspaceId, sellerName, orderDay],
+    );
+    orderSeq = Number(row?.next ?? 1) || 1;
+  }
+
   // T2: owner_id = creador (sub del JWT) para el alcance del vendedor.
-  const cols = ["id", "workspace_id", "created_by", "owner_id", ...Object.keys(saleFields)];
-  const vals: TursoArg[] = [id, workspaceId, auth.userId, auth.userId, ...Object.values(saleFields)];
+  const cols = ["id", "workspace_id", "created_by", "owner_id", "order_seq", "order_day", ...Object.keys(saleFields)];
+  const vals: TursoArg[] = [id, workspaceId, auth.userId, auth.userId, orderSeq, orderDay, ...Object.values(saleFields)];
 
   // C2: insertamos sale + items + payments en una transacción atómica
   // via tursoTransaction (BEGIN/COMMIT en la misma pipeline). Si CUALQUIER

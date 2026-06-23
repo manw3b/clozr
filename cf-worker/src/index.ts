@@ -101,6 +101,8 @@ import {
   handleSendWarranty,
 } from "./routes/sales";
 import { handleListOrigins, handleCreateOrigin, handleDeleteOrigin } from "./routes/origins";
+import { handleListAppointments, handleCreateAppointment, handleUpdateAppointment, handleDeleteAppointment } from "./routes/appointments";
+import { handleListAppointmentTypes, handleCreateAppointmentType, handleDeleteAppointmentType } from "./routes/appointmentTypes";
 import { handleGetSettings, handlePutSettings } from "./routes/settings";
 import { handleGetRolePermissions, handlePutRolePermissions } from "./routes/rolePermissions";
 import { handleGetCustomRoles, handlePutCustomRoles } from "./routes/customRoles";
@@ -430,6 +432,27 @@ export default {
         if (!oId && req.method === "GET")    return cors(req, env, await handleListOrigins(wsId, req, env));
         if (!oId && req.method === "POST")   return cors(req, env, await handleCreateOrigin(wsId, req, env));
         if (oId && req.method === "DELETE")  return cors(req, env, await handleDeleteOrigin(wsId, oId, req, env));
+      }
+
+      // Turnos (appointments) — entidad propia del cliente. Fase ④.
+      const wsApptMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/appointments(?:\/([^/]+))?\/?$/);
+      if (wsApptMatch) {
+        const wsId = wsApptMatch[1]!;
+        const aId = wsApptMatch[2];
+        if (!aId && req.method === "GET")    return cors(req, env, await handleListAppointments(wsId, req, env));
+        if (!aId && req.method === "POST")   return cors(req, env, await handleCreateAppointment(wsId, req, env));
+        if (aId && req.method === "PATCH")   return cors(req, env, await handleUpdateAppointment(wsId, aId, req, env));
+        if (aId && req.method === "DELETE")  return cors(req, env, await handleDeleteAppointment(wsId, aId, req, env));
+      }
+
+      // Tipos de turno — lista editable por workspace. Fase ④.
+      const wsApptTypesMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/appointment-types(?:\/([^/]+))?\/?$/);
+      if (wsApptTypesMatch) {
+        const wsId = wsApptTypesMatch[1]!;
+        const tId = wsApptTypesMatch[2];
+        if (!tId && req.method === "GET")    return cors(req, env, await handleListAppointmentTypes(wsId, req, env));
+        if (!tId && req.method === "POST")   return cors(req, env, await handleCreateAppointmentType(wsId, req, env));
+        if (tId && req.method === "DELETE")  return cors(req, env, await handleDeleteAppointmentType(wsId, tId, req, env));
       }
 
       // Config KV por workspace (plantillas de turno editables, etc). Fase ②.

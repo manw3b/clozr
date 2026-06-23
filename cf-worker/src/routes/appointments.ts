@@ -74,28 +74,42 @@ export async function handleCreateAppointment(workspaceId: string, req: Request,
   if (!appointmentAt) return json({ error: "missing_appointment_at" }, 400);
   const status = typeof body.status === "string" && STATUSES.has(body.status) ? body.status : "pending";
 
+  const saleId = typeof body.sale_id === "string" && body.sale_id ? body.sale_id : null;
+  const customerId = typeof body.customer_id === "string" ? body.customer_id : null;
+  const customerName = typeof body.customer_name === "string" ? body.customer_name : null;
+  const customerPhone = typeof body.customer_phone === "string" ? body.customer_phone : null;
+  const type = typeof body.type === "string" ? body.type : null;
+  const origin = typeof body.origin === "string" ? body.origin : null;
+  const notes = typeof body.notes === "string" ? body.notes : null;
+
+  // Upsert por venta: "Generar turno" desde la misma venta actualiza el turno
+  // existente en vez de duplicarlo.
+  if (saleId) {
+    const existing = await tursoFirst(
+      env,
+      `SELECT id FROM appointments WHERE workspace_id = ? AND sale_id = ? AND deleted_at IS NULL LIMIT 1`,
+      [workspaceId, saleId],
+    );
+    if (existing) {
+      const eid = String(existing.id);
+      await tursoExec(
+        env,
+        `UPDATE appointments SET customer_id = ?, customer_name = ?, customer_phone = ?, appointment_at = ?, type = ?, origin = ?, notes = ?, status = ?, updated_at = datetime('now')
+           WHERE id = ? AND workspace_id = ?`,
+        [customerId, customerName, customerPhone, appointmentAt, type, origin, notes, status, eid, workspaceId],
+      );
+      return json({ id: eid });
+    }
+  }
+
   const id = typeof body.id === "string" && body.id ? body.id : crypto.randomUUID();
   const ownerName = typeof body.owner_name === "string" ? body.owner_name : auth.email ?? null;
-
   await tursoExec(
     env,
     `INSERT INTO appointments
-       (id, workspace_id, customer_id, customer_name, customer_phone, appointment_at, type, origin, notes, status, owner_id, owner_name)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      id,
-      workspaceId,
-      typeof body.customer_id === "string" ? body.customer_id : null,
-      typeof body.customer_name === "string" ? body.customer_name : null,
-      typeof body.customer_phone === "string" ? body.customer_phone : null,
-      appointmentAt,
-      typeof body.type === "string" ? body.type : null,
-      typeof body.origin === "string" ? body.origin : null,
-      typeof body.notes === "string" ? body.notes : null,
-      status,
-      auth.userId,
-      ownerName,
-    ],
+       (id, workspace_id, sale_id, customer_id, customer_name, customer_phone, appointment_at, type, origin, notes, status, owner_id, owner_name)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, workspaceId, saleId, customerId, customerName, customerPhone, appointmentAt, type, origin, notes, status, auth.userId, ownerName],
   );
   return json({ id }, 201);
 }

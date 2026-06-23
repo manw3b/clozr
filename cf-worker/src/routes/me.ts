@@ -47,6 +47,8 @@ interface WorkspaceForUser {
   billing_interval: string;
   /** Crecimiento: si este espacio está cubierto por el plan de otro, su id. */
   covered_by: string | null;
+  /** Fase ①: dirección del local (para el "Estamos en …" del turno). */
+  address: string | null;
 }
 
 interface MeResponse {
@@ -96,7 +98,7 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
                    w.logo_key, w.banner_key, w.icon, w.unlocked_catalogs,
                    w.discount_type, w.discount_value, w.discount_target,
                    w.plan, w.seats, w.plan_status, w.billing_interval,
-                   w.covered_by_workspace_id,
+                   w.covered_by_workspace_id, w.address,
                    m.role, m.status
               FROM memberships m
               INNER JOIN cloud_workspaces w ON w.id = m.workspace_id
@@ -149,6 +151,7 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
       plan_status: String(r.plan_status ?? "active"),
       billing_interval: String(r.billing_interval ?? "monthly"),
       covered_by: r.covered_by_workspace_id == null ? null : String(r.covered_by_workspace_id),
+      address: r.address == null ? null : String(r.address),
     })),
   };
   return json(body);

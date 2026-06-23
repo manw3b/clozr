@@ -1158,6 +1158,61 @@ export async function ensureOrigins(env: Env): Promise<void> {
   originsReady = true;
 }
 
+let appointmentsReady = false;
+
+/**
+ * Fase ④: turnos como entidad propia (no atados a una venta). Un turno es del
+ * CLIENTE y puede ser para distintas cosas (reparación, plan canje, venta, …).
+ * `type` guarda el nombre del tipo (lista editable en appointment_types).
+ * `appointment_at` es wall-clock local "YYYY-MM-DDTHH:mm". Lazy CREATE TABLE.
+ */
+export async function ensureAppointments(env: Env): Promise<void> {
+  if (appointmentsReady) return;
+  await tursoQuery(env, {
+    sql: `CREATE TABLE IF NOT EXISTS appointments (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+      customer_id TEXT,
+      customer_name TEXT,
+      customer_phone TEXT,
+      appointment_at TEXT NOT NULL,
+      type TEXT,
+      origin TEXT,
+      notes TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      owner_id TEXT,
+      owner_name TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT,
+      deleted_at TEXT
+    )`,
+  });
+  await tursoQuery(env, {
+    sql: `CREATE INDEX IF NOT EXISTS idx_appointments_ws ON appointments(workspace_id, deleted_at, appointment_at)`,
+  });
+  appointmentsReady = true;
+}
+
+let appointmentTypesReady = false;
+
+/** Fase ④: lista editable de tipos de turno por workspace (como origins). */
+export async function ensureAppointmentTypes(env: Env): Promise<void> {
+  if (appointmentTypesReady) return;
+  await tursoQuery(env, {
+    sql: `CREATE TABLE IF NOT EXISTS appointment_types (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+      name TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at TEXT
+    )`,
+  });
+  await tursoQuery(env, {
+    sql: `CREATE INDEX IF NOT EXISTS idx_appointment_types_ws ON appointment_types(workspace_id, deleted_at)`,
+  });
+  appointmentTypesReady = true;
+}
+
 let workspaceSettingsReady = false;
 
 /**

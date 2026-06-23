@@ -59,7 +59,7 @@ export async function handlePutSettings(workspaceId: string, req: Request, env: 
   if (entries.length === 0) return json({ ok: true });
   if (entries.length > MAX_KEYS) return json({ error: "too_many_keys" }, 400);
   // role_permissions es reservada: solo se edita por el endpoint owner-only.
-  if (entries.some(([k]) => k === "role_permissions" || k === "custom_roles")) return json({ error: "reserved_key" }, 400);
+  if (entries.some(([k]) => k === "role_permissions" || k === "custom_roles" || k === "home_layouts")) return json({ error: "reserved_key" }, 400);
 
   for (const [k, v] of entries) {
     if (typeof k !== "string" || !k || k.length > MAX_KEY) return json({ error: "invalid_key" }, 400);

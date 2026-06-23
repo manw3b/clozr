@@ -107,6 +107,7 @@ import { handleListRepairs as handleListRepairOrders, handleCreateRepair, handle
 import { handleGetSettings, handlePutSettings } from "./routes/settings";
 import { handleGetRolePermissions, handlePutRolePermissions } from "./routes/rolePermissions";
 import { handleGetCustomRoles, handlePutCustomRoles } from "./routes/customRoles";
+import { handleGetHomeLayouts, handlePutHomeLayouts } from "./routes/homeLayouts";
 import { handleListCatalogPrices, handleSetCatalogPrice } from "./routes/catalogPrices";
 import {
   handleGenericList, handleGenericCreate, handleGenericUpdate,
@@ -490,6 +491,14 @@ export default {
         const wsId = wsCustomRolesMatch[1]!;
         if (req.method === "GET") return cors(req, env, await handleGetCustomRoles(wsId, req, env));
         if (req.method === "PUT") return cors(req, env, await handlePutCustomRoles(wsId, req, env));
+      }
+
+      // Home por rol configurable (Fase ⑧). PUT = solo owner.
+      const wsHomeLayoutsMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/home-layouts\/?$/);
+      if (wsHomeLayoutsMatch) {
+        const wsId = wsHomeLayoutsMatch[1]!;
+        if (req.method === "GET") return cors(req, env, await handleGetHomeLayouts(wsId, req, env));
+        if (req.method === "PUT") return cors(req, env, await handlePutHomeLayouts(wsId, req, env));
       }
 
       // T3 — Billing checkout (crea preapproval MP). Va antes del PATCH

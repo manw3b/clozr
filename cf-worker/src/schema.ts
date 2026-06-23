@@ -945,6 +945,46 @@ export async function ensureConsoleSchema(env: Env): Promise<void> {
   consoleSchemaReady = true;
 }
 
+let joinCodesSchemaReady = false;
+
+/**
+ * Códigos de unión a la tienda (join-by-code): el dueño genera un código y
+ * cualquiera logueado lo canjea (POST /join) para entrar como empleado, sin
+ * que se pre-cargue su email. `code` es único global (el canje es por código,
+ * no scoped a workspace). Seat-gate + expiración + revocación controlan abuso.
+ *
+ * Lazy + memoizada, sin bumpear SCHEMA_VERSION (mismo criterio no-fatal que
+ * ensureConsoleSchema): un workspace existente no fuerza re-migración global en
+ * frío. La llaman los handlers de generar/canjear.
+ */
+export async function ensureJoinCodesSchema(env: Env): Promise<void> {
+  if (joinCodesSchemaReady) return;
+  await tursoQuery(
+    env,
+    {
+      sql: `CREATE TABLE IF NOT EXISTS workspace_join_codes (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+        code TEXT NOT NULL,
+        role TEXT NOT NULL,
+        created_by_user_id TEXT REFERENCES users(id),
+        expires_at TEXT NOT NULL,
+        max_uses INTEGER,
+        uses INTEGER NOT NULL DEFAULT 0,
+        revoked_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+    },
+    {
+      sql: `CREATE UNIQUE INDEX IF NOT EXISTS uq_workspace_join_codes_code ON workspace_join_codes(code)`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_workspace_join_codes_ws ON workspace_join_codes(workspace_id, revoked_at)`,
+    },
+  );
+  joinCodesSchemaReady = true;
+}
+
 let billingSchemaReady = false;
 
 /**

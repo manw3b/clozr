@@ -66,6 +66,8 @@ import {
   handlePatchMember,
   handleRevokeMember,
   handleIssueAccessCode,
+  handleCreateJoinCode,
+  handleRedeemJoinCode,
 } from "./routes/workspaces";
 import {
   handleListAssignedTaskTemplates, handleCreateAssignedTaskTemplate,
@@ -305,6 +307,7 @@ export default {
         /^\/workspaces\/([^/]+)\/members(?:\/([^/]+))?\/?$/,
       );
       const wsInviteMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/invite\/?$/);
+      const wsJoinCodesMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/join-codes\/?$/);
 
       // Customers paths (F2-B R1):
       //   GET    /workspaces/:wid/customers
@@ -647,6 +650,9 @@ export default {
         const wsId = wsInviteMatch[1]!;
         return cors(req, env, await handleInviteMember(wsId, req, env));
       }
+      if (wsJoinCodesMatch && req.method === "POST") {
+        return cors(req, env, await handleCreateJoinCode(wsJoinCodesMatch[1]!, req, env));
+      }
 
       switch (route) {
         case "GET /":
@@ -683,6 +689,9 @@ export default {
 
         case "POST /workspaces":
           return cors(req, env, await handleCreateWorkspace(req, env));
+
+        case "POST /join":
+          return cors(req, env, await handleRedeemJoinCode(req, env));
 
         default:
           return cors(req, env, json({ error: "not_found", route }, 404));

@@ -14,7 +14,7 @@
  */
 
 import type { Env } from "../index";
-import { ensureSchema } from "../schema";
+import { ensureSchema, ensureCashSessionBuckets } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoQuery, tursoExec, tursoFirst } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
@@ -30,8 +30,16 @@ function num(v: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+// Caja Nivel B — arqueo por bucket. El cliente manda un objeto plano
+// { "Efectivo·ARS": 1000, ... }; lo guardamos como JSON TEXT. Cualquier cosa
+// que no sea un objeto plano se ignora (null).
+function bucketsJson(v: unknown): string | null {
+  return v && typeof v === "object" && !Array.isArray(v) ? JSON.stringify(v) : null;
+}
+
 export async function handleListCashSessions(wsId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureCashSessionBuckets(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
@@ -48,6 +56,7 @@ export async function handleListCashSessions(wsId: string, req: Request, env: En
 
 export async function handleOpenCashSession(wsId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureCashSessionBuckets(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
@@ -84,15 +93,16 @@ export async function handleOpenCashSession(wsId: string, req: Request, env: Env
   const id = crypto.randomUUID();
   const openedArs = num(body.opened_balance_ars);
   const openedUsd = num(body.opened_balance_usd);
+  const openedBuckets = bucketsJson(body.opened_buckets);
   const notes = typeof body.notes === "string" ? body.notes : null;
 
   try {
     await tursoExec(
       env,
       `INSERT INTO cash_sessions
-         (id, workspace_id, session_date, opened_balance_ars, opened_balance_usd, opened_by, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, wsId, sessionDate, openedArs, openedUsd, auth.userId, notes],
+         (id, workspace_id, session_date, opened_balance_ars, opened_balance_usd, opened_buckets, opened_by, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, wsId, sessionDate, openedArs, openedUsd, openedBuckets, auth.userId, notes],
     );
   } catch (e) {
     // Race: otra request creó la sesión en paralelo (unique index) → devolvemos la existente.
@@ -121,6 +131,7 @@ export async function handleCloseCashSession(
   env: Env,
 ): Promise<Response> {
   await ensureSchema(env);
+  await ensureCashSessionBuckets(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
@@ -147,6 +158,7 @@ export async function handleCloseCashSession(
 
   const closedArs = num(body.closed_balance_ars);
   const closedUsd = num(body.closed_balance_usd);
+  const closedBuckets = bucketsJson(body.closed_buckets);
 
   // closed_at lo fija el SERVER (no confiamos en el reloj del cliente).
   // El `AND closed_at IS NULL` hace el cierre ATÓMICO: si dos requests cierran
@@ -156,10 +168,10 @@ export async function handleCloseCashSession(
     env,
     `UPDATE cash_sessions
        SET closed_at = datetime('now'),
-           closed_balance_ars = ?, closed_balance_usd = ?,
+           closed_balance_ars = ?, closed_balance_usd = ?, closed_buckets = ?,
            closed_by = ?, updated_at = datetime('now')
        WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL AND closed_at IS NULL`,
-    [closedArs, closedUsd, auth.userId, sid, wsId],
+    [closedArs, closedUsd, closedBuckets, auth.userId, sid, wsId],
   );
 
   const updated = await tursoFirst(env, `SELECT * FROM cash_sessions WHERE id = ?`, [sid]);

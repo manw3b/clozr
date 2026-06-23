@@ -653,6 +653,13 @@ async function applySchema(env: Env): Promise<void> {
     },
   );
 
+  // Caja Nivel B — arqueo por bucket (método × moneda). JSON map en TEXT,
+  // ej { "Efectivo·ARS": 1000, "Crypto·USD": 200 }. Los opened/closed_balance_
+  // ars/usd siguen siendo la SUMA por moneda (back-compat). safeAddColumn es
+  // idempotente; en prod (v11) lo aplica el lazy ensureCashSessionBuckets().
+  await safeAddColumn(env, "cash_sessions", "opened_buckets", "TEXT");
+  await safeAddColumn(env, "cash_sessions", "closed_buckets", "TEXT");
+
   // ── F2-B R5: Catálogo + payment_methods + customer_types/tags ────
   await tursoQuery(
     env,
@@ -1043,6 +1050,21 @@ export async function ensureWorkspaceColumns(env: Env): Promise<void> {
   await safeAddColumn(env, "cloud_workspaces", "ai_credits", "INTEGER");
   await safeAddColumn(env, "cloud_workspaces", "ai_msgs_used", "INTEGER");
   workspaceColsReady = true;
+}
+
+let cashBucketsReady = false;
+
+/**
+ * Caja Nivel B: columnas JSON de arqueo por bucket (método × moneda) en
+ * cash_sessions. Lazy/auto-curativo (mismo patrón que ensureConsoleSchema) para
+ * NO bumpear SCHEMA_VERSION — solo los handlers de cash-sessions las leen, el
+ * resto del backend no las necesita en frío. safeAddColumn ignora duplicate.
+ */
+export async function ensureCashSessionBuckets(env: Env): Promise<void> {
+  if (cashBucketsReady) return;
+  await safeAddColumn(env, "cash_sessions", "opened_buckets", "TEXT");
+  await safeAddColumn(env, "cash_sessions", "closed_buckets", "TEXT");
+  cashBucketsReady = true;
 }
 
 /**

@@ -982,6 +982,10 @@ export async function ensureJoinCodesSchema(env: Env): Promise<void> {
       sql: `CREATE INDEX IF NOT EXISTS idx_workspace_join_codes_ws ON workspace_join_codes(workspace_id, revoked_at)`,
     },
   );
+  // Origen de cada membership: 'owner' (creó la tienda) | 'invite' (lo agregaron
+  // por email) | 'code' (entró con código). Lazy: en DBs viejas la columna puede
+  // no existir. NULL = legado (el front lo infiere por rol).
+  await safeAddColumn(env, "memberships", "source", "TEXT");
   joinCodesSchemaReady = true;
 }
 

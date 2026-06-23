@@ -31,6 +31,7 @@ interface CreateBody { name?: unknown; }
 
 export async function handleCreateWorkspace(req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureJoinCodesSchema(env); // garantiza memberships.source
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
 
@@ -49,8 +50,8 @@ export async function handleCreateWorkspace(req: Request, env: Env): Promise<Res
       args: [workspaceId, name, auth.userId],
     },
     {
-      sql: `INSERT INTO memberships (id, workspace_id, user_id, email, role, status, accepted_at, invited_by_user_id)
-            VALUES (?, ?, ?, ?, 'owner', 'active', datetime('now'), ?)`,
+      sql: `INSERT INTO memberships (id, workspace_id, user_id, email, role, status, accepted_at, invited_by_user_id, source)
+            VALUES (?, ?, ?, ?, 'owner', 'active', datetime('now'), ?, 'owner')`,
       args: [membershipId, workspaceId, auth.userId, auth.email, auth.userId],
     },
   );
@@ -125,6 +126,7 @@ async function membership(env: Env, workspaceId: string, userId: string): Promis
 
 export async function handleListMembers(workspaceId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureJoinCodesSchema(env); // garantiza memberships.source
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
 
@@ -132,7 +134,7 @@ export async function handleListMembers(workspaceId: string, req: Request, env: 
   if (!me) return json({ error: "not_a_member" }, 403);
 
   const [rows] = await tursoQuery(env, {
-    sql: `SELECT m.id, m.user_id, m.email, m.role, m.status, m.invited_at, m.accepted_at,
+    sql: `SELECT m.id, m.user_id, m.email, m.role, m.status, m.invited_at, m.accepted_at, m.source,
                  u.name AS user_name
             FROM memberships m
             LEFT JOIN users u ON u.id = m.user_id
@@ -157,6 +159,7 @@ const VALID_ROLES = new Set(["admin", "vendedor", "viewer"]);
 
 export async function handleInviteMember(workspaceId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureJoinCodesSchema(env); // garantiza memberships.source
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
 
@@ -210,8 +213,8 @@ export async function handleInviteMember(workspaceId: string, req: Request, env:
   await tursoExec(
     env,
     `INSERT INTO memberships
-       (id, workspace_id, user_id, email, role, status, invited_by_user_id, accepted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, workspace_id, user_id, email, role, status, invited_by_user_id, accepted_at, source)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'invite')`,
     [
       membershipId,
       workspaceId,
@@ -303,6 +306,63 @@ export async function handleCreateJoinCode(workspaceId: string, req: Request, en
   return json({ code, role, expiresAt }, 201);
 }
 
+/* ── GET /workspaces/:id/join-codes ──────────────────────────────────── */
+// Código de tienda activo (no revocado, no vencido) o { code: null }.
+export async function handleGetActiveJoinCode(workspaceId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  await ensureJoinCodesSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+
+  const me = await membership(env, workspaceId, auth.userId);
+  if (!me) return json({ error: "not_a_member" }, 403);
+  {
+    const denied = requirePerm(String(me.role), "team.manage");
+    if (denied) return denied;
+  }
+
+  const row = await tursoFirst(
+    env,
+    `SELECT code, role, expires_at, uses, created_at
+       FROM workspace_join_codes
+       WHERE workspace_id = ? AND revoked_at IS NULL AND expires_at > ?
+       ORDER BY created_at DESC LIMIT 1`,
+    [workspaceId, new Date().toISOString()],
+  );
+  if (!row) return json({ code: null });
+  return json({
+    code: String(row.code),
+    role: String(row.role),
+    expiresAt: String(row.expires_at),
+    uses: Number(row.uses ?? 0),
+    createdAt: row.created_at ? String(row.created_at) : null,
+  });
+}
+
+/* ── DELETE /workspaces/:id/join-codes ───────────────────────────────── */
+// Revoca el/los código(s) activo(s) de la tienda.
+export async function handleRevokeJoinCodes(workspaceId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  await ensureJoinCodesSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+
+  const me = await membership(env, workspaceId, auth.userId);
+  if (!me) return json({ error: "not_a_member" }, 403);
+  {
+    const denied = requirePerm(String(me.role), "team.manage");
+    if (denied) return denied;
+  }
+
+  await tursoExec(
+    env,
+    `UPDATE workspace_join_codes SET revoked_at = datetime('now')
+       WHERE workspace_id = ? AND revoked_at IS NULL`,
+    [workspaceId],
+  );
+  return json({ ok: true });
+}
+
 /* ── POST /join ──────────────────────────────────────────────────────── */
 // Canje de un código de tienda por el usuario logueado. El código es la
 // autorización para entrar: no hace falta que el dueño haya pre-cargado el
@@ -377,8 +437,8 @@ export async function handleRedeemJoinCode(req: Request, env: Env): Promise<Resp
   await tursoExec(
     env,
     `INSERT INTO memberships
-       (id, workspace_id, user_id, email, role, status, invited_by_user_id, accepted_at)
-       VALUES (?, ?, ?, ?, ?, 'active', NULL, datetime('now'))`,
+       (id, workspace_id, user_id, email, role, status, invited_by_user_id, accepted_at, source)
+       VALUES (?, ?, ?, ?, ?, 'active', NULL, datetime('now'), 'code')`,
     [crypto.randomUUID(), workspaceId, auth.userId, email, codeRole],
   );
   await tursoExec(env, `UPDATE workspace_join_codes SET uses = uses + 1 WHERE code = ?`, [code]);

@@ -68,6 +68,8 @@ import {
   handleIssueAccessCode,
   handleCreateJoinCode,
   handleRedeemJoinCode,
+  handleGetActiveJoinCode,
+  handleRevokeJoinCodes,
 } from "./routes/workspaces";
 import {
   handleListAssignedTaskTemplates, handleCreateAssignedTaskTemplate,
@@ -650,8 +652,11 @@ export default {
         const wsId = wsInviteMatch[1]!;
         return cors(req, env, await handleInviteMember(wsId, req, env));
       }
-      if (wsJoinCodesMatch && req.method === "POST") {
-        return cors(req, env, await handleCreateJoinCode(wsJoinCodesMatch[1]!, req, env));
+      if (wsJoinCodesMatch) {
+        const wsId = wsJoinCodesMatch[1]!;
+        if (req.method === "POST")   return cors(req, env, await handleCreateJoinCode(wsId, req, env));
+        if (req.method === "GET")    return cors(req, env, await handleGetActiveJoinCode(wsId, req, env));
+        if (req.method === "DELETE") return cors(req, env, await handleRevokeJoinCodes(wsId, req, env));
       }
 
       switch (route) {

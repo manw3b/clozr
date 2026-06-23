@@ -28,6 +28,7 @@ export type Permission =
   | "cash.write"
   | "inventory.write"
   | "tasks.write"
+  | "repairs.write"
   | "reports.view"
   | "settings.manage"
   | "team.manage"
@@ -40,6 +41,7 @@ const OPERATE: Permission[] = [
   "pipeline.write",
   "cash.write",
   "tasks.write",
+  "repairs.write",
 ];
 
 /** Todas las claves de permiso — columnas de la matriz editable por rol (Fase ⑤). */
@@ -50,6 +52,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   "cash.write",
   "inventory.write",
   "tasks.write",
+  "repairs.write",
   "reports.view",
   "settings.manage",
   "team.manage",

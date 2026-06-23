@@ -103,6 +103,7 @@ import {
 import { handleListOrigins, handleCreateOrigin, handleDeleteOrigin } from "./routes/origins";
 import { handleListAppointments, handleCreateAppointment, handleUpdateAppointment, handleDeleteAppointment } from "./routes/appointments";
 import { handleListAppointmentTypes, handleCreateAppointmentType, handleDeleteAppointmentType } from "./routes/appointmentTypes";
+import { handleListRepairs as handleListRepairOrders, handleCreateRepair, handleUpdateRepair, handleDeleteRepair as handleDeleteRepairOrder } from "./routes/repairs";
 import { handleGetSettings, handlePutSettings } from "./routes/settings";
 import { handleGetRolePermissions, handlePutRolePermissions } from "./routes/rolePermissions";
 import { handleGetCustomRoles, handlePutCustomRoles } from "./routes/customRoles";
@@ -453,6 +454,18 @@ export default {
         if (!tId && req.method === "GET")    return cors(req, env, await handleListAppointmentTypes(wsId, req, env));
         if (!tId && req.method === "POST")   return cors(req, env, await handleCreateAppointmentType(wsId, req, env));
         if (tId && req.method === "DELETE")  return cors(req, env, await handleDeleteAppointmentType(wsId, tId, req, env));
+      }
+
+      // Reparaciones del taller — módulo propio. Fase ⑥.
+      // (Distinto de catalog-repairs/refurbish, que vive bajo /catalog/:id/repairs.)
+      const wsRepairOrdersMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/repairs(?:\/([^/]+))?\/?$/);
+      if (wsRepairOrdersMatch) {
+        const wsId = wsRepairOrdersMatch[1]!;
+        const rId = wsRepairOrdersMatch[2];
+        if (!rId && req.method === "GET")    return cors(req, env, await handleListRepairOrders(wsId, req, env));
+        if (!rId && req.method === "POST")   return cors(req, env, await handleCreateRepair(wsId, req, env));
+        if (rId && req.method === "PATCH")   return cors(req, env, await handleUpdateRepair(wsId, rId, req, env));
+        if (rId && req.method === "DELETE")  return cors(req, env, await handleDeleteRepairOrder(wsId, rId, req, env));
       }
 
       // Config KV por workspace (plantillas de turno editables, etc). Fase ②.

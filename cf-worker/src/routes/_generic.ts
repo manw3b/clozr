@@ -11,7 +11,8 @@ import type { Env } from "../index";
 import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, type TursoArg } from "../turso";
-import { requirePerm, type Permission } from "../permissions";
+import { type Permission } from "../permissions";
+import { requirePermWs } from "../permissionsWs";
 
 export interface TableSpec {
   /** SQL table name. */
@@ -100,7 +101,7 @@ export async function handleGenericCreate(spec: TableSpec, workspaceId: string, 
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
   if (spec.permission) {
-    const denied = requirePerm(role, spec.permission);
+    const denied = await requirePermWs(env, workspaceId, role, spec.permission);
     if (denied) return denied;
   } else if (!spec.rolesCreate.has(role)) {
     return json({ error: "forbidden" }, 403);
@@ -157,7 +158,7 @@ export async function handleGenericUpdate(spec: TableSpec, workspaceId: string, 
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
   if (spec.permission) {
-    const denied = requirePerm(role, spec.permission);
+    const denied = await requirePermWs(env, workspaceId, role, spec.permission);
     if (denied) return denied;
   } else if (!spec.rolesEdit.has(role)) {
     return json({ error: "forbidden" }, 403);
@@ -204,7 +205,7 @@ export async function handleGenericDelete(spec: TableSpec, workspaceId: string, 
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
   if (spec.permission) {
-    const denied = requirePerm(role, spec.permission);
+    const denied = await requirePermWs(env, workspaceId, role, spec.permission);
     if (denied) return denied;
   } else if (!spec.rolesDelete.has(role)) {
     return json({ error: "forbidden" }, 403);

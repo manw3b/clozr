@@ -22,7 +22,7 @@ import { ensureSchema, ensureSalesOrderSeq, ensureSalesTurno } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, tursoTransaction, type TursoArg } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
-import { requirePerm } from "../permissions";
+import { requirePermWs } from "../permissionsWs";
 import { sendWarrantyEmail } from "../email";
 
 const ROLES_READ = new Set(["owner", "admin", "vendedor", "viewer"]);
@@ -168,7 +168,7 @@ export async function handleListSaleItems(workspaceId: string, req: Request, env
   // GET /sale-items alimenta Reportes → requiere reports.view (managers).
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const deniedReports = requirePerm(role, "reports.view");
+  const deniedReports = await requirePermWs(env, workspaceId, role, "reports.view");
   if (deniedReports) return deniedReports;
 
   const [rows] = await tursoQuery(env, {
@@ -242,7 +242,7 @@ export async function handleCreateSale(workspaceId: string, req: Request, env: E
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "sales.write");
+  const denied = await requirePermWs(env, workspaceId, role, "sales.write");
   if (denied) return denied;
 
   let body: CreateSaleBody;
@@ -436,7 +436,7 @@ export async function handleUpdateSale(workspaceId: string, saleId: string, req:
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "sales.write");
+  const denied = await requirePermWs(env, workspaceId, role, "sales.write");
   if (denied) return denied;
 
   const ownerErr = await assertOwnsSale(env, workspaceId, saleId, role, auth.userId);
@@ -466,7 +466,7 @@ export async function handleAddPayment(workspaceId: string, saleId: string, req:
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "sales.write");
+  const denied = await requirePermWs(env, workspaceId, role, "sales.write");
   if (denied) return denied;
 
   const ownerErr = await assertOwnsSale(env, workspaceId, saleId, role, auth.userId);
@@ -520,7 +520,7 @@ export async function handleDeleteSale(workspaceId: string, saleId: string, req:
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "sales.write");
+  const denied = await requirePermWs(env, workspaceId, role, "sales.write");
   if (denied) return denied;
 
   const ownerErr = await assertOwnsSale(env, workspaceId, saleId, role, auth.userId);

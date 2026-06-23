@@ -23,7 +23,7 @@ import { ensureSchema, ensureWorkspaceColumns, ensureJoinCodesSchema } from "../
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, type Row, type TursoArg } from "../turso";
 import { sendInviteEmail } from "../email";
-import { requirePerm } from "../permissions";
+import { requirePermWs } from "../permissionsWs";
 
 /* ── POST /workspaces ────────────────────────────────────────────────── */
 
@@ -80,7 +80,7 @@ export async function handleUpdateWorkspace(workspaceId: string, req: Request, e
 
   const me = await membership(env, workspaceId, auth.userId);
   if (!me) return json({ error: "not_a_member" }, 403);
-  const denied = requirePerm(String(me.role), "settings.manage");
+  const denied = await requirePermWs(env, workspaceId, String(me.role), "settings.manage");
   if (denied) return denied;
 
   let body: Record<string, unknown>;
@@ -166,7 +166,7 @@ export async function handleInviteMember(workspaceId: string, req: Request, env:
   const me = await membership(env, workspaceId, auth.userId);
   if (!me) return json({ error: "not_a_member" }, 403);
   {
-    const denied = requirePerm(String(me.role), "team.manage");
+    const denied = await requirePermWs(env, workspaceId, String(me.role), "team.manage");
     if (denied) return denied;
   }
 
@@ -270,7 +270,7 @@ export async function handleCreateJoinCode(workspaceId: string, req: Request, en
   const me = await membership(env, workspaceId, auth.userId);
   if (!me) return json({ error: "not_a_member" }, 403);
   {
-    const denied = requirePerm(String(me.role), "team.manage");
+    const denied = await requirePermWs(env, workspaceId, String(me.role), "team.manage");
     if (denied) return denied;
   }
 
@@ -317,7 +317,7 @@ export async function handleGetActiveJoinCode(workspaceId: string, req: Request,
   const me = await membership(env, workspaceId, auth.userId);
   if (!me) return json({ error: "not_a_member" }, 403);
   {
-    const denied = requirePerm(String(me.role), "team.manage");
+    const denied = await requirePermWs(env, workspaceId, String(me.role), "team.manage");
     if (denied) return denied;
   }
 
@@ -350,7 +350,7 @@ export async function handleRevokeJoinCodes(workspaceId: string, req: Request, e
   const me = await membership(env, workspaceId, auth.userId);
   if (!me) return json({ error: "not_a_member" }, 403);
   {
-    const denied = requirePerm(String(me.role), "team.manage");
+    const denied = await requirePermWs(env, workspaceId, String(me.role), "team.manage");
     if (denied) return denied;
   }
 
@@ -464,7 +464,7 @@ export async function handlePatchMember(
   const me = await membership(env, workspaceId, auth.userId);
   if (!me) return json({ error: "not_a_member" }, 403);
   {
-    const denied = requirePerm(String(me.role), "team.manage");
+    const denied = await requirePermWs(env, workspaceId, String(me.role), "team.manage");
     if (denied) return denied;
   }
 
@@ -543,7 +543,7 @@ export async function handleIssueAccessCode(
   const me = await membership(env, workspaceId, auth.userId);
   if (!me) return json({ error: "not_a_member" }, 403);
   {
-    const denied = requirePerm(String(me.role), "team.manage");
+    const denied = await requirePermWs(env, workspaceId, String(me.role), "team.manage");
     if (denied) return denied;
   }
 
@@ -610,7 +610,7 @@ export async function handleRevokeMember(
   const me = await membership(env, workspaceId, auth.userId);
   if (!me) return json({ error: "not_a_member" }, 403);
   {
-    const denied = requirePerm(String(me.role), "team.manage");
+    const denied = await requirePermWs(env, workspaceId, String(me.role), "team.manage");
     if (denied) return denied;
   }
 

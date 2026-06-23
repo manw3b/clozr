@@ -22,7 +22,7 @@ import type { Env } from "../index";
 import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, type TursoArg } from "../turso";
-import { requirePerm } from "../permissions";
+import { requirePermWs } from "../permissionsWs";
 
 /* ── permission helpers ──────────────────────────────────────────────── */
 
@@ -128,7 +128,7 @@ export async function handleCreateCustomer(workspaceId: string, req: Request, en
 
   const role = await getMembershipRole(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "customers.write");
+  const denied = await requirePermWs(env, workspaceId, role, "customers.write");
   if (denied) return denied;
 
   let body: CreateBody;
@@ -176,7 +176,7 @@ export async function handleUpdateCustomer(
 
   const role = await getMembershipRole(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "customers.write");
+  const denied = await requirePermWs(env, workspaceId, role, "customers.write");
   if (denied) return denied;
 
   // T2: el vendedor solo edita SUS clientes.
@@ -216,7 +216,7 @@ export async function handleDeleteCustomer(
 
   const role = await getMembershipRole(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "customers.write");
+  const denied = await requirePermWs(env, workspaceId, role, "customers.write");
   if (denied) return denied;
 
   // T2: el vendedor solo borra SUS clientes.

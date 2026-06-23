@@ -21,7 +21,7 @@ import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoQuery, type TursoArg } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
-import { requirePerm } from "../permissions";
+import { requirePermWs } from "../permissionsWs";
 
 const ROLES_READ = new Set(["owner", "admin", "vendedor", "viewer"]);
 
@@ -47,7 +47,7 @@ export async function handleCreateCustomerContact(workspaceId: string, customerI
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role) return json({ error: "forbidden" }, 403);
-  const denied = requirePerm(role, "customers.write");
+  const denied = await requirePermWs(env, workspaceId, role, "customers.write");
   if (denied) return denied;
 
   let body: Record<string, unknown>;

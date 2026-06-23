@@ -102,6 +102,7 @@ import {
 } from "./routes/sales";
 import { handleListOrigins, handleCreateOrigin, handleDeleteOrigin } from "./routes/origins";
 import { handleGetSettings, handlePutSettings } from "./routes/settings";
+import { handleGetRolePermissions, handlePutRolePermissions } from "./routes/rolePermissions";
 import { handleListCatalogPrices, handleSetCatalogPrice } from "./routes/catalogPrices";
 import {
   handleGenericList, handleGenericCreate, handleGenericUpdate,
@@ -436,6 +437,14 @@ export default {
         const wsId = wsSettingsMatch[1]!;
         if (req.method === "GET") return cors(req, env, await handleGetSettings(wsId, req, env));
         if (req.method === "PUT") return cors(req, env, await handlePutSettings(wsId, req, env));
+      }
+
+      // Permisos por rol editables por negocio (Fase ⑤). PUT = solo owner.
+      const wsRolePermsMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/role-permissions\/?$/);
+      if (wsRolePermsMatch) {
+        const wsId = wsRolePermsMatch[1]!;
+        if (req.method === "GET") return cors(req, env, await handleGetRolePermissions(wsId, req, env));
+        if (req.method === "PUT") return cors(req, env, await handlePutRolePermissions(wsId, req, env));
       }
 
       // T3 — Billing checkout (crea preapproval MP). Va antes del PATCH

@@ -42,7 +42,22 @@ const OPERATE: Permission[] = [
   "tasks.write",
 ];
 
-const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
+/** Todas las claves de permiso — columnas de la matriz editable por rol (Fase ⑤). */
+export const ALL_PERMISSIONS: Permission[] = [
+  "customers.write",
+  "sales.write",
+  "pipeline.write",
+  "cash.write",
+  "inventory.write",
+  "tasks.write",
+  "reports.view",
+  "settings.manage",
+  "team.manage",
+  "billing.manage",
+  "workspace.delete",
+];
+
+export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   owner: [
     ...OPERATE,
     "inventory.write",

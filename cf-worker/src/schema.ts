@@ -1215,6 +1215,53 @@ export async function ensureAppointmentTypes(env: Env): Promise<void> {
   appointmentTypesReady = true;
 }
 
+let repairsReady = false;
+
+/**
+ * Reparaciones (Fase ⑥) — módulo propio del taller. Ciclo: recibido →
+ * diagnóstico → presupuestado → aprobado → en reparación → listo → entregado
+ * (+ cancelado). Links opcionales a turno de origen y venta de cobro.
+ * appointment_at/fechas son wall-clock local. Lazy CREATE TABLE.
+ */
+export async function ensureRepairs(env: Env): Promise<void> {
+  if (repairsReady) return;
+  await tursoQuery(env, {
+    sql: `CREATE TABLE IF NOT EXISTS repairs (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+      customer_id TEXT,
+      customer_name TEXT,
+      customer_phone TEXT,
+      device_model TEXT,
+      device_imei TEXT,
+      device_passcode TEXT,
+      accessories TEXT,
+      problem TEXT,
+      diagnosis TEXT,
+      status TEXT NOT NULL DEFAULT 'received',
+      parts_cost REAL,
+      labor_cost REAL,
+      technician TEXT,
+      warranty_months INTEGER,
+      notes TEXT,
+      received_at TEXT,
+      estimated_at TEXT,
+      delivered_at TEXT,
+      appointment_id TEXT,
+      sale_id TEXT,
+      owner_id TEXT,
+      owner_name TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT,
+      deleted_at TEXT
+    )`,
+  });
+  await tursoQuery(env, {
+    sql: `CREATE INDEX IF NOT EXISTS idx_repairs_ws ON repairs(workspace_id, deleted_at, status)`,
+  });
+  repairsReady = true;
+}
+
 let workspaceSettingsReady = false;
 
 /**

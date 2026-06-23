@@ -70,7 +70,7 @@ export async function handleCreateWorkspace(req: Request, env: Env): Promise<Res
  * daily_goal_count. (Otros campos del schema están fuera de scope —
  * created_at no se edita, owner_user_id requiere flow separado).
  */
-const WS_EDITABLE = ["name", "industry", "icon", "daily_goal", "daily_goal_currency", "daily_goal_count"] as const;
+const WS_EDITABLE = ["name", "industry", "icon", "daily_goal", "daily_goal_currency", "daily_goal_count", "address"] as const;
 
 export async function handleUpdateWorkspace(workspaceId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);

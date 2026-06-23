@@ -18,7 +18,7 @@
  */
 
 import type { Env } from "../index";
-import { ensureSchema, ensureSalesOrderSeq } from "../schema";
+import { ensureSchema, ensureSalesOrderSeq, ensureSalesTurno } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, tursoTransaction, type TursoArg } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
@@ -41,6 +41,7 @@ const SALE_EDITABLE = [
   "subtotal", "total", "total_paid", "balance", "is_paid",
   "payment_method", "notes", "out_of_stock_sale",
   "regularized_at", "regularized_by", "sale_date",
+  "appointment_at", "origin",
 ] as const;
 
 const ITEM_EDITABLE = [
@@ -137,6 +138,7 @@ export async function handleSendWarranty(
 export async function handleListSales(workspaceId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
   await ensureSalesOrderSeq(env);
+  await ensureSalesTurno(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
@@ -188,6 +190,7 @@ export async function handleListSaleItems(workspaceId: string, req: Request, env
 export async function handleGetSale(workspaceId: string, saleId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
   await ensureSalesOrderSeq(env);
+  await ensureSalesTurno(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
@@ -234,6 +237,7 @@ interface CreateSaleBody {
 export async function handleCreateSale(workspaceId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
   await ensureSalesOrderSeq(env);
+  await ensureSalesTurno(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
@@ -427,6 +431,7 @@ export async function handleCreateSale(workspaceId: string, req: Request, env: E
 
 export async function handleUpdateSale(workspaceId: string, saleId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureSalesTurno(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);

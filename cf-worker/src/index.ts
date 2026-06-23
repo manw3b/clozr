@@ -100,6 +100,7 @@ import {
   handleDeleteSale, handleAddPayment, handleImportSales, handleListSaleItems,
   handleSendWarranty,
 } from "./routes/sales";
+import { handleListOrigins, handleCreateOrigin, handleDeleteOrigin } from "./routes/origins";
 import { handleListCatalogPrices, handleSetCatalogPrice } from "./routes/catalogPrices";
 import {
   handleGenericList, handleGenericCreate, handleGenericUpdate,
@@ -416,6 +417,16 @@ export default {
         if (sId && req.method === "GET")     return cors(req, env, await handleGetSale(wsId, sId, req, env));
         if (sId && req.method === "PATCH")   return cors(req, env, await handleUpdateSale(wsId, sId, req, env));
         if (sId && req.method === "DELETE")  return cors(req, env, await handleDeleteSale(wsId, sId, req, env));
+      }
+
+      // Orígenes ("viene de") — lista gestionable por workspace. Fase ①.
+      const wsOriginsMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/origins(?:\/([^/]+))?\/?$/);
+      if (wsOriginsMatch) {
+        const wsId = wsOriginsMatch[1]!;
+        const oId = wsOriginsMatch[2];
+        if (!oId && req.method === "GET")    return cors(req, env, await handleListOrigins(wsId, req, env));
+        if (!oId && req.method === "POST")   return cors(req, env, await handleCreateOrigin(wsId, req, env));
+        if (oId && req.method === "DELETE")  return cors(req, env, await handleDeleteOrigin(wsId, oId, req, env));
       }
 
       // T3 — Billing checkout (crea preapproval MP). Va antes del PATCH

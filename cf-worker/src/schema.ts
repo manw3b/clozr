@@ -667,6 +667,24 @@ async function applySchema(env: Env): Promise<void> {
   await safeAddColumn(env, "sales", "order_seq", "INTEGER");
   await safeAddColumn(env, "sales", "order_day", "TEXT");
 
+  // Fase ①: turno + origen por venta, y lista de orígenes. En prod lo aplican
+  // los lazy ensureSalesTurno / ensureOrigins (sin bumpear SCHEMA_VERSION).
+  // La dirección del local (cloud_workspaces.address) la cubre ensureWorkspaceColumns.
+  await safeAddColumn(env, "sales", "appointment_at", "TEXT");
+  await safeAddColumn(env, "sales", "origin", "TEXT");
+  await tursoQuery(env, {
+    sql: `CREATE TABLE IF NOT EXISTS origins (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+      name TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at TEXT
+    )`,
+  });
+  await tursoQuery(env, {
+    sql: `CREATE INDEX IF NOT EXISTS idx_origins_workspace ON origins(workspace_id, deleted_at)`,
+  });
+
   // ── F2-B R5: Catálogo + payment_methods + customer_types/tags ────
   await tursoQuery(
     env,
@@ -1056,6 +1074,8 @@ export async function ensureWorkspaceColumns(env: Env): Promise<void> {
   // 1 mensaje) y nº de mensajes gratis ya consumidos (cap = AI_FREE_LIMIT).
   await safeAddColumn(env, "cloud_workspaces", "ai_credits", "INTEGER");
   await safeAddColumn(env, "cloud_workspaces", "ai_msgs_used", "INTEGER");
+  // Fase ①: dirección del local (para el "Estamos en …" del turno).
+  await safeAddColumn(env, "cloud_workspaces", "address", "TEXT");
   workspaceColsReady = true;
 }
 
@@ -1086,6 +1106,44 @@ export async function ensureSalesOrderSeq(env: Env): Promise<void> {
   await safeAddColumn(env, "sales", "order_seq", "INTEGER");
   await safeAddColumn(env, "sales", "order_day", "TEXT");
   salesOrderSeqReady = true;
+}
+
+let salesTurnoReady = false;
+
+/**
+ * Fase ①: turno (cita) + origen ("viene de") por venta. appointment_at es la
+ * fecha/hora local del turno (sin tz, wall-clock); origin es el nombre elegido
+ * de la lista de orígenes (denormalizado para reportes simples y resiliencia).
+ * Lazy/auto-curativo, sin bumpear SCHEMA_VERSION.
+ */
+export async function ensureSalesTurno(env: Env): Promise<void> {
+  if (salesTurnoReady) return;
+  await safeAddColumn(env, "sales", "appointment_at", "TEXT");
+  await safeAddColumn(env, "sales", "origin", "TEXT");
+  salesTurnoReady = true;
+}
+
+let originsReady = false;
+
+/**
+ * Fase ①: lista gestionable de orígenes ("viene de") por workspace — ej
+ * "MobileZone", "Instagram". Lazy CREATE TABLE para no bumpear SCHEMA_VERSION.
+ */
+export async function ensureOrigins(env: Env): Promise<void> {
+  if (originsReady) return;
+  await tursoQuery(env, {
+    sql: `CREATE TABLE IF NOT EXISTS origins (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+      name TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at TEXT
+    )`,
+  });
+  await tursoQuery(env, {
+    sql: `CREATE INDEX IF NOT EXISTS idx_origins_workspace ON origins(workspace_id, deleted_at)`,
+  });
+  originsReady = true;
 }
 
 /**

@@ -1175,6 +1175,7 @@ export async function ensureAppointments(env: Env): Promise<void> {
       customer_id TEXT,
       customer_name TEXT,
       customer_phone TEXT,
+      sale_id TEXT,
       appointment_at TEXT NOT NULL,
       type TEXT,
       origin TEXT,
@@ -1190,6 +1191,7 @@ export async function ensureAppointments(env: Env): Promise<void> {
   await tursoQuery(env, {
     sql: `CREATE INDEX IF NOT EXISTS idx_appointments_ws ON appointments(workspace_id, deleted_at, appointment_at)`,
   });
+  await safeAddColumn(env, "appointments", "sale_id", "TEXT"); // turnos creados desde una venta
   appointmentsReady = true;
 }
 

@@ -103,6 +103,7 @@ import {
 import { handleListOrigins, handleCreateOrigin, handleDeleteOrigin } from "./routes/origins";
 import { handleGetSettings, handlePutSettings } from "./routes/settings";
 import { handleGetRolePermissions, handlePutRolePermissions } from "./routes/rolePermissions";
+import { handleGetCustomRoles, handlePutCustomRoles } from "./routes/customRoles";
 import { handleListCatalogPrices, handleSetCatalogPrice } from "./routes/catalogPrices";
 import {
   handleGenericList, handleGenericCreate, handleGenericUpdate,
@@ -445,6 +446,14 @@ export default {
         const wsId = wsRolePermsMatch[1]!;
         if (req.method === "GET") return cors(req, env, await handleGetRolePermissions(wsId, req, env));
         if (req.method === "PUT") return cors(req, env, await handlePutRolePermissions(wsId, req, env));
+      }
+
+      // Roles personalizados (Fase ⑤.B). PUT = solo owner.
+      const wsCustomRolesMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/custom-roles\/?$/);
+      if (wsCustomRolesMatch) {
+        const wsId = wsCustomRolesMatch[1]!;
+        if (req.method === "GET") return cors(req, env, await handleGetCustomRoles(wsId, req, env));
+        if (req.method === "PUT") return cors(req, env, await handlePutCustomRoles(wsId, req, env));
       }
 
       // T3 — Billing checkout (crea preapproval MP). Va antes del PATCH

@@ -23,7 +23,7 @@ import { ensureSchema, ensureWorkspaceColumns, ensureJoinCodesSchema } from "../
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, type Row, type TursoArg } from "../turso";
 import { sendInviteEmail } from "../email";
-import { requirePermWs } from "../permissionsWs";
+import { requirePermWs, getCustomRoleIds } from "../permissionsWs";
 
 /* ── POST /workspaces ────────────────────────────────────────────────── */
 
@@ -173,7 +173,10 @@ export async function handleInviteMember(workspaceId: string, req: Request, env:
   let body: InviteBody;
   try { body = (await req.json()) as InviteBody; } catch { return json({ error: "invalid_body" }, 400); }
   if (typeof body.email !== "string") return json({ error: "missing_email" }, 400);
-  if (typeof body.role !== "string" || !VALID_ROLES.has(body.role)) return json({ error: "invalid_role" }, 400);
+  if (typeof body.role !== "string") return json({ error: "invalid_role" }, 400);
+  if (!VALID_ROLES.has(body.role) && !(await getCustomRoleIds(env, workspaceId)).has(body.role)) {
+    return json({ error: "invalid_role" }, 400);
+  }
 
   const email = body.email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "invalid_email" }, 400);
@@ -470,7 +473,10 @@ export async function handlePatchMember(
 
   let body: PatchBody;
   try { body = (await req.json()) as PatchBody; } catch { return json({ error: "invalid_body" }, 400); }
-  if (typeof body.role !== "string" || !PATCHABLE_ROLES.has(body.role)) return json({ error: "invalid_role" }, 400);
+  if (typeof body.role !== "string") return json({ error: "invalid_role" }, 400);
+  if (!PATCHABLE_ROLES.has(body.role) && !(await getCustomRoleIds(env, workspaceId)).has(body.role)) {
+    return json({ error: "invalid_role" }, 400);
+  }
 
   // Solo owner puede crear otros owner. Admin no puede promover a owner.
   if (body.role === "owner" && me.role !== "owner") return json({ error: "only_owner_can_promote_to_owner" }, 403);

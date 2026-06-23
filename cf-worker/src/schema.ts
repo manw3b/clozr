@@ -685,6 +685,18 @@ async function applySchema(env: Env): Promise<void> {
     sql: `CREATE INDEX IF NOT EXISTS idx_origins_workspace ON origins(workspace_id, deleted_at)`,
   });
 
+  // Fase ②: config KV por workspace (ej plantillas de turno editables). En prod
+  // lo aplica el lazy ensureWorkspaceSettings (sin bumpear SCHEMA_VERSION).
+  await tursoQuery(env, {
+    sql: `CREATE TABLE IF NOT EXISTS workspace_settings (
+      workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+      key TEXT NOT NULL,
+      value TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (workspace_id, key)
+    )`,
+  });
+
   // ── F2-B R5: Catálogo + payment_methods + customer_types/tags ────
   await tursoQuery(
     env,
@@ -1144,6 +1156,26 @@ export async function ensureOrigins(env: Env): Promise<void> {
     sql: `CREATE INDEX IF NOT EXISTS idx_origins_workspace ON origins(workspace_id, deleted_at)`,
   });
   originsReady = true;
+}
+
+let workspaceSettingsReady = false;
+
+/**
+ * Fase ②: config KV por workspace (workspace_id, key, value) — ej plantillas
+ * de turno editables por negocio. Lazy CREATE TABLE sin bumpear SCHEMA_VERSION.
+ */
+export async function ensureWorkspaceSettings(env: Env): Promise<void> {
+  if (workspaceSettingsReady) return;
+  await tursoQuery(env, {
+    sql: `CREATE TABLE IF NOT EXISTS workspace_settings (
+      workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+      key TEXT NOT NULL,
+      value TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (workspace_id, key)
+    )`,
+  });
+  workspaceSettingsReady = true;
 }
 
 /**

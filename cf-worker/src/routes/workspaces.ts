@@ -19,7 +19,7 @@
  */
 
 import type { Env } from "../index";
-import { ensureSchema, ensureWorkspaceColumns } from "../schema";
+import { ensureSchema, ensureWorkspaceColumns, ensureJoinCodesSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, type Row, type TursoArg } from "../turso";
 import { sendInviteEmail } from "../email";
@@ -31,6 +31,7 @@ interface CreateBody { name?: unknown; }
 
 export async function handleCreateWorkspace(req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureJoinCodesSchema(env); // garantiza memberships.source
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
 
@@ -49,8 +50,8 @@ export async function handleCreateWorkspace(req: Request, env: Env): Promise<Res
       args: [workspaceId, name, auth.userId],
     },
     {
-      sql: `INSERT INTO memberships (id, workspace_id, user_id, email, role, status, accepted_at, invited_by_user_id)
-            VALUES (?, ?, ?, ?, 'owner', 'active', datetime('now'), ?)`,
+      sql: `INSERT INTO memberships (id, workspace_id, user_id, email, role, status, accepted_at, invited_by_user_id, source)
+            VALUES (?, ?, ?, ?, 'owner', 'active', datetime('now'), ?, 'owner')`,
       args: [membershipId, workspaceId, auth.userId, auth.email, auth.userId],
     },
   );
@@ -125,6 +126,7 @@ async function membership(env: Env, workspaceId: string, userId: string): Promis
 
 export async function handleListMembers(workspaceId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureJoinCodesSchema(env); // garantiza memberships.source
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
 
@@ -132,7 +134,7 @@ export async function handleListMembers(workspaceId: string, req: Request, env: 
   if (!me) return json({ error: "not_a_member" }, 403);
 
   const [rows] = await tursoQuery(env, {
-    sql: `SELECT m.id, m.user_id, m.email, m.role, m.status, m.invited_at, m.accepted_at,
+    sql: `SELECT m.id, m.user_id, m.email, m.role, m.status, m.invited_at, m.accepted_at, m.source,
                  u.name AS user_name
             FROM memberships m
             LEFT JOIN users u ON u.id = m.user_id
@@ -157,6 +159,7 @@ const VALID_ROLES = new Set(["admin", "vendedor", "viewer"]);
 
 export async function handleInviteMember(workspaceId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureJoinCodesSchema(env); // garantiza memberships.source
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
 
@@ -210,8 +213,8 @@ export async function handleInviteMember(workspaceId: string, req: Request, env:
   await tursoExec(
     env,
     `INSERT INTO memberships
-       (id, workspace_id, user_id, email, role, status, invited_by_user_id, accepted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, workspace_id, user_id, email, role, status, invited_by_user_id, accepted_at, source)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'invite')`,
     [
       membershipId,
       workspaceId,
@@ -224,12 +227,11 @@ export async function handleInviteMember(workspaceId: string, req: Request, env:
     ],
   );
 
-  // Cargar workspace name + inviter name para el email.
+  // Cargar workspace name para el email.
   const ws = await tursoFirst(env, `SELECT name FROM cloud_workspaces WHERE id = ?`, [workspaceId]);
   await sendInviteEmail({
     to: email,
     workspaceName: ws ? String(ws.name) : "tu equipo",
-    inviterEmail: auth.email,
     role: body.role,
     apiKey: env.RESEND_API_KEY,
     from: env.RESEND_FROM,
@@ -240,6 +242,208 @@ export async function handleInviteMember(workspaceId: string, req: Request, env:
   });
 
   return json({ id: membershipId, email, role: body.role, status }, 201);
+}
+
+/* ── POST /workspaces/:id/join-codes ─────────────────────────────────── */
+// El dueño/encargado genera un código de la tienda. Cualquiera logueado que lo
+// canjee (POST /join) entra como empleado con el rol del código. No expone
+// emails ni requiere pre-cargar a la persona. Sólo un código activo por
+// workspace (generar revoca los anteriores).
+
+const JOIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sin O/0/I/1
+function genJoinCode(): string {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  let out = "";
+  for (let i = 0; i < 8; i++) out += JOIN_CODE_ALPHABET[bytes[i]! % JOIN_CODE_ALPHABET.length];
+  return out;
+}
+
+interface JoinCodeBody { role?: unknown; expiresInDays?: unknown; }
+
+export async function handleCreateJoinCode(workspaceId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  await ensureJoinCodesSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+
+  const me = await membership(env, workspaceId, auth.userId);
+  if (!me) return json({ error: "not_a_member" }, 403);
+  {
+    const denied = requirePerm(String(me.role), "team.manage");
+    if (denied) return denied;
+  }
+
+  let body: JoinCodeBody = {};
+  try { body = (await req.json()) as JoinCodeBody; } catch { /* body opcional */ }
+  const role = typeof body.role === "string" && VALID_ROLES.has(body.role) ? body.role : "vendedor";
+  const days = Math.min(30, Math.max(1, Math.round(Number(body.expiresInDays) || 7)));
+  const expiresAt = new Date(Date.now() + days * 86_400_000).toISOString();
+
+  // Un solo código activo por tienda: revocamos los anteriores.
+  await tursoExec(
+    env,
+    `UPDATE workspace_join_codes SET revoked_at = datetime('now')
+       WHERE workspace_id = ? AND revoked_at IS NULL`,
+    [workspaceId],
+  );
+
+  // Código único (reintento ante colisión, muy improbable con 32^8).
+  let code = genJoinCode();
+  for (let i = 0; i < 4; i++) {
+    const clash = await tursoFirst(env, `SELECT 1 AS x FROM workspace_join_codes WHERE code = ?`, [code]);
+    if (!clash) break;
+    code = genJoinCode();
+  }
+
+  await tursoExec(
+    env,
+    `INSERT INTO workspace_join_codes (id, workspace_id, code, role, created_by_user_id, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    [crypto.randomUUID(), workspaceId, code, role, auth.userId, expiresAt],
+  );
+
+  return json({ code, role, expiresAt }, 201);
+}
+
+/* ── GET /workspaces/:id/join-codes ──────────────────────────────────── */
+// Código de tienda activo (no revocado, no vencido) o { code: null }.
+export async function handleGetActiveJoinCode(workspaceId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  await ensureJoinCodesSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+
+  const me = await membership(env, workspaceId, auth.userId);
+  if (!me) return json({ error: "not_a_member" }, 403);
+  {
+    const denied = requirePerm(String(me.role), "team.manage");
+    if (denied) return denied;
+  }
+
+  const row = await tursoFirst(
+    env,
+    `SELECT code, role, expires_at, uses, created_at
+       FROM workspace_join_codes
+       WHERE workspace_id = ? AND revoked_at IS NULL AND expires_at > ?
+       ORDER BY created_at DESC LIMIT 1`,
+    [workspaceId, new Date().toISOString()],
+  );
+  if (!row) return json({ code: null });
+  return json({
+    code: String(row.code),
+    role: String(row.role),
+    expiresAt: String(row.expires_at),
+    uses: Number(row.uses ?? 0),
+    createdAt: row.created_at ? String(row.created_at) : null,
+  });
+}
+
+/* ── DELETE /workspaces/:id/join-codes ───────────────────────────────── */
+// Revoca el/los código(s) activo(s) de la tienda.
+export async function handleRevokeJoinCodes(workspaceId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  await ensureJoinCodesSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+
+  const me = await membership(env, workspaceId, auth.userId);
+  if (!me) return json({ error: "not_a_member" }, 403);
+  {
+    const denied = requirePerm(String(me.role), "team.manage");
+    if (denied) return denied;
+  }
+
+  await tursoExec(
+    env,
+    `UPDATE workspace_join_codes SET revoked_at = datetime('now')
+       WHERE workspace_id = ? AND revoked_at IS NULL`,
+    [workspaceId],
+  );
+  return json({ ok: true });
+}
+
+/* ── POST /join ──────────────────────────────────────────────────────── */
+// Canje de un código de tienda por el usuario logueado. El código es la
+// autorización para entrar: no hace falta que el dueño haya pre-cargado el
+// email. Seat-gate del plan + expiración + revocación controlan el acceso.
+
+interface RedeemBody { code?: unknown; }
+
+export async function handleRedeemJoinCode(req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  await ensureJoinCodesSchema(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+
+  let body: RedeemBody;
+  try { body = (await req.json()) as RedeemBody; } catch { return json({ error: "invalid_body" }, 400); }
+  if (typeof body.code !== "string" || !body.code.trim()) return json({ error: "missing_code" }, 400);
+  const code = body.code.trim().toUpperCase().replace(/\s+/g, "");
+
+  const row = await tursoFirst(
+    env,
+    `SELECT id, workspace_id, role, expires_at, max_uses, uses
+       FROM workspace_join_codes WHERE code = ? AND revoked_at IS NULL`,
+    [code],
+  );
+  if (!row) return json({ error: "invalid_code" }, 404);
+  if (String(row.expires_at) <= new Date().toISOString()) return json({ error: "expired" }, 410);
+  const maxUses = row.max_uses == null ? null : Number(row.max_uses);
+  if (maxUses != null && Number(row.uses) >= maxUses) return json({ error: "code_exhausted" }, 409);
+
+  const workspaceId = String(row.workspace_id);
+  const codeRole = String(row.role);
+
+  const ws = await tursoFirst(env, `SELECT name FROM cloud_workspaces WHERE id = ?`, [workspaceId]);
+  if (!ws) return json({ error: "invalid_code" }, 404);
+  const workspaceName = String(ws.name);
+  const email = auth.email.toLowerCase();
+
+  // ¿Ya tiene una membership no revocada en esta tienda?
+  const existing = await tursoFirst(
+    env,
+    `SELECT id, status, role FROM memberships
+       WHERE workspace_id = ? AND email = ? AND status != 'revoked'`,
+    [workspaceId, email],
+  );
+  if (existing) {
+    if (String(existing.status) === "active") {
+      // Ya es miembro: idempotente, devolvemos la tienda igual.
+      return json({ workspaceId, workspaceName, role: String(existing.role ?? codeRole), already: true });
+    }
+    // Estaba 'invited' (el dueño pre-cargó el email): activamos y linkeamos user.
+    await tursoExec(
+      env,
+      `UPDATE memberships SET status = 'active', user_id = ?, accepted_at = datetime('now')
+         WHERE id = ?`,
+      [auth.userId, String(existing.id)],
+    );
+    await tursoExec(env, `UPDATE workspace_join_codes SET uses = uses + 1 WHERE code = ?`, [code]);
+    return json({ workspaceId, workspaceName, role: String(existing.role ?? codeRole) });
+  }
+
+  // Seat-gate: no superar los asientos del plan (activos + invitados).
+  const usedRow = await tursoFirst(
+    env,
+    `SELECT COUNT(*) AS n FROM memberships WHERE workspace_id = ? AND status IN ('active', 'invited')`,
+    [workspaceId],
+  );
+  const seatsRow = await tursoFirst(env, `SELECT seats FROM cloud_workspaces WHERE id = ?`, [workspaceId]);
+  const used = usedRow ? Number(usedRow.n) : 0;
+  const seats = seatsRow ? Number(seatsRow.seats ?? 1) : 1;
+  if (used >= seats) return json({ error: "seat_limit", used, seats }, 402);
+
+  await tursoExec(
+    env,
+    `INSERT INTO memberships
+       (id, workspace_id, user_id, email, role, status, invited_by_user_id, accepted_at, source)
+       VALUES (?, ?, ?, ?, ?, 'active', NULL, datetime('now'), 'code')`,
+    [crypto.randomUUID(), workspaceId, auth.userId, email, codeRole],
+  );
+  await tursoExec(env, `UPDATE workspace_join_codes SET uses = uses + 1 WHERE code = ?`, [code]);
+
+  return json({ workspaceId, workspaceName, role: codeRole });
 }
 
 /* ── PATCH /workspaces/:id/members/:mid ──────────────────────────────── */

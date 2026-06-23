@@ -97,7 +97,6 @@ function escapeHtml(s: string): string {
 export interface SendInviteOpts {
   to: string;
   workspaceName: string;
-  inviterEmail: string;
   role: string;
   apiKey: string;
   from: string;
@@ -121,9 +120,10 @@ export async function sendInviteEmail(opts: SendInviteOpts): Promise<void> {
     body: JSON.stringify({
       from: opts.from,
       to: opts.to,
-      subject: `${opts.inviterEmail} te invitó a ${opts.workspaceName} en Clozr`,
-      html: renderInviteHtml({ workspaceName: opts.workspaceName, inviterEmail: opts.inviterEmail, roleLabel }),
-      text: renderInviteText({ workspaceName: opts.workspaceName, inviterEmail: opts.inviterEmail, roleLabel }),
+      // No revelamos quién invitó (privacidad del dueño).
+      subject: `Te sumaron a ${opts.workspaceName} en Clozr`,
+      html: renderInviteHtml({ workspaceName: opts.workspaceName, email: opts.to, roleLabel }),
+      text: renderInviteText({ workspaceName: opts.workspaceName, email: opts.to, roleLabel }),
     }),
   });
   if (!res.ok) {
@@ -132,42 +132,49 @@ export async function sendInviteEmail(opts: SendInviteOpts): Promise<void> {
   }
 }
 
-function renderInviteHtml(o: { workspaceName: string; inviterEmail: string; roleLabel: string }): string {
+function renderInviteHtml(o: { workspaceName: string; email: string; roleLabel: string }): string {
   return `<!doctype html>
 <html>
-<body style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; color: #1f2937;">
-  <h1 style="font-size: 22px; margin: 0 0 12px;">Te invitaron a ${escapeHtml(o.workspaceName)}</h1>
-  <p style="font-size: 15px; line-height: 1.5; color: #374151;">
-    <strong>${escapeHtml(o.inviterEmail)}</strong> te incluyó como
-    <strong>${escapeHtml(o.roleLabel)}</strong> en <strong>${escapeHtml(o.workspaceName)}</strong>.
-  </p>
-  <p style="font-size: 15px; line-height: 1.5; color: #374151; margin-top: 24px;">
-    Para entrar, abrí Clozr en tu PC, andá a <strong>Ajustes → Cuenta en la nube</strong>
-    y pedí un magic link con este email. Cuando entres vas a ver el workspace ya disponible.
-  </p>
-  <p style="font-size: 13px; color: #6b7280; line-height: 1.5; margin-top: 28px;">
-    Si no tenés Clozr todavía, descargalo desde
-    <a href="https://github.com/manw3b/clozr/releases/latest" style="color: #ef4444;">github.com/manw3b/clozr/releases/latest</a>.
-  </p>
-  <p style="font-size: 12px; color: #9ca3af; margin-top: 32px;">
-    Si no esperabas esta invitación, ignorá este email — no se hace nada sin login.
-  </p>
+<body style="margin: 0; background: #f3f4f6; font-family: -apple-system, Segoe UI, Roboto, sans-serif;">
+  <div style="max-width: 480px; margin: 40px auto; padding: 0 16px;">
+    <!-- Banner Clozr -->
+    <div style="background: #ef4444; border-radius: 14px 14px 0 0; padding: 22px 24px; text-align: center;">
+      <span style="color: #fff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Clozr</span>
+    </div>
+    <div style="background: #fff; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 14px 14px; padding: 28px 24px; color: #1f2937;">
+      <h1 style="font-size: 21px; margin: 0 0 12px;">Te sumaron a ${escapeHtml(o.workspaceName)}</h1>
+      <p style="font-size: 15px; line-height: 1.5; color: #374151; margin: 0 0 20px;">
+        Te agregaron como <strong>${escapeHtml(o.roleLabel)}</strong> en <strong>${escapeHtml(o.workspaceName)}</strong>. Entrá desde la web para empezar:
+      </p>
+      <ol style="font-size: 15px; line-height: 1.7; color: #374151; margin: 0 0 22px; padding-left: 20px;">
+        <li>Entrá a <strong>clozr.online/app</strong></li>
+        <li>Ingresá tu email: <strong>${escapeHtml(o.email)}</strong></li>
+        <li>Pedí el código por email y listo — vas a ver el espacio disponible.</li>
+      </ol>
+      <p style="margin: 0;">
+        <a href="${APP_URL}" style="display: inline-block; padding: 12px 24px; background: #ef4444; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">
+          Abrir Clozr
+        </a>
+      </p>
+      <p style="font-size: 12px; color: #9ca3af; margin-top: 28px;">
+        Si no esperabas esta invitación, ignorá este email — no se hace nada sin login.
+      </p>
+    </div>
+    <p style="font-size: 12px; color: #9ca3af; margin: 16px 0 0; text-align: center;">Clozr · el CRM simple para tu negocio.</p>
+  </div>
 </body>
 </html>`;
 }
 
-function renderInviteText(o: { workspaceName: string; inviterEmail: string; roleLabel: string }): string {
-  return `${o.inviterEmail} te invitó a ${o.workspaceName} en Clozr como ${o.roleLabel}.
+function renderInviteText(o: { workspaceName: string; email: string; roleLabel: string }): string {
+  return `Te sumaron a ${o.workspaceName} en Clozr como ${o.roleLabel}.
 
 Para entrar:
-1. Abrí Clozr en tu PC
-2. Ajustes → Cuenta en la nube
-3. Pedí un magic link con este email
-4. Vas a ver el workspace ya disponible
+1. Entrá a ${APP_URL}
+2. Ingresá tu email: ${o.email}
+3. Pedí el código por email y listo — vas a ver el espacio disponible.
 
-Si no tenés Clozr: https://github.com/manw3b/clozr/releases/latest
-
-Si no esperabas esta invitación, ignorá este email.`;
+Si no esperabas esta invitación, ignorá este email — no se hace nada sin login.`;
 }
 
 /* ── Dunning (recordatorios de pago) ─────────────────────────────────────

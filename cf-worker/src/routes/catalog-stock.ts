@@ -20,9 +20,10 @@ import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoQuery } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
-// C5: matriz de permisos compartida con el frontend. La fuente única
-// de verdad evita que un permiso cambie en un lado y no en el otro.
-import { can } from "../../../src/lib/permissions";
+// Enforcement con la matriz del Worker (espejo del frontend web), igual que el
+// resto de las rutas. decrement-stock = sales.write (el vendedor descuenta al
+// vender); alta/baja de IMEIs = inventory.write (gestión de inventario).
+import { requirePerm } from "../permissions";
 
 export async function handleDecrementStock(
   wsId: string,
@@ -36,7 +37,10 @@ export async function handleDecrementStock(
 
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
   if (!role) return json({ error: "not_a_member" }, 403);
-  if (!can(role, "decrementStock")) return json({ error: "forbidden" }, 403);
+  {
+    const denied = requirePerm(role, "sales.write");
+    if (denied) return denied;
+  }
 
   let body: { quantity?: unknown };
   try {
@@ -110,7 +114,10 @@ export async function handleAddImeis(wsId: string, itemId: string, req: Request,
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
   if (!role) return json({ error: "not_a_member" }, 403);
-  if (!can(role, "editCatalogItem")) return json({ error: "forbidden" }, 403);
+  {
+    const denied = requirePerm(role, "inventory.write");
+    if (denied) return denied;
+  }
 
   let body: { imeis?: unknown };
   try {
@@ -167,7 +174,10 @@ export async function handleDeleteImei(wsId: string, itemId: string, imeiId: str
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, wsId, auth.userId);
   if (!role) return json({ error: "not_a_member" }, 403);
-  if (!can(role, "editCatalogItem")) return json({ error: "forbidden" }, 403);
+  {
+    const denied = requirePerm(role, "inventory.write");
+    if (denied) return denied;
+  }
 
   const [rows] = await tursoQuery(env, {
     sql: `SELECT sold_at FROM catalog_imei WHERE id = ? AND workspace_id = ? AND catalog_item_id = ?`,

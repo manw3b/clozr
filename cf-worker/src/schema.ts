@@ -653,6 +653,13 @@ async function applySchema(env: Env): Promise<void> {
     },
   );
 
+  // Caja Nivel B — arqueo por bucket (método × moneda). JSON map en TEXT,
+  // ej { "Efectivo·ARS": 1000, "Crypto·USD": 200 }. Los opened/closed_balance_
+  // ars/usd siguen siendo la SUMA por moneda (back-compat). safeAddColumn es
+  // idempotente; en prod (v11) lo aplica el lazy ensureCashSessionBuckets().
+  await safeAddColumn(env, "cash_sessions", "opened_buckets", "TEXT");
+  await safeAddColumn(env, "cash_sessions", "closed_buckets", "TEXT");
+
   // ── F2-B R5: Catálogo + payment_methods + customer_types/tags ────
   await tursoQuery(
     env,
@@ -945,6 +952,50 @@ export async function ensureConsoleSchema(env: Env): Promise<void> {
   consoleSchemaReady = true;
 }
 
+let joinCodesSchemaReady = false;
+
+/**
+ * Códigos de unión a la tienda (join-by-code): el dueño genera un código y
+ * cualquiera logueado lo canjea (POST /join) para entrar como empleado, sin
+ * que se pre-cargue su email. `code` es único global (el canje es por código,
+ * no scoped a workspace). Seat-gate + expiración + revocación controlan abuso.
+ *
+ * Lazy + memoizada, sin bumpear SCHEMA_VERSION (mismo criterio no-fatal que
+ * ensureConsoleSchema): un workspace existente no fuerza re-migración global en
+ * frío. La llaman los handlers de generar/canjear.
+ */
+export async function ensureJoinCodesSchema(env: Env): Promise<void> {
+  if (joinCodesSchemaReady) return;
+  await tursoQuery(
+    env,
+    {
+      sql: `CREATE TABLE IF NOT EXISTS workspace_join_codes (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+        code TEXT NOT NULL,
+        role TEXT NOT NULL,
+        created_by_user_id TEXT REFERENCES users(id),
+        expires_at TEXT NOT NULL,
+        max_uses INTEGER,
+        uses INTEGER NOT NULL DEFAULT 0,
+        revoked_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+    },
+    {
+      sql: `CREATE UNIQUE INDEX IF NOT EXISTS uq_workspace_join_codes_code ON workspace_join_codes(code)`,
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_workspace_join_codes_ws ON workspace_join_codes(workspace_id, revoked_at)`,
+    },
+  );
+  // Origen de cada membership: 'owner' (creó la tienda) | 'invite' (lo agregaron
+  // por email) | 'code' (entró con código). Lazy: en DBs viejas la columna puede
+  // no existir. NULL = legado (el front lo infiere por rol).
+  await safeAddColumn(env, "memberships", "source", "TEXT");
+  joinCodesSchemaReady = true;
+}
+
 let billingSchemaReady = false;
 
 /**
@@ -999,6 +1050,21 @@ export async function ensureWorkspaceColumns(env: Env): Promise<void> {
   await safeAddColumn(env, "cloud_workspaces", "ai_credits", "INTEGER");
   await safeAddColumn(env, "cloud_workspaces", "ai_msgs_used", "INTEGER");
   workspaceColsReady = true;
+}
+
+let cashBucketsReady = false;
+
+/**
+ * Caja Nivel B: columnas JSON de arqueo por bucket (método × moneda) en
+ * cash_sessions. Lazy/auto-curativo (mismo patrón que ensureConsoleSchema) para
+ * NO bumpear SCHEMA_VERSION — solo los handlers de cash-sessions las leen, el
+ * resto del backend no las necesita en frío. safeAddColumn ignora duplicate.
+ */
+export async function ensureCashSessionBuckets(env: Env): Promise<void> {
+  if (cashBucketsReady) return;
+  await safeAddColumn(env, "cash_sessions", "opened_buckets", "TEXT");
+  await safeAddColumn(env, "cash_sessions", "closed_buckets", "TEXT");
+  cashBucketsReady = true;
 }
 
 /**

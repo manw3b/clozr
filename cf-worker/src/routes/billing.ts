@@ -12,7 +12,7 @@
  *
  * Decisiones de producto (confirmadas):
  *   - Free = 1 asiento. Pro = ARS 25.000/mes, 3 asientos. Team = ARS
- *     60.000/mes, ilimitado (9999). Trial 14 días.
+ *     60.000/mes, ilimitado (9999).
  *   - Cobro recurrente mensual en ARS. external_reference = "wid:plan" para
  *     que el webhook sepa qué workspace y qué plan activar sin estado previo.
  *
@@ -91,8 +91,6 @@ export function billingReason(
   return `${parts.join(" + ")} (${interval === "annual" ? "anual" : "mensual"})`;
 }
 
-const TRIAL_DAYS = 14;
-
 /* ── POST /workspaces/:wid/billing/checkout ──────────────────────────── */
 
 export async function handleBillingCheckout(workspaceId: string, req: Request, env: Env): Promise<Response> {
@@ -154,7 +152,6 @@ export async function handleBillingCheckout(workspaceId: string, req: Request, e
       frequency_type: "months",
       transaction_amount: amountArs,
       currency_id: "ARS",
-      free_trial: { frequency: TRIAL_DAYS, frequency_type: "days" },
     },
     status: "pending",
   };
@@ -624,8 +621,8 @@ export async function handleBillingWebhook(req: Request, env: Env): Promise<Resp
   const planStatus = mapMpStatus(pre.status);
 
   if (planStatus === "active") {
-    // Alta/renovación OK (incluye el período de trial: MP deja el preapproval
-    // en 'authorized'). Activamos el plan + asientos y limpiamos el reloj de
+    // Alta/renovación OK: MP deja el preapproval en 'authorized'. Activamos el
+    // plan + asientos y limpiamos el reloj de
     // gracia (plan_status_changed_at = NULL ⇒ sin degradación pendiente).
     //
     // Empleados extra: en el PRIMER link usamos el del external_reference; en

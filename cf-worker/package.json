@@ -11,7 +11,9 @@
     "secret:turso-url": "wrangler secret put TURSO_DATABASE_URL",
     "secret:turso-token": "wrangler secret put TURSO_AUTH_TOKEN",
     "secret:resend": "wrangler secret put RESEND_API_KEY",
-    "secret:jwt": "wrangler secret put JWT_SECRET"
+    "secret:jwt": "wrangler secret put JWT_SECRET",
+    "secret:mp-token": "wrangler secret put MP_ACCESS_TOKEN",
+    "secret:mp-webhook": "wrangler secret put MP_WEBHOOK_SECRET"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250101.0",

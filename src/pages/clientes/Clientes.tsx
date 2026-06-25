@@ -16,7 +16,7 @@ import {
   useContextMenu,
 } from '../../components/ContextMenu';
 import { WhatsAppIcon } from '../../components/icons/WhatsAppIcon';
-import { Phone, Pencil, Trash2, Mail, Copy } from 'lucide-react';
+import { Phone, Pencil, Archive, Mail, Copy } from 'lucide-react';
 import { EmptyState } from '../../components/EmptyState';
 import { DataTable, applySort, ColumnDef } from '../../components/data-table';
 import { ClientDrawer } from './components/ClientDrawer';
@@ -433,29 +433,29 @@ export function Clientes() {
         <ConfirmDeleteModal
           open
           onClose={() => setConfirmDelete(null)}
-          title={`Eliminar a ${confirmDelete.client.name}`}
+          title={`Archivar a ${confirmDelete.client.name}`}
           description={
             <>
-              Vas a eliminar <strong>{confirmDelete.client.name}</strong> de tu
-              cartera. {confirmDelete.client.phone && (
+              Vas a archivar a <strong>{confirmDelete.client.name}</strong>: se oculta
+              de tu lista de clientes. {confirmDelete.client.phone && (
                 <>Su teléfono ({confirmDelete.client.phone}) deja de estar disponible para WhatsApp/llamada rápida. </>
               )}
               {confirmDelete.client.totalPurchases ? (
-                <>Tiene <strong>{confirmDelete.client.totalPurchases}</strong> {confirmDelete.client.totalPurchases === 1 ? 'venta registrada' : 'ventas registradas'} — el historial queda en la DB pero sin nombre asociado.</>
+                <>Tiene <strong>{confirmDelete.client.totalPurchases}</strong> {confirmDelete.client.totalPurchases === 1 ? 'venta registrada' : 'ventas registradas'} — el historial se conserva intacto (con su nombre).</>
               ) : null}
             </>
           }
           confirmText={confirmDelete.client.name}
-          confirmLabel={`Eliminar a ${confirmDelete.client.name.split(' ')[0]}`}
+          confirmLabel={`Archivar a ${confirmDelete.client.name.split(' ')[0]}`}
           onConfirm={async () => {
             await new Promise<void>((resolve, reject) =>
               deleteMut.mutate([confirmDelete.client.id], {
                 onSuccess: () => {
-                  showToast('Cliente eliminado', 'success');
+                  showToast('Cliente archivado', 'success');
                   resolve();
                 },
                 onError: (err) => {
-                  showToast(err instanceof Error ? err.message : 'Error al eliminar', 'error');
+                  showToast(err instanceof Error ? err.message : 'Error al archivar', 'error');
                   reject(err);
                 },
               }),
@@ -468,30 +468,30 @@ export function Clientes() {
         <ConfirmDeleteModal
           open
           onClose={() => setConfirmDelete(null)}
-          title={`Eliminar ${confirmDelete.ids.length} clientes`}
+          title={`Archivar ${confirmDelete.ids.length} clientes`}
           description={
             <>
-              Vas a borrar <strong>{confirmDelete.ids.length} clientes</strong> de
-              tu cartera en una sola pasada. Para borrados masivos pedimos un
-              tipeo más explícito porque no se pueden recuperar uno por uno.
+              Vas a archivar <strong>{confirmDelete.ids.length} clientes</strong> de
+              una sola pasada: se ocultan de tu lista. El historial de ventas se
+              conserva. Para acciones masivas pedimos un tipeo más explícito.
             </>
           }
-          confirmText={`ELIMINAR ${confirmDelete.ids.length}`}
-          confirmLabel={`Eliminar ${confirmDelete.ids.length} clientes`}
+          confirmText={`ARCHIVAR ${confirmDelete.ids.length}`}
+          confirmLabel={`Archivar ${confirmDelete.ids.length} clientes`}
           onConfirm={async () => {
             const ids = confirmDelete.ids;
             await new Promise<void>((resolve, reject) =>
               deleteMut.mutate(ids, {
                 onSuccess: () => {
                   showToast(
-                    `${ids.length} cliente${ids.length === 1 ? '' : 's'} eliminado${ids.length === 1 ? '' : 's'}`,
+                    `${ids.length} cliente${ids.length === 1 ? '' : 's'} archivado${ids.length === 1 ? '' : 's'}`,
                     'success',
                   );
                   setSelected(new Set());
                   resolve();
                 },
                 onError: (err) => {
-                  showToast(err instanceof Error ? err.message : 'Error al eliminar', 'error');
+                  showToast(err instanceof Error ? err.message : 'Error al archivar', 'error');
                   reject(err);
                 },
               }),
@@ -589,13 +589,13 @@ export function Clientes() {
           <ContextMenuDivider />
           <ContextMenuItem
             tone="danger"
-            icon={<Trash2 size={14} />}
+            icon={<Archive size={14} />}
             onClick={() => {
               setConfirmDelete({ kind: 'single', client: ctxClient });
               ctxMenu.close();
             }}
           >
-            Eliminar
+            Archivar
           </ContextMenuItem>
         </ContextMenu>
       )}

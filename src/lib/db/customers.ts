@@ -119,7 +119,7 @@ export async function getAll(workspaceId: string): Promise<Customer[]> {
     log.warn("getAll cloud failed, fallback local", { scope: "customersDb", data: { error: res.error } });
   }
   return dbSelect<Customer>(
-    "SELECT * FROM customers WHERE workspace_id = ? ORDER BY name ASC",
+    "SELECT * FROM customers WHERE workspace_id = ? AND deleted_at IS NULL ORDER BY name ASC",
     [workspaceId],
   );
 }
@@ -147,7 +147,7 @@ export async function search(
   // hidratar. Si en un futuro necesitamos full-text del cloud, agregamos
   // endpoint dedicado.
   const { query, type } = options;
-  let sql = "SELECT * FROM customers WHERE workspace_id = ?";
+  let sql = "SELECT * FROM customers WHERE workspace_id = ? AND deleted_at IS NULL";
   const params: unknown[] = [workspaceId];
 
   if (type) {
@@ -293,7 +293,7 @@ export async function remove(workspaceId: string, id: string): Promise<void> {
     // Write-through al local.
     try {
       await dbExecute(
-        "DELETE FROM customers WHERE workspace_id = ? AND id = ?",
+        "UPDATE customers SET deleted_at = datetime('now') WHERE workspace_id = ? AND id = ?",
         [workspaceId, id],
       );
     } catch (e) {
@@ -303,7 +303,7 @@ export async function remove(workspaceId: string, id: string): Promise<void> {
   }
 
   await dbExecute(
-    "DELETE FROM customers WHERE workspace_id = ? AND id = ?",
+    "UPDATE customers SET deleted_at = datetime('now') WHERE workspace_id = ? AND id = ?",
     [workspaceId, id],
   );
 }

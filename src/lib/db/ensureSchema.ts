@@ -686,6 +686,7 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
   await safe(() => dbExecute(`ALTER TABLE customers ADD COLUMN facebook TEXT`));
   await safe(() => dbExecute(`ALTER TABLE customers ADD COLUMN tiktok TEXT`));
   await safe(() => dbExecute(`ALTER TABLE customers ADD COLUMN twitter TEXT`));
+  await safe(() => dbExecute(`ALTER TABLE customers ADD COLUMN deleted_at TEXT`));
 
   // ════════════════════════════════════════════════════════════
   //  030 — Tareas obligatorias (templates asignados por dueño)

@@ -362,6 +362,8 @@ export interface SaleItem {
   subtotal: number;
   imei: string | null;
   from_stock: number;
+  /** Fase ③: moneda de la línea ('ARS' | 'USD'). Default 'USD' en escritorio. */
+  currency: string;
 }
 
 export interface SalePayment {
@@ -486,6 +488,7 @@ export interface CreateSaleInput {
     base_price?: number | null;
     imei?: string | null;
     from_stock?: boolean;
+    currency?: "ARS" | "USD";
   }>;
   payments: Array<{
     method: string;

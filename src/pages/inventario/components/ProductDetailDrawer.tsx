@@ -6,6 +6,7 @@ import { Button } from "../../../components/Button";
 import { Input } from "../../../components/Input";
 import { Badge } from "../../../components/Badge";
 import { catalogDb } from "../../../lib/db/catalog";
+import { partitionDeviceIds } from "../../../lib/deviceId";
 import { useUIStore } from "../../../store/uiStore";
 import { useUndoableActions } from "../../../store/useUndoableActions";
 import { useWorkspaceStore } from "../../../store/workspaceStore";
@@ -353,7 +354,15 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onLoadAnotherVarian
                 <Button
                   size="sm"
                   variant="primary"
-                  onClick={() => addImeisMut.mutate()}
+                  onClick={() => {
+                    const list = imeisText.split(/[\s,;\n]+/).map((s) => s.trim()).filter(Boolean);
+                    const { invalid } = partitionDeviceIds(list);
+                    if (invalid.length > 0) {
+                      showToast(`IMEI/Serie inválido: ${invalid.slice(0, 3).join(", ")}${invalid.length > 3 ? "…" : ""}. El IMEI debe tener 15 dígitos.`, "error");
+                      return;
+                    }
+                    addImeisMut.mutate();
+                  }}
                   loading={addImeisMut.isPending}
                   disabled={!imeisText.trim()}
                 >

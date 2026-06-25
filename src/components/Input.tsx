@@ -69,6 +69,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
             ...style,
           }}
           {...rest}
+          onWheel={(e) => {
+            // Evita que la ruedita del mouse cambie el valor en <input type="number">.
+            if (e.currentTarget.type === 'number') e.currentTarget.blur();
+            rest.onWheel?.(e);
+          }}
         />
         {iconRight && (
           <span style={{ display: 'inline-flex', color: color.textDim, flexShrink: 0 }}>{iconRight}</span>

@@ -116,6 +116,7 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
 
   const [clientSearch, setClientSearch] = useState("");
   const [client, setClient] = useState<Client | null>(preset?.client ?? null);
+  const [walkInName, setWalkInName] = useState(""); // nombre suelto de mostrador (cliente no guardado)
   const [creatingClient, setCreatingClient] = useState(false);
 
   const [items, setItems] = useState<ItemDraft[]>(() =>
@@ -202,6 +203,7 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
   function reset() {
     setClientSearch("");
     setClient(null);
+    setWalkInName("");
     setCreatingClient(false);
     setItems([emptyItem()]);
     setPaymentMethodId("");
@@ -281,7 +283,7 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
     setSubmitting(true);
     const payload: NewSalePayload = {
       clientId: client?.id ?? null,
-      clientName: client?.name ?? null,
+      clientName: client?.name ?? (walkInName.trim() || null),
       customerTypeId: customerType?.id ?? null,
       items: items.map((it) => ({
         catalogItemId: it.outOfStock ? null : it.catalogItem?.id ?? null,
@@ -311,7 +313,7 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
         totalInPaymentCurrency,
         currency: paymentMethod.currency,
         itemsCount: items.length,
-        clientName: client?.name ?? null,
+        clientName: client?.name ?? (walkInName.trim() || null),
         methodName: paymentMethod.name,
       });
       setTimeout(() => {
@@ -409,6 +411,30 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
             customerType={customerType}
             onClear={() => setClient(null)}
           />
+        ) : walkInName ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: space[3],
+              padding: `${space[2]} ${space[3]}`,
+              background: color.surface2,
+              border: `1px solid ${color.border}`,
+              borderRadius: radius.md,
+            }}
+          >
+            <Avatar name={walkInName} size={28} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: weight.semibold, color: color.text }}>{walkInName}</div>
+              <div style={{ fontSize: text.xs, color: color.textMuted }}>Cliente de mostrador (no se guarda)</div>
+            </div>
+            <button
+              onClick={() => setWalkInName("")}
+              style={{ background: "transparent", color: color.textMuted, cursor: "pointer", fontSize: text.xs }}
+            >
+              Quitar
+            </button>
+          </div>
         ) : creatingClient ? (
           <InlineCreateClient
             wid={wid}
@@ -417,6 +443,7 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
             onCancel={() => setCreatingClient(false)}
             onCreated={(c) => {
               setClient(c);
+              setWalkInName("");
               setCreatingClient(false);
               setClientSearch("");
             }}
@@ -426,7 +453,8 @@ export function NewSaleModal({ open, onClose, onSubmit, preset }: NewSaleModalPr
             search={clientSearch}
             setSearch={setClientSearch}
             results={filteredClients}
-            onPick={setClient}
+            onPick={(c) => { setClient(c); setWalkInName(""); }}
+            onUseWalkIn={(name) => setWalkInName(name)}
             onCreateNew={() => setCreatingClient(true)}
           />
         )}
@@ -1010,12 +1038,14 @@ function ClientPicker({
   setSearch,
   results,
   onPick,
+  onUseWalkIn,
   onCreateNew,
 }: {
   search: string;
   setSearch: (s: string) => void;
   results: Client[];
   onPick: (c: Client) => void;
+  onUseWalkIn?: (name: string) => void;
   onCreateNew: () => void;
 }) {
   return (
@@ -1062,6 +1092,27 @@ function ClientPicker({
             </button>
           ))}
         </div>
+      )}
+      {onUseWalkIn && search.trim() && (
+        <button
+          onClick={() => onUseWalkIn(search.trim())}
+          style={{
+            marginTop: space[2],
+            display: "flex",
+            alignItems: "center",
+            width: "100%",
+            padding: `${space[2]} ${space[3]}`,
+            background: color.surface2,
+            border: `1px solid ${color.border}`,
+            borderRadius: radius.md,
+            textAlign: "left",
+            color: color.text,
+            fontSize: text.sm,
+            cursor: "pointer",
+          }}
+        >
+          Usar «{search.trim()}» (mostrador)
+        </button>
       )}
       <button
         onClick={onCreateNew}

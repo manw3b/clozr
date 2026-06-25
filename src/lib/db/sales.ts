@@ -115,6 +115,7 @@ async function fetchSaleCloudCached(jwt: string, wsId: string, saleId: string) {
     subtotal: i.subtotal,
     imei: i.imei,
     from_stock: i.from_stock,
+    currency: i.currency ?? "USD",
   }));
   const payments: SalePayment[] = res.data.payments.map((p) => ({
     id: p.id,
@@ -164,6 +165,15 @@ export async function getPayments(saleId: string): Promise<SalePayment[]> {
 // BUG 2 FIX: removed explicit BEGIN/COMMIT/ROLLBACK — tauri-plugin-sql
 // wraps each execute internally, causing "cannot start a transaction within a
 // transaction". Statements run sequentially without explicit transaction.
+/** Valor unitario en USD de un ítem según su moneda. Los ítems en ARS se
+ *  convierten al dólar del momento; sin cotización válida se toma tal cual.
+ *  El escritorio totaliza la venta en USD, así que esto homogeniza mixtos. */
+function itemUnitUsd(item: { unit_price: number; currency?: string | null }, rate: number): number {
+  return (item.currency ?? "USD") === "USD" || rate <= 0
+    ? item.unit_price
+    : item.unit_price / rate;
+}
+
 export async function createSale(
   workspaceId: string,
   data: CreateSaleInput,
@@ -178,11 +188,12 @@ export async function createSale(
   // best-effort post-venta — podía quedar una venta sin ingreso de caja.
   const cloudC = cloudCtx();
   if (cloudC) {
+    const rate = data.usd_to_ars ?? 0;
+    // sales.subtotal/total en USD: los ítems en ARS se convierten al dólar.
     const subtotal = data.items.reduce(
-      (sum, item) => sum + item.unit_price * item.quantity,
+      (sum, item) => sum + itemUnitUsd(item, rate) * item.quantity,
       0,
     );
-    const rate = data.usd_to_ars ?? 0;
     const totalPaid = data.payments.reduce((sum, p) => {
       if ((p.currency ?? "ARS") === "USD" || rate <= 0) return sum + p.amount;
       return sum + p.amount / rate;
@@ -253,6 +264,7 @@ export async function createSale(
         subtotal: it.unit_price * it.quantity,
         imei: it.imei ?? null,
         from_stock: it.from_stock ? 1 : 0,
+        currency: it.currency ?? "USD",
       })),
       payments: data.payments.map((p) => ({
         id: crypto.randomUUID(),
@@ -283,13 +295,14 @@ export async function createSale(
     };
   }
 
-  // sales.subtotal y sales.total siempre en USD (fuente de verdad). items.unit_price es USD.
+  // sales.subtotal y sales.total siempre en USD (fuente de verdad). Los ítems
+  // en ARS (moneda por ítem) se convierten al dólar del momento.
+  const rate = data.usd_to_ars ?? 0;
   const subtotal = data.items.reduce(
-    (sum, item) => sum + item.unit_price * item.quantity,
+    (sum, item) => sum + itemUnitUsd(item, rate) * item.quantity,
     0,
   );
   // total_paid también en USD. Si el payment está en ARS, convertimos con la cotización del momento.
-  const rate = data.usd_to_ars ?? 0;
   const totalPaid = data.payments.reduce((sum, p) => {
     if ((p.currency ?? "ARS") === "USD" || rate <= 0) return sum + p.amount;
     return sum + p.amount / rate;
@@ -350,8 +363,8 @@ export async function createSale(
 
     await dbExecute(
       `INSERT INTO sale_items
-        (id, sale_id, catalog_item_id, description, quantity, unit_price, base_price, subtotal, imei, from_stock)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, sale_id, catalog_item_id, description, quantity, unit_price, base_price, subtotal, imei, from_stock, currency)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         crypto.randomUUID(), id,
         item.catalog_item_id ?? null,
@@ -360,6 +373,7 @@ export async function createSale(
         item.unit_price * item.quantity,
         recordedImei,
         isFromStock ? 1 : 0,
+        item.currency ?? "USD",
       ],
     );
 

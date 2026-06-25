@@ -600,6 +600,14 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
   await safe(() => dbExecute(`CREATE INDEX IF NOT EXISTS idx_sale_payments_sale ON sale_payments(sale_id)`));
 
   // ════════════════════════════════════════════════════════════
+  // 031 — moneda por ítem (Fase ③)
+  // ════════════════════════════════════════════════════════════
+  // Cada línea de venta puede estar en ARS o USD. Default 'USD': el escritorio
+  // es USD-first (los ítems históricos se cargaron en dólares). El subtotal/total
+  // de la venta sigue en USD, convirtiendo los ítems en ARS al dólar del momento.
+  await safe(() => dbExecute(`ALTER TABLE sale_items ADD COLUMN currency TEXT DEFAULT 'USD'`));
+
+  // ════════════════════════════════════════════════════════════
   // 029 — daily_goal_count (cantidad de ventas objetivo del día)
   // ════════════════════════════════════════════════════════════
   await safe(() => dbExecute(`ALTER TABLE workspaces ADD COLUMN daily_goal_count INTEGER DEFAULT 0`));
@@ -686,6 +694,7 @@ export async function ensureSchemaOn(db: Database): Promise<void> {
   await safe(() => dbExecute(`ALTER TABLE customers ADD COLUMN facebook TEXT`));
   await safe(() => dbExecute(`ALTER TABLE customers ADD COLUMN tiktok TEXT`));
   await safe(() => dbExecute(`ALTER TABLE customers ADD COLUMN twitter TEXT`));
+  await safe(() => dbExecute(`ALTER TABLE customers ADD COLUMN deleted_at TEXT`));
 
   // ════════════════════════════════════════════════════════════
   //  030 — Tareas obligatorias (templates asignados por dueño)

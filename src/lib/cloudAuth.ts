@@ -698,7 +698,7 @@ export interface CloudSaleItem {
   id: string; sale_id: string; catalog_item_id: string | null;
   description: string; quantity: number; unit_price: number;
   base_price: number | null; subtotal: number; imei: string | null;
-  from_stock: number;
+  from_stock: number; currency?: string;
 }
 
 export interface CloudSalePayment {

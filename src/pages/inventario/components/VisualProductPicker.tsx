@@ -5,6 +5,7 @@ import { Modal } from "../../../components/Modal";
 import { Button } from "../../../components/Button";
 import { Input } from "../../../components/Input";
 import { Stepper } from "../../../components/Stepper";
+import { isValidDeviceId } from "../../../lib/deviceId";
 import {
   getCategories,
   getFamilies,
@@ -222,8 +223,12 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
         }
       }
 
-      // 3) IMEIs (filtramos vacíos)
+      // 3) IMEIs (filtramos vacíos). Validamos: IMEI 15 díg o serie libre.
       const cleanImeis = imeis.map((i) => i.trim()).filter(Boolean);
+      const badId = cleanImeis.find((i) => !isValidDeviceId(i));
+      if (badId) {
+        throw new Error(`IMEI/Serie inválido: "${badId}". El IMEI debe tener 15 dígitos; si el equipo no tiene IMEI, cargá un número de serie.`);
+      }
       let added = 0;
       if (cleanImeis.length > 0) {
         const res = await catalogDb.addImeis(item.id, cleanImeis);
@@ -249,6 +254,9 @@ export function VisualProductPicker({ open, onClose, wid, onCreated, onSwitchToM
       } as CatalogItemWithImeis;
       onCreated?.(withImeis);
       onClose();
+    },
+    onError: (e) => {
+      showToast(e instanceof Error ? e.message : "No se pudo crear el producto", "error");
     },
   });
 

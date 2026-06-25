@@ -18,7 +18,7 @@
  */
 
 import type { Env } from "../index";
-import { ensureSchema, ensureSalesOrderSeq, ensureSalesTurno } from "../schema";
+import { ensureSchema, ensureSalesOrderSeq, ensureSalesTurno, ensureSalesItemCurrency } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, tursoTransaction, type TursoArg } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
@@ -47,6 +47,7 @@ const SALE_EDITABLE = [
 const ITEM_EDITABLE = [
   "catalog_item_id", "description", "quantity", "unit_price",
   "base_price", "subtotal", "imei", "from_stock", "unit_cost",
+  "currency",
 ] as const;
 
 const PAYMENT_EDITABLE = [
@@ -139,6 +140,7 @@ export async function handleListSales(workspaceId: string, req: Request, env: En
   await ensureSchema(env);
   await ensureSalesOrderSeq(env);
   await ensureSalesTurno(env);
+  await ensureSalesItemCurrency(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
@@ -191,6 +193,7 @@ export async function handleGetSale(workspaceId: string, saleId: string, req: Re
   await ensureSchema(env);
   await ensureSalesOrderSeq(env);
   await ensureSalesTurno(env);
+  await ensureSalesItemCurrency(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
@@ -238,6 +241,7 @@ export async function handleCreateSale(workspaceId: string, req: Request, env: E
   await ensureSchema(env);
   await ensureSalesOrderSeq(env);
   await ensureSalesTurno(env);
+  await ensureSalesItemCurrency(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);

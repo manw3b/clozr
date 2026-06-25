@@ -491,6 +491,11 @@ async function applySchema(env: Env): Promise<void> {
   // cliente cae al join del catálogo como fallback (back-compat, sin backfill).
   await safeAddColumn(env, "sale_items", "unit_cost", "REAL DEFAULT 0");
 
+  // 010 — moneda por ítem (Fase ③). Cada línea puede ser ARS o USD. Default
+  // 'ARS' = back-compat (ventas históricas en pesos). Las DBs existentes la
+  // reciben de forma lazy vía ensureSalesItemCurrency() (sin bumpear versión).
+  await safeAddColumn(env, "sale_items", "currency", "TEXT DEFAULT 'ARS'");
+
   // 009 — precios por tipo de cliente. Cada producto del catálogo puede tener
   // un precio sugerido distinto por tipo de cliente (final/revendedor/
   // mayorista/empresa). En ARS (la web es ARS-only). Sin fila = sin precio
@@ -1133,6 +1138,19 @@ export async function ensureSalesTurno(env: Env): Promise<void> {
   await safeAddColumn(env, "sales", "appointment_at", "TEXT");
   await safeAddColumn(env, "sales", "origin", "TEXT");
   salesTurnoReady = true;
+}
+
+let salesItemCurrencyReady = false;
+
+/**
+ * Fase ③: moneda por ítem de venta. Cada línea (sale_items) puede estar en ARS
+ * o USD de forma independiente. Default 'ARS' (la web es ARS-nativa y las ventas
+ * históricas son todas en pesos). Lazy/auto-curativo, sin bumpear SCHEMA_VERSION.
+ */
+export async function ensureSalesItemCurrency(env: Env): Promise<void> {
+  if (salesItemCurrencyReady) return;
+  await safeAddColumn(env, "sale_items", "currency", "TEXT DEFAULT 'ARS'");
+  salesItemCurrencyReady = true;
 }
 
 let originsReady = false;

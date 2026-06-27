@@ -262,7 +262,7 @@ export function WhatsAppTemplatesSection({ wid }: Props) {
           <input
             value={address}
             onChange={(e) => onChange<string>(setAddress)(e.target.value)}
-            placeholder="calle 44 e/ 17 y 18 Número 1136 (Timbre 101)"
+            placeholder="Ej: Av. Principal 123 (Timbre 5)"
             style={inputStyle}
           />
         </section>

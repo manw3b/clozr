@@ -51,7 +51,9 @@ Estamos en {direccion} (Por favor respetar el turno asignado).`,
 PEDIDO:
 VUELTO:`,
 
-  address: "calle 44 e/ 17 y 18 Número 1136 (Timbre 101)",
+  // SIN default real: cada negocio carga SU dirección en Ajustes. Vacío para
+  // no filtrar datos de un negocio a otro en los mensajes (multi-tenant).
+  address: "",
   codePrefix: "B",
   postSale: `¡Hola {nombre}! Gracias por elegirnos en {negocio} para tu {producto} 🙌
 

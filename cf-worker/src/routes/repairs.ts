@@ -171,6 +171,10 @@ export async function handleListRepairParts(workspaceId: string, repairId: strin
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role || !ROLES_READ.has(role)) return json({ error: "forbidden" }, 403);
 
+  // La reparación debe pertenecer a este workspace (no solo existir).
+  const repair = await tursoFirst(env, `SELECT id FROM repairs WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`, [repairId, workspaceId]);
+  if (!repair) return json({ error: "not_found" }, 404);
+
   const [rows] = await tursoQuery(env, {
     sql: `SELECT * FROM repair_parts WHERE repair_id = ? AND workspace_id = ? ORDER BY created_at ASC`,
     args: [repairId, workspaceId],

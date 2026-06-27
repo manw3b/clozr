@@ -19,7 +19,7 @@
 import type { Env } from "../index";
 import { ensureSchema } from "../schema";
 import { requireAuth } from "../auth";
-import { tursoExec, tursoQuery, type TursoArg } from "../turso";
+import { tursoExec, tursoFirst, tursoQuery, type TursoArg } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
 import { requirePermWs } from "../permissionsWs";
 
@@ -31,6 +31,10 @@ export async function handleListCustomerContacts(workspaceId: string, customerId
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
   if (!role || !ROLES_READ.has(role)) return json({ error: "forbidden" }, 403);
+
+  // El cliente debe pertenecer a este workspace (no solo existir).
+  const owns = await tursoFirst(env, `SELECT id FROM customers WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`, [customerId, workspaceId]);
+  if (!owns) return json({ error: "not_found" }, 404);
 
   const [rows] = await tursoQuery(env, {
     sql: `SELECT * FROM customer_contacts
@@ -49,6 +53,10 @@ export async function handleCreateCustomerContact(workspaceId: string, customerI
   if (!role) return json({ error: "forbidden" }, 403);
   const denied = await requirePermWs(env, workspaceId, role, "customers.write");
   if (denied) return denied;
+
+  // El cliente debe pertenecer a este workspace (no solo existir).
+  const owns = await tursoFirst(env, `SELECT id FROM customers WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`, [customerId, workspaceId]);
+  if (!owns) return json({ error: "not_found" }, 404);
 
   let body: Record<string, unknown>;
   try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }

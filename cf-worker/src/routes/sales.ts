@@ -590,7 +590,7 @@ export async function handleImportSales(workspaceId: string, req: Request, env: 
   const errors: Array<{ id: string; error: string }> = [];
   for (const s of body.sales) {
     const id = typeof s.id === "string" && s.id ? s.id : crypto.randomUUID();
-    const exists = await tursoFirst(env, `SELECT id FROM sales WHERE id = ?`, [id]);
+    const exists = await tursoFirst(env, `SELECT id FROM sales WHERE id = ? AND workspace_id = ?`, [id, workspaceId]);
     if (exists) { skipped++; continue; }
     const fields = pick(s as Record<string, unknown>, SALE_EDITABLE);
     const createdAt = typeof s.created_at === "string" ? s.created_at : null;

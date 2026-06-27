@@ -256,7 +256,7 @@ export async function handleGenericImport(spec: TableSpec, workspaceId: string, 
       }
     }
     if (missingReq) continue;
-    const exists = await tursoFirst(env, `SELECT id FROM ${spec.table} WHERE id = ?`, [id]);
+    const exists = await tursoFirst(env, `SELECT id FROM ${spec.table} WHERE id = ? AND workspace_id = ?`, [id, workspaceId]);
     if (exists) { skipped++; continue; }
     const fields = pickFields(it as Record<string, unknown>, spec.editable);
     const createdAt = typeof it.created_at === "string" ? it.created_at : null;

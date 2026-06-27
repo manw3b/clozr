@@ -555,11 +555,17 @@ export async function handleIssueAccessCode(
 
   const target = await tursoFirst(
     env,
-    `SELECT email, status FROM memberships
+    `SELECT email, status, role FROM memberships
        WHERE id = ? AND workspace_id = ? AND status IN ('invited', 'active')`,
     [membershipId, workspaceId],
   );
   if (!target) return json({ error: "member_not_found" }, 404);
+  // Un admin/encargado NO puede emitir un código de login para un OWNER: el
+  // código es account-wide → sería tomar la cuenta del dueño (acceso a TODOS
+  // sus workspaces). Solo un owner puede emitir códigos para otro owner.
+  if (String(target.role) === "owner" && String(me.role) !== "owner") {
+    return json({ error: "forbidden" }, 403);
+  }
 
   // Generar magic_link como en /auth/request (mismo formato).
   const token = randomHex(32);

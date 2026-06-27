@@ -153,9 +153,9 @@ export async function handleAddImeis(wsId: string, itemId: string, req: Request,
   await tursoQuery(env, {
     sql: `UPDATE catalog_items
             SET track_stock = 1,
-                stock = (SELECT COUNT(*) FROM catalog_imei WHERE catalog_item_id = ? AND sold_at IS NULL)
+                stock = (SELECT COUNT(*) FROM catalog_imei WHERE catalog_item_id = ? AND workspace_id = ? AND sold_at IS NULL)
             WHERE id = ? AND workspace_id = ?`,
-    args: [itemId, itemId, wsId],
+    args: [itemId, wsId, itemId, wsId],
   });
   const [rows] = await tursoQuery(env, {
     sql: `SELECT id, imei, sold_at, sale_id, created_at FROM catalog_imei
@@ -190,13 +190,13 @@ export async function handleDeleteImei(wsId: string, itemId: string, imeiId: str
   await tursoQuery(env, { sql: `DELETE FROM catalog_imei WHERE id = ? AND workspace_id = ?`, args: [imeiId, wsId] });
   await tursoQuery(env, {
     sql: `UPDATE catalog_items
-            SET stock = (SELECT COUNT(*) FROM catalog_imei WHERE catalog_item_id = ? AND sold_at IS NULL)
+            SET stock = (SELECT COUNT(*) FROM catalog_imei WHERE catalog_item_id = ? AND workspace_id = ? AND sold_at IS NULL)
             WHERE id = ? AND workspace_id = ?`,
-    args: [itemId, itemId, wsId],
+    args: [itemId, wsId, itemId, wsId],
   });
   const [after] = await tursoQuery(env, {
-    sql: `SELECT COUNT(*) AS n FROM catalog_imei WHERE catalog_item_id = ? AND sold_at IS NULL`,
-    args: [itemId],
+    sql: `SELECT COUNT(*) AS n FROM catalog_imei WHERE catalog_item_id = ? AND workspace_id = ? AND sold_at IS NULL`,
+    args: [itemId, wsId],
   });
   return json({ ok: true, stock: Number(after?.[0]?.n ?? 0) });
 }

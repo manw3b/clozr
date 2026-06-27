@@ -32,6 +32,13 @@ compatibility_flags = ["nodejs_compat"]
 binding = "ASSETS"
 bucket_name = "clozr-assets"
 
+# R2 bucket PRIVADO para los backups diarios de la base (cron runBackup).
+# A diferencia de ASSETS, este NUNCA se sirve público (no exponer por /assets/).
+# Creado con: `npx wrangler r2 bucket create clozr-backups`.
+[[r2_buckets]]
+binding = "BACKUPS"
+bucket_name = "clozr-backups"
+
 # ── AI Triage matutino (PoC) ───────────────────────────────────────────
 # Cron de Cloudflare: corre runAiTriage (src/cron/aiTriage.ts) que redacta
 # follow-ups de leads estancados con una llamada a Claude Haiku.

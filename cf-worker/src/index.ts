@@ -50,6 +50,9 @@ export interface Env {
   MP_WEBHOOK_SECRET: string;
   // R2 bucket binding (I) — para logos/banners del workspace.
   ASSETS: R2Bucket;
+  // R2 bucket PRIVADO para los backups diarios de la base (cron runBackup).
+  // Opcional: si el binding no está, el cron hace skip limpio.
+  BACKUPS?: R2Bucket;
 }
 
 import { handleAuthRequest } from "./routes/request";
@@ -135,6 +138,7 @@ import { runAiTriage } from "./cron/aiTriage";
 import { runPlanDowngrade } from "./cron/planDowngrade";
 import { runRepricing } from "./cron/reprice";
 import { runDunning } from "./cron/dunning";
+import { runBackup } from "./cron/backup";
 import { getBlueRate } from "./dolar";
 
 export default {
@@ -155,6 +159,8 @@ export default {
         .catch((e) => console.error("[cron] dunning:", e)),
     );
     ctx.waitUntil(runRepricing(env).catch((e) => console.error("[cron] reprice:", e)));
+    // Backup diario de la base a R2 privado (capa 2 de la estrategia de backups).
+    ctx.waitUntil(runBackup(env).catch((e) => console.error("[cron] backup:", e)));
   },
 
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -244,6 +250,18 @@ export default {
         }
         const result = await runDunning(env);
         return cors(req, env, json({ ok: true, ...result }));
+      }
+
+      // ── Admin: disparar un backup de la base a mano (on-demand) ────────
+      // Útil antes de una migración riesgosa, o para verificar el backup sin
+      // esperar al cron diario. Mismo gate shared-secret (x-admin-secret ==
+      // JWT_SECRET). Escribe a R2 privado `clozr-backups` (dump/YYYY-MM-DD.json).
+      if (route === "POST /admin/backup") {
+        if (!adminOk(req, env)) {
+          return cors(req, env, json({ error: "unauthorized" }, 401));
+        }
+        const result = await runBackup(env);
+        return cors(req, env, json(result));
       }
 
       // ── Admin: diagnóstico de billing (validación MP) ──────────────

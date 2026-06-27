@@ -140,3 +140,124 @@ export async function handleDeleteRepair(workspaceId: string, repairId: string, 
   );
   return json({ ok: true });
 }
+
+/* ── Repuestos itemizados (descuentan stock del catálogo) ─────────────── */
+
+/** Recalcula repairs.parts_cost = suma de los subtotales de sus repuestos. */
+async function recomputePartsCost(env: Env, workspaceId: string, repairId: string): Promise<number> {
+  const row = await tursoFirst(
+    env,
+    `SELECT COALESCE(SUM(subtotal), 0) AS total FROM repair_parts WHERE repair_id = ? AND workspace_id = ?`,
+    [repairId, workspaceId],
+  );
+  const total = Number(row?.total ?? 0);
+  await tursoExec(
+    env,
+    `UPDATE repairs SET parts_cost = ?, updated_at = datetime('now') WHERE id = ? AND workspace_id = ?`,
+    [total, repairId, workspaceId],
+  );
+  return total;
+}
+
+export async function handleListRepairParts(workspaceId: string, repairId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  await ensureRepairs(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+  const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
+  if (!role || !ROLES_READ.has(role)) return json({ error: "forbidden" }, 403);
+
+  const [rows] = await tursoQuery(env, {
+    sql: `SELECT * FROM repair_parts WHERE repair_id = ? AND workspace_id = ? ORDER BY created_at ASC`,
+    args: [repairId, workspaceId],
+  });
+  return json({ parts: rows ?? [] });
+}
+
+export async function handleAddRepairPart(workspaceId: string, repairId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  await ensureRepairs(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+  const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = await requirePermWs(env, workspaceId, role, "repairs.write");
+  if (denied) return denied;
+
+  const repair = await tursoFirst(
+    env,
+    `SELECT id FROM repairs WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+    [repairId, workspaceId],
+  );
+  if (!repair) return json({ error: "not_found" }, 404);
+
+  let body: Record<string, unknown>;
+  try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
+  const description = typeof body.description === "string" ? body.description.trim() : "";
+  if (!description) return json({ error: "missing_description" }, 400);
+  const catalogItemId = typeof body.catalog_item_id === "string" && body.catalog_item_id ? body.catalog_item_id : null;
+  const quantity = Math.max(1, Math.floor(Number(body.quantity) || 1));
+  const unitPrice = Math.max(0, Number(body.unit_price) || 0);
+  const subtotal = quantity * unitPrice;
+
+  const partId = crypto.randomUUID();
+  await tursoExec(
+    env,
+    `INSERT INTO repair_parts (id, repair_id, workspace_id, catalog_item_id, description, quantity, unit_price, subtotal)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [partId, repairId, workspaceId, catalogItemId, description, quantity, unitPrice, subtotal],
+  );
+
+  // Si la pieza salió del inventario, descontamos su stock (atómico, sin negativos).
+  // `stock IS NOT NULL` evita tocar ítems que no llevan inventario.
+  if (catalogItemId) {
+    await tursoExec(
+      env,
+      `UPDATE catalog_items SET stock = MAX(0, stock - ?), updated_at = datetime('now')
+         WHERE id = ? AND workspace_id = ? AND stock IS NOT NULL`,
+      [quantity, catalogItemId, workspaceId],
+    );
+  }
+
+  const partsCost = await recomputePartsCost(env, workspaceId, repairId);
+  return json({ ok: true, id: partId, parts_cost: partsCost }, 201);
+}
+
+export async function handleDeleteRepairPart(workspaceId: string, repairId: string, partId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  await ensureRepairs(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+  const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
+  if (!role) return json({ error: "forbidden" }, 403);
+  const denied = await requirePermWs(env, workspaceId, role, "repairs.write");
+  if (denied) return denied;
+
+  const part = await tursoFirst(
+    env,
+    `SELECT catalog_item_id, quantity FROM repair_parts WHERE id = ? AND repair_id = ? AND workspace_id = ?`,
+    [partId, repairId, workspaceId],
+  );
+  if (!part) return json({ error: "not_found" }, 404);
+
+  await tursoExec(
+    env,
+    `DELETE FROM repair_parts WHERE id = ? AND repair_id = ? AND workspace_id = ?`,
+    [partId, repairId, workspaceId],
+  );
+
+  // Reponemos al inventario el stock que habíamos descontado.
+  const cii = typeof part.catalog_item_id === "string" ? part.catalog_item_id : null;
+  const qty = Number(part.quantity) || 0;
+  if (cii && qty > 0) {
+    await tursoExec(
+      env,
+      `UPDATE catalog_items SET stock = stock + ?, updated_at = datetime('now')
+         WHERE id = ? AND workspace_id = ? AND stock IS NOT NULL`,
+      [qty, cii, workspaceId],
+    );
+  }
+
+  const partsCost = await recomputePartsCost(env, workspaceId, repairId);
+  return json({ ok: true, parts_cost: partsCost });
+}

@@ -103,7 +103,7 @@ import {
 import { handleListOrigins, handleCreateOrigin, handleDeleteOrigin } from "./routes/origins";
 import { handleListAppointments, handleCreateAppointment, handleUpdateAppointment, handleDeleteAppointment } from "./routes/appointments";
 import { handleListAppointmentTypes, handleCreateAppointmentType, handleDeleteAppointmentType } from "./routes/appointmentTypes";
-import { handleListRepairs as handleListRepairOrders, handleCreateRepair, handleUpdateRepair, handleDeleteRepair as handleDeleteRepairOrder } from "./routes/repairs";
+import { handleListRepairs as handleListRepairOrders, handleCreateRepair, handleUpdateRepair, handleDeleteRepair as handleDeleteRepairOrder, handleListRepairParts, handleAddRepairPart, handleDeleteRepairPart } from "./routes/repairs";
 import { handleGetSettings, handlePutSettings } from "./routes/settings";
 import { handleGetRolePermissions, handlePutRolePermissions } from "./routes/rolePermissions";
 import { handleGetCustomRoles, handlePutCustomRoles } from "./routes/customRoles";
@@ -459,6 +459,17 @@ export default {
 
       // Reparaciones del taller — módulo propio. Fase ⑥.
       // (Distinto de catalog-repairs/refurbish, que vive bajo /catalog/:id/repairs.)
+      // Repuestos de una orden: /workspaces/:wid/repairs/:rid/parts[/:partId]. Va
+      // antes del match de la orden (tiene 2 segmentos, no colisiona igual).
+      const wsRepairPartsMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/repairs\/([^/]+)\/parts(?:\/([^/]+))?\/?$/);
+      if (wsRepairPartsMatch) {
+        const wsId = wsRepairPartsMatch[1]!;
+        const rId = wsRepairPartsMatch[2]!;
+        const partId = wsRepairPartsMatch[3];
+        if (!partId && req.method === "GET")    return cors(req, env, await handleListRepairParts(wsId, rId, req, env));
+        if (!partId && req.method === "POST")   return cors(req, env, await handleAddRepairPart(wsId, rId, req, env));
+        if (partId && req.method === "DELETE")  return cors(req, env, await handleDeleteRepairPart(wsId, rId, partId, req, env));
+      }
       const wsRepairOrdersMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/repairs(?:\/([^/]+))?\/?$/);
       if (wsRepairOrdersMatch) {
         const wsId = wsRepairOrdersMatch[1]!;

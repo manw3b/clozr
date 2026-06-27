@@ -1277,6 +1277,24 @@ export async function ensureRepairs(env: Env): Promise<void> {
   await tursoQuery(env, {
     sql: `CREATE INDEX IF NOT EXISTS idx_repairs_ws ON repairs(workspace_id, deleted_at, status)`,
   });
+  // Repuestos itemizados de una reparación. catalog_item_id (nullable): si está,
+  // la pieza salió del inventario y descuenta stock; si es null, es texto libre.
+  await tursoQuery(env, {
+    sql: `CREATE TABLE IF NOT EXISTS repair_parts (
+      id TEXT PRIMARY KEY,
+      repair_id TEXT NOT NULL REFERENCES repairs(id),
+      workspace_id TEXT NOT NULL REFERENCES cloud_workspaces(id),
+      catalog_item_id TEXT,
+      description TEXT NOT NULL,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      unit_price REAL NOT NULL DEFAULT 0,
+      subtotal REAL NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  });
+  await tursoQuery(env, {
+    sql: `CREATE INDEX IF NOT EXISTS idx_repair_parts_repair ON repair_parts(repair_id)`,
+  });
   repairsReady = true;
 }
 

@@ -1210,6 +1210,7 @@ export async function ensureAppointments(env: Env): Promise<void> {
     sql: `CREATE INDEX IF NOT EXISTS idx_appointments_ws ON appointments(workspace_id, deleted_at, appointment_at)`,
   });
   await safeAddColumn(env, "appointments", "sale_id", "TEXT"); // turnos creados desde una venta
+  await safeAddColumn(env, "appointments", "product", "TEXT"); // equipo/producto que el cliente viene a ver
   appointmentsReady = true;
 }
 

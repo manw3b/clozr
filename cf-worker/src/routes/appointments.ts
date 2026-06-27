@@ -24,7 +24,7 @@ const ROLES_READ = new Set(["owner", "admin", "vendedor", "viewer"]);
 
 const EDITABLE = [
   "customer_id", "customer_name", "customer_phone",
-  "appointment_at", "type", "origin", "notes", "status",
+  "appointment_at", "type", "origin", "product", "notes", "status",
 ] as const;
 
 const STATUSES = new Set(["pending", "done", "cancelled"]);
@@ -80,6 +80,7 @@ export async function handleCreateAppointment(workspaceId: string, req: Request,
   const customerPhone = typeof body.customer_phone === "string" ? body.customer_phone : null;
   const type = typeof body.type === "string" ? body.type : null;
   const origin = typeof body.origin === "string" ? body.origin : null;
+  const product = typeof body.product === "string" ? body.product : null;
   const notes = typeof body.notes === "string" ? body.notes : null;
 
   // Upsert por venta: "Generar turno" desde la misma venta actualiza el turno
@@ -94,9 +95,9 @@ export async function handleCreateAppointment(workspaceId: string, req: Request,
       const eid = String(existing.id);
       await tursoExec(
         env,
-        `UPDATE appointments SET customer_id = ?, customer_name = ?, customer_phone = ?, appointment_at = ?, type = ?, origin = ?, notes = ?, status = ?, updated_at = datetime('now')
+        `UPDATE appointments SET customer_id = ?, customer_name = ?, customer_phone = ?, appointment_at = ?, type = ?, origin = ?, product = ?, notes = ?, status = ?, updated_at = datetime('now')
            WHERE id = ? AND workspace_id = ?`,
-        [customerId, customerName, customerPhone, appointmentAt, type, origin, notes, status, eid, workspaceId],
+        [customerId, customerName, customerPhone, appointmentAt, type, origin, product, notes, status, eid, workspaceId],
       );
       return json({ id: eid });
     }
@@ -107,9 +108,9 @@ export async function handleCreateAppointment(workspaceId: string, req: Request,
   await tursoExec(
     env,
     `INSERT INTO appointments
-       (id, workspace_id, sale_id, customer_id, customer_name, customer_phone, appointment_at, type, origin, notes, status, owner_id, owner_name)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, workspaceId, saleId, customerId, customerName, customerPhone, appointmentAt, type, origin, notes, status, auth.userId, ownerName],
+       (id, workspace_id, sale_id, customer_id, customer_name, customer_phone, appointment_at, type, origin, product, notes, status, owner_id, owner_name)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, workspaceId, saleId, customerId, customerName, customerPhone, appointmentAt, type, origin, product, notes, status, auth.userId, ownerName],
   );
   return json({ id }, 201);
 }

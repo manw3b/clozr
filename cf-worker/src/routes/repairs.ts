@@ -26,7 +26,7 @@ const EDITABLE = [
   "customer_id", "customer_name", "customer_phone",
   "device_model", "device_imei", "device_passcode", "accessories",
   "problem", "diagnosis", "status",
-  "parts_cost", "labor_cost", "technician", "warranty_months", "notes",
+  "parts_cost", "labor_cost", "deposit", "technician", "warranty_months", "notes",
   "received_at", "estimated_at", "delivered_at",
   "appointment_id", "sale_id",
 ] as const;
@@ -82,11 +82,15 @@ export async function handleCreateRepair(workspaceId: string, req: Request, env:
   if (!("received_at" in fields) || !fields.received_at) fields.received_at = new Date().toISOString().slice(0, 16);
 
   const id = typeof body.id === "string" && body.id ? body.id : crypto.randomUUID();
-  const cols = ["id", "workspace_id", "owner_id", "owner_name", ...Object.keys(fields)];
-  const vals: TursoArg[] = [id, workspaceId, auth.userId, typeof body.owner_name === "string" ? body.owner_name : auth.email ?? null, ...Object.values(fields)];
+  // N° de orden secuencial por taller (workspace), estable ante borrados (MAX+1).
+  const seqRow = await tursoFirst(env, `SELECT COALESCE(MAX(order_seq), 0) + 1 AS next FROM repairs WHERE workspace_id = ?`, [workspaceId]);
+  const orderSeq = Number(seqRow?.next ?? 1) || 1;
+  const ownerName = typeof body.owner_name === "string" ? body.owner_name : auth.email ?? null;
+  const cols = ["id", "workspace_id", "owner_id", "owner_name", "order_seq", ...Object.keys(fields)];
+  const vals: TursoArg[] = [id, workspaceId, auth.userId, ownerName, orderSeq, ...Object.values(fields)];
   const placeholders = cols.map(() => "?").join(", ");
   await tursoExec(env, `INSERT INTO repairs (${cols.join(", ")}) VALUES (${placeholders})`, vals);
-  return json({ id }, 201);
+  return json({ id, order_seq: orderSeq }, 201);
 }
 
 export async function handleUpdateRepair(workspaceId: string, repairId: string, req: Request, env: Env): Promise<Response> {

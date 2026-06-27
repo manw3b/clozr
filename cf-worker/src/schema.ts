@@ -1295,6 +1295,9 @@ export async function ensureRepairs(env: Env): Promise<void> {
   await tursoQuery(env, {
     sql: `CREATE INDEX IF NOT EXISTS idx_repair_parts_repair ON repair_parts(repair_id)`,
   });
+  // #4: seña/anticipo + N° de orden secuencial por taller (lazy, DBs existentes).
+  await safeAddColumn(env, "repairs", "deposit", "REAL");
+  await safeAddColumn(env, "repairs", "order_seq", "INTEGER");
   repairsReady = true;
 }
 

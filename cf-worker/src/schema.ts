@@ -1211,6 +1211,7 @@ export async function ensureAppointments(env: Env): Promise<void> {
   });
   await safeAddColumn(env, "appointments", "sale_id", "TEXT"); // turnos creados desde una venta
   await safeAddColumn(env, "appointments", "product", "TEXT"); // equipo/producto que el cliente viene a ver
+  await safeAddColumn(env, "appointments", "day_seq", "INTEGER"); // orden del turno dentro de su día (para el código P27F1)
   appointmentsReady = true;
 }
 

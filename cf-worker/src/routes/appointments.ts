@@ -88,7 +88,7 @@ export async function handleCreateAppointment(workspaceId: string, req: Request,
   if (saleId) {
     const existing = await tursoFirst(
       env,
-      `SELECT id FROM appointments WHERE workspace_id = ? AND sale_id = ? AND deleted_at IS NULL LIMIT 1`,
+      `SELECT id, day_seq FROM appointments WHERE workspace_id = ? AND sale_id = ? AND deleted_at IS NULL LIMIT 1`,
       [workspaceId, saleId],
     );
     if (existing) {
@@ -99,20 +99,36 @@ export async function handleCreateAppointment(workspaceId: string, req: Request,
            WHERE id = ? AND workspace_id = ?`,
         [customerId, customerName, customerPhone, appointmentAt, type, origin, product, notes, status, eid, workspaceId],
       );
-      return json({ id: eid });
+      return json({ id: eid, day_seq: existing.day_seq ?? null });
     }
   }
 
   const id = typeof body.id === "string" && body.id ? body.id : crypto.randomUUID();
-  const ownerName = typeof body.owner_name === "string" ? body.owner_name : auth.email ?? null;
+  // Nombre del responsable (para la inicial del código P27F1): el que mande el
+  // cliente, o el nombre real del usuario logueado, o su email como último recurso.
+  let ownerName = typeof body.owner_name === "string" && body.owner_name.trim() ? body.owner_name.trim() : null;
+  if (!ownerName) {
+    const u = await tursoFirst(env, `SELECT name FROM users WHERE id = ?`, [auth.userId]);
+    ownerName = (u && typeof u.name === "string" && u.name.trim() ? u.name.trim() : null) ?? auth.email ?? null;
+  }
+  // Orden del turno dentro de su día (para el código): MAX(day_seq)+1 entre los
+  // turnos del MISMO día del turno. No se renumera al editar/borrar (estable).
+  const apptDay = appointmentAt.slice(0, 10);
+  const seqRow = await tursoFirst(
+    env,
+    `SELECT COALESCE(MAX(day_seq), 0) + 1 AS n FROM appointments
+       WHERE workspace_id = ? AND substr(appointment_at, 1, 10) = ? AND deleted_at IS NULL`,
+    [workspaceId, apptDay],
+  );
+  const daySeq = Number(seqRow?.n ?? 1);
   await tursoExec(
     env,
     `INSERT INTO appointments
-       (id, workspace_id, sale_id, customer_id, customer_name, customer_phone, appointment_at, type, origin, product, notes, status, owner_id, owner_name)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, workspaceId, saleId, customerId, customerName, customerPhone, appointmentAt, type, origin, product, notes, status, auth.userId, ownerName],
+       (id, workspace_id, sale_id, customer_id, customer_name, customer_phone, appointment_at, type, origin, product, notes, status, day_seq, owner_id, owner_name)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, workspaceId, saleId, customerId, customerName, customerPhone, appointmentAt, type, origin, product, notes, status, daySeq, auth.userId, ownerName],
   );
-  return json({ id }, 201);
+  return json({ id, day_seq: daySeq }, 201);
 }
 
 export async function handleUpdateAppointment(workspaceId: string, appointmentId: string, req: Request, env: Env): Promise<Response> {

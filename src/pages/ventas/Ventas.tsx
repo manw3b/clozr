@@ -249,7 +249,7 @@ export function Ventas() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: space[5], height: '100%' }}>
       <PageHeader
         title="Ventas"
-        subtitle={`${filtered.length} ${filtered.length === 1 ? 'venta' : 'ventas'} · ${formatMoney(totalPeriod)} en el período`}
+        subtitle={`${filtered.length} ${filtered.length === 1 ? 'venta' : 'ventas'} · ${formatMoney(totalPeriod, 'USD')} en el período`}
         actions={
           <>
             <Button
@@ -535,7 +535,7 @@ const columns: ColumnDef<Sale>[] = [
         </div>
         {s.status === 'partial' && s.pending && (
           <div style={{ fontSize: 10, color: color.warning, fontWeight: weight.semibold, marginTop: 1 }}>
-            Falta {formatMoney(s.pending)}
+            Falta {formatMoney(s.pending, s.currency as 'USD' | 'ARS')}
           </div>
         )}
       </div>

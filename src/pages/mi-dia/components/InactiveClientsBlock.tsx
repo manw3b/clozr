@@ -30,7 +30,7 @@ export function InactiveClientsBlock({
       title="Clientes en riesgo"
       count={clients.length}
       countTone="warning"
-      subtitle={`${formatMoney(totalValue)} en valor histórico a recuperar`}
+      subtitle={`${formatMoney(totalValue, 'USD')} en valor histórico a recuperar`}
       icon={<UserMinus size={16} strokeWidth={2.2} />}
       iconTone="warning"
       onViewAll={onViewAll}
@@ -131,7 +131,7 @@ function InactiveRow({
           {client.lifetimeValue && (
             <>
               <span>·</span>
-              <span>{formatMoney(client.lifetimeValue)} histórico</span>
+              <span>{formatMoney(client.lifetimeValue, 'USD')} histórico</span>
             </>
           )}
         </div>

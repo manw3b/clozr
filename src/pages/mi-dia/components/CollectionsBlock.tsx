@@ -31,8 +31,8 @@ export function CollectionsBlock({
       countTone={overdueAmount > 0 ? 'danger' : 'neutral'}
       subtitle={
         overdueAmount > 0
-          ? `${formatMoney(overdueAmount)} atrasado`
-          : `Total: ${formatMoney(totalAmount)}`
+          ? `${formatMoney(overdueAmount, 'USD')} atrasado`
+          : `Total: ${formatMoney(totalAmount, 'USD')}`
       }
       icon={<Wallet size={16} strokeWidth={2.2} />}
       iconTone={overdueAmount > 0 ? 'danger' : 'warning'}
@@ -141,7 +141,7 @@ function CollectionRow({
             letterSpacing: '-0.2px',
           }}
         >
-          {formatMoney(collection.amount)}
+          {formatMoney(collection.amount, 'USD')}
         </div>
       </div>
 

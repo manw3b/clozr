@@ -120,8 +120,10 @@ export function dbSaleToDomain(s: DbSale): Sale {
     number: `V-${s.id.slice(0, 6).toUpperCase()}`,
     clientId: s.customer_id ?? "",
     clientName: s.customer_name ?? "Sin cliente",
+    // sales.total está en USD (fuente de verdad del escritorio). Mapper legacy
+    // que todavía alimenta la vista de Clientes (useClientsData).
     amount: s.total,
-    currency: "ARS",
+    currency: "USD",
     status: saleStatus(s.is_paid, s.total_paid),
     paid: s.total_paid,
     pending: s.balance,
@@ -165,11 +167,10 @@ export function dbSaleToDueCollection(s: DbSale): DueCollection {
     clientName: s.customer_name ?? "Sin cliente",
     amount: s.balance,
     total: s.total,
-    // Hoy todas las ventas se asumen ARS — el schema de sales no guarda
-    // currency a nivel header (la moneda vive en cada sale_payment).
-    // Para el cobro alcanza este default; el método de pago elegido
-    // define la moneda del nuevo pago.
-    currency: "ARS",
+    // sales.balance/total están en USD (fuente de verdad del escritorio), así
+    // que el saldo se muestra en dólares. Al cobrar, el método de pago elegido
+    // define la moneda del nuevo pago (ARS o USD).
+    currency: "USD",
     dueAt: due,
     daysOverdue,
     product: s.notes ?? undefined,

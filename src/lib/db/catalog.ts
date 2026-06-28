@@ -419,9 +419,9 @@ export async function getRecentSalesForProduct(
   workspaceId: string,
   catalogItemId: string,
   limit = 5,
-): Promise<Array<{ sale_id: string; sale_date: string; customer_name: string | null; unit_price: number; quantity: number }>> {
+): Promise<Array<{ sale_id: string; sale_date: string; customer_name: string | null; unit_price: number; quantity: number; currency: string | null }>> {
   return dbSelect(
-    `SELECT si.sale_id, s.sale_date, s.customer_name, si.unit_price, si.quantity
+    `SELECT si.sale_id, s.sale_date, s.customer_name, si.unit_price, si.quantity, si.currency
      FROM sale_items si
      JOIN sales s ON s.id = si.sale_id
      WHERE s.workspace_id = ? AND si.catalog_item_id = ?

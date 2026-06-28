@@ -251,7 +251,7 @@ export function MyDayHero({
                     lineHeight: 1,
                   }}
                 >
-                  {formatMoney(goal.current)}
+                  {formatMoney(goal.current, 'USD')}
                 </span>
                 <span
                   style={{
@@ -260,7 +260,7 @@ export function MyDayHero({
                     fontWeight: weight.medium,
                   }}
                 >
-                  de {formatMoney(goal.amount)}
+                  de {formatMoney(goal.amount, 'USD')}
                 </span>
                 {canEdit && (
                   <GoalEditButton current={goal.amount} onSave={onSetGoal!} />
@@ -284,7 +284,7 @@ export function MyDayHero({
                   <>
                     Faltan{' '}
                     <span style={{ color: color.text, fontWeight: weight.semibold }}>
-                      {formatMoney(remaining)}
+                      {formatMoney(remaining, 'USD')}
                     </span>{' '}
                     para el objetivo
                   </>

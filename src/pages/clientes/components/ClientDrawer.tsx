@@ -142,10 +142,10 @@ export function ClientDrawer({
         }}
       >
         <Stat label="Compras" value={String(client.totalPurchases || 0)} />
-        <Stat label="Histórico" value={formatMoney(client.lifetimeValue || 0)} compact />
+        <Stat label="Histórico" value={formatMoney(client.lifetimeValue || 0, 'USD')} compact />
         <Stat
           label="Deuda"
-          value={formatMoney(totalDebt)}
+          value={formatMoney(totalDebt, 'USD')}
           compact
           tone={totalDebt > 0 ? 'danger' : 'neutral'}
         />
@@ -723,11 +723,11 @@ function SaleCard({ sale }: { sale: Sale }) {
             letterSpacing: '-0.2px',
           }}
         >
-          {formatMoney(sale.amount)}
+          {formatMoney(sale.amount, 'USD')}
         </div>
         {sale.status === 'partial' && (
           <div style={{ fontSize: 10, color: color.warning, fontWeight: weight.semibold, marginTop: 2 }}>
-            Falta {formatMoney(sale.amount - sale.paid)}
+            Falta {formatMoney(sale.amount - sale.paid, 'USD')}
           </div>
         )}
       </div>
@@ -791,7 +791,7 @@ function DebtsTab({
             Saldo pendiente total
           </div>
           <div style={{ fontSize: text.xl, fontWeight: weight.bold, color: color.danger }}>
-            {formatMoney(total)}
+            {formatMoney(total, 'USD')}
           </div>
         </div>
       </div>
@@ -839,7 +839,7 @@ function DebtsTab({
               color: debt.daysOverdue > 0 ? color.danger : color.text,
             }}
           >
-            {formatMoney(debt.amount)}
+            {formatMoney(debt.amount, 'USD')}
           </div>
           {onMarkPaid && (
             <Button variant="secondary" size="sm" onClick={() => onMarkPaid(debt.saleId)}>

@@ -159,7 +159,7 @@ export function Deudas() {
       align: "right",
       cell: (r) => (
         <span style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.danger }}>
-          {formatMoney(r.totalDue)}
+          {formatMoney(r.totalDue, 'USD')}
         </span>
       ),
     },
@@ -278,7 +278,7 @@ export function Deudas() {
               letterSpacing: "-0.5px",
             }}
           >
-            {formatMoney(totals.totalDue)}
+            {formatMoney(totals.totalDue, 'USD')}
           </div>
         </Card>
         <Card padding={5}>

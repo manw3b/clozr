@@ -428,7 +428,7 @@ export function ProductDetailDrawer({ item, onClose, onEdit, onLoadAnotherVarian
                     </div>
                   </div>
                   <div style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text }}>
-                    {formatMoney(s.unit_price * s.quantity)}
+                    {formatMoney(s.unit_price * s.quantity, (s.currency ?? 'USD') as 'ARS' | 'USD')}
                   </div>
                 </div>
               ))}

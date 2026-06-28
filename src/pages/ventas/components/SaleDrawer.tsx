@@ -138,7 +138,7 @@ export function SaleDrawer({
           >
             <AlertCircle size={14} strokeWidth={2.4} />
             <span>
-              Falta {formatMoney(remaining)}{' '}
+              Falta {formatMoney(remaining, sale.currency as 'USD' | 'ARS')}{' '}
               {sale.dueAt && (
                 <>· {isOverdue ? 'vencida' : 'vence'} {formatRelative(sale.dueAt, { kind: 'due' })}</>
               )}
@@ -353,13 +353,13 @@ function ItemRow({ item, divider }: { item: SaleItem; divider: boolean }) {
         </div>
         <div style={{ fontSize: text.xs, color: color.textMuted, marginTop: 2 }}>
           {item.quantity > 1
-            ? `${item.quantity} × ${formatMoney(item.unit_price)}`
-            : formatMoney(item.unit_price)}
+            ? `${item.quantity} × ${formatMoney(item.unit_price, (item.currency ?? 'USD') as 'ARS' | 'USD')}`
+            : formatMoney(item.unit_price, (item.currency ?? 'USD') as 'ARS' | 'USD')}
           {item.imei && ` · IMEI ${item.imei}`}
         </div>
       </div>
       <div style={{ fontSize: text.sm, fontWeight: weight.semibold, color: color.text, fontVariantNumeric: 'tabular-nums' }}>
-        {formatMoney(subtotal)}
+        {formatMoney(subtotal, (item.currency ?? 'USD') as 'ARS' | 'USD')}
       </div>
     </div>
   );

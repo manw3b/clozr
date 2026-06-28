@@ -22,7 +22,7 @@ export function SalesBlock({ sales, onSaleClick, onNewSale, onViewAll }: SalesBl
       title="Ventas de hoy"
       count={sales.length}
       countTone="primary"
-      subtitle={sales.length > 0 ? `Total: ${formatMoney(total)}` : undefined}
+      subtitle={sales.length > 0 ? `Total: ${formatMoney(total, 'USD')}` : undefined}
       icon={<ShoppingCart size={16} strokeWidth={2.2} />}
       iconTone="success"
       onViewAll={onViewAll}
@@ -113,11 +113,11 @@ function SaleRow({ sale, onClick, isLast }: { sale: Sale; onClick: () => void; i
             letterSpacing: '-0.2px',
           }}
         >
-          {formatMoney(sale.amount)}
+          {formatMoney(sale.amount, 'USD')}
         </div>
         {sale.status === 'partial' && (
           <div style={{ fontSize: 10, color: color.warning, fontWeight: weight.semibold }}>
-            Falta {formatMoney(sale.amount - sale.paid)}
+            Falta {formatMoney(sale.amount - sale.paid, 'USD')}
           </div>
         )}
       </div>

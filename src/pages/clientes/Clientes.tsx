@@ -726,7 +726,7 @@ const baseColumns: ColumnDef<Client>[] = [
           fontVariantNumeric: 'tabular-nums',
         }}
       >
-        {c.lifetimeValue ? formatMoney(c.lifetimeValue) : '—'}
+        {c.lifetimeValue ? formatMoney(c.lifetimeValue, 'USD') : '—'}
       </span>
     ),
   },
@@ -746,7 +746,7 @@ const baseColumns: ColumnDef<Client>[] = [
             fontVariantNumeric: 'tabular-nums',
           }}
         >
-          {formatMoney(c.balanceDue)}
+          {formatMoney(c.balanceDue, 'USD')}
         </span>
       ) : (
         <span style={{ color: color.textDim, fontSize: text.sm }}>—</span>

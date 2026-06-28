@@ -101,7 +101,7 @@ import {
 import {
   handleListSales, handleGetSale, handleCreateSale, handleUpdateSale,
   handleDeleteSale, handleAddPayment, handleImportSales, handleListSaleItems,
-  handleSendWarranty,
+  handleSendWarranty, handleBackfillSalesUsd,
 } from "./routes/sales";
 import { handleListOrigins, handleCreateOrigin, handleDeleteOrigin } from "./routes/origins";
 import { handleListAppointments, handleCreateAppointment, handleUpdateAppointment, handleDeleteAppointment } from "./routes/appointments";
@@ -421,12 +421,18 @@ export default {
         if (req.method === "PUT") return cors(req, env, await handleSetCatalogPrice(wsId, req, env));
       }
       const wsSalesImportMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales\/import\/?$/);
+      const wsSalesBackfillUsdMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales\/backfill-usd\/?$/);
       const wsSalePaymentMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales\/([^/]+)\/payments\/?$/);
       const wsSaleWarrantyMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales\/([^/]+)\/warranty\/?$/);
       const wsSaleMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/sales(?:\/([^/]+))?\/?$/);
 
       if (wsSalesImportMatch && req.method === "POST") {
         return cors(req, env, await handleImportSales(wsSalesImportMatch[1]!, req, env));
+      }
+      // Backfill USD (Fase 1b) — convierte ventas legacy a US$ al blue actual.
+      // Va antes del match genérico de /sales/:sid (POST owner-only).
+      if (wsSalesBackfillUsdMatch && req.method === "POST") {
+        return cors(req, env, await handleBackfillSalesUsd(wsSalesBackfillUsdMatch[1]!, req, env));
       }
       if (wsSalePaymentMatch && req.method === "POST") {
         return cors(req, env, await handleAddPayment(wsSalePaymentMatch[1]!, wsSalePaymentMatch[2]!, req, env));

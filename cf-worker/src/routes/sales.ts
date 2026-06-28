@@ -528,6 +528,73 @@ export async function handleAddPayment(workspaceId: string, saleId: string, req:
   return json({ ok: true, id: payId }, 201);
 }
 
+/* ── Backfill USD (Fase 1b) ──────────────────────────────────────────────
+ * Convierte las ventas legacy (total_usd NULL) a US$ usando el blue ACTUAL
+ * que manda la app (no hay cotización histórica). One-shot e idempotente:
+ * sólo toca las que todavía no tienen US$, así se puede re-correr sin
+ * duplicar ni pisar ventas ya en dólares.
+ *
+ *   sale_payments.amount_usd = pago en US$ → amount ; en pesos → amount / rate
+ *   sales.total_usd          = total / rate           (las columnas ARS son ARS)
+ *   sales.total_paid_usd     = Σ amount_usd            (consistente con los pagos)
+ *   sales.balance_usd        = total_usd − Σ amount_usd
+ *   sales.fx_rate            = rate
+ *
+ * Permiso: owner only (es una migración de datos del workspace).
+ */
+export async function handleBackfillSalesUsd(workspaceId: string, req: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
+  await ensureSalesUsd(env);
+  const auth = await requireAuth(req, env);
+  if (!auth) return json({ error: "unauthorized" }, 401);
+  const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
+  if (role !== "owner") return json({ error: "forbidden" }, 403);
+
+  let body: Record<string, unknown>;
+  try { body = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "invalid_body" }, 400); }
+  const rate = typeof body.rate === "number" ? body.rate : NaN;
+  if (!Number.isFinite(rate) || rate <= 0) return json({ error: "invalid_rate" }, 400);
+
+  // Cuántas ventas legacy hay para convertir (las que aún no tienen US$).
+  const pending = await tursoFirst(
+    env,
+    `SELECT COUNT(*) AS n FROM sales WHERE workspace_id = ? AND deleted_at IS NULL AND total_usd IS NULL`,
+    [workspaceId],
+  );
+  const count = Number(pending?.n ?? 0);
+  if (count === 0) return json({ ok: true, updated: 0, rate });
+
+  // Atómico: (1) pagos primero —mientras las sales todavía gatean por
+  // total_usd IS NULL—, (2) después las sales. El orden importa porque ambos
+  // statements usan total_usd IS NULL como gate.
+  await tursoTransaction(
+    env,
+    {
+      sql: `UPDATE sale_payments
+              SET amount_usd = CASE WHEN currency = 'USD' THEN amount ELSE amount / ? END,
+                  fx_rate = ?
+            WHERE amount_usd IS NULL
+              AND sale_id IN (
+                SELECT id FROM sales
+                 WHERE workspace_id = ? AND deleted_at IS NULL AND total_usd IS NULL
+              )`,
+      args: [rate, rate, workspaceId],
+    },
+    {
+      sql: `UPDATE sales
+              SET total_usd      = total / ?,
+                  total_paid_usd = COALESCE((SELECT SUM(amount_usd) FROM sale_payments WHERE sale_id = sales.id), 0),
+                  balance_usd    = (total / ?) - COALESCE((SELECT SUM(amount_usd) FROM sale_payments WHERE sale_id = sales.id), 0),
+                  fx_rate        = ?,
+                  updated_at     = datetime('now')
+            WHERE workspace_id = ? AND deleted_at IS NULL AND total_usd IS NULL`,
+      args: [rate, rate, rate, workspaceId],
+    },
+  );
+
+  return json({ ok: true, updated: count, rate });
+}
+
 /* ── DELETE soft ─────────────────────────────────────────────────────── */
 
 export async function handleDeleteSale(workspaceId: string, saleId: string, req: Request, env: Env): Promise<Response> {

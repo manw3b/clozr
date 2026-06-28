@@ -18,7 +18,7 @@
  */
 
 import type { Env } from "../index";
-import { ensureSchema, ensureSalesOrderSeq, ensureSalesTurno, ensureSalesItemCurrency } from "../schema";
+import { ensureSchema, ensureSalesOrderSeq, ensureSalesTurno, ensureSalesItemCurrency, ensureSalesUsd } from "../schema";
 import { requireAuth } from "../auth";
 import { tursoExec, tursoFirst, tursoQuery, tursoTransaction, type TursoArg } from "../turso";
 import { getRoleInWorkspace, json } from "./_generic";
@@ -39,6 +39,8 @@ function arLocalDay(iso: string): string {
 const SALE_EDITABLE = [
   "customer_id", "customer_name", "seller_id", "seller_name",
   "subtotal", "total", "total_paid", "balance", "is_paid",
+  // USD-nativo: el dólar es la fuente de verdad; las columnas ARS quedan de referencia.
+  "total_usd", "total_paid_usd", "balance_usd", "fx_rate",
   "payment_method", "notes", "out_of_stock_sale",
   "regularized_at", "regularized_by", "sale_date",
   "appointment_at", "origin",
@@ -51,7 +53,7 @@ const ITEM_EDITABLE = [
 ] as const;
 
 const PAYMENT_EDITABLE = [
-  "method", "currency", "amount", "is_deposit",
+  "method", "currency", "amount", "amount_usd", "fx_rate", "is_deposit",
 ] as const;
 
 const CASH_MOVEMENT_EDITABLE = [
@@ -141,6 +143,7 @@ export async function handleListSales(workspaceId: string, req: Request, env: En
   await ensureSalesOrderSeq(env);
   await ensureSalesTurno(env);
   await ensureSalesItemCurrency(env);
+  await ensureSalesUsd(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
@@ -194,6 +197,7 @@ export async function handleGetSale(workspaceId: string, saleId: string, req: Re
   await ensureSalesOrderSeq(env);
   await ensureSalesTurno(env);
   await ensureSalesItemCurrency(env);
+  await ensureSalesUsd(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
@@ -242,6 +246,7 @@ export async function handleCreateSale(workspaceId: string, req: Request, env: E
   await ensureSalesOrderSeq(env);
   await ensureSalesTurno(env);
   await ensureSalesItemCurrency(env);
+  await ensureSalesUsd(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
@@ -466,6 +471,7 @@ export async function handleUpdateSale(workspaceId: string, saleId: string, req:
 
 export async function handleAddPayment(workspaceId: string, saleId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  await ensureSalesUsd(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   const role = await getRoleInWorkspace(env, workspaceId, auth.userId);
@@ -496,7 +502,11 @@ export async function handleAddPayment(workspaceId: string, saleId: string, req:
   const vals: TursoArg[] = [payId, saleId, ...Object.values(pfields)];
 
   // Insert payment + recalcular total_paid / balance / is_paid en una pipeline.
-  const total = Number(sale.total ?? 0);
+  // USD-nativo: el saldo de verdad es en USD (total_usd − Σ amount_usd). Para
+  // ventas legacy (total_usd NULL) COALESCE(total_usd, total) + COALESCE(amount_usd,
+  // amount) caen al cálculo viejo en ARS → cero cambio para lo existente.
+  // Mantenemos ambas columnas (ARS referencia, USD fuente de verdad). Usamos
+  // refs de columna directas (total, total_usd) → solo bindeamos saleId.
   await tursoQuery(
     env,
     {
@@ -505,12 +515,14 @@ export async function handleAddPayment(workspaceId: string, saleId: string, req:
     },
     {
       sql: `UPDATE sales SET
-              total_paid = COALESCE((SELECT SUM(amount) FROM sale_payments WHERE sale_id = ?), 0),
-              balance = ? - COALESCE((SELECT SUM(amount) FROM sale_payments WHERE sale_id = ?), 0),
-              is_paid = CASE WHEN ? - COALESCE((SELECT SUM(amount) FROM sale_payments WHERE sale_id = ?), 0) <= 0.01 THEN 1 ELSE 0 END,
+              total_paid     = COALESCE((SELECT SUM(amount)     FROM sale_payments WHERE sale_id = ?), 0),
+              total_paid_usd = COALESCE((SELECT SUM(amount_usd) FROM sale_payments WHERE sale_id = ?), 0),
+              balance        = total     - COALESCE((SELECT SUM(amount)     FROM sale_payments WHERE sale_id = ?), 0),
+              balance_usd    = total_usd - COALESCE((SELECT SUM(amount_usd) FROM sale_payments WHERE sale_id = ?), 0),
+              is_paid = CASE WHEN COALESCE(total_usd, total) - COALESCE((SELECT SUM(COALESCE(amount_usd, amount)) FROM sale_payments WHERE sale_id = ?), 0) <= 0.01 THEN 1 ELSE 0 END,
               updated_at = datetime('now')
             WHERE id = ?`,
-      args: [saleId, total, saleId, total, saleId, saleId],
+      args: [saleId, saleId, saleId, saleId, saleId, saleId],
     },
   );
   return json({ ok: true, id: payId }, 201);

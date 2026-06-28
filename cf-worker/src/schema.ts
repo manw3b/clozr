@@ -496,6 +496,19 @@ async function applySchema(env: Env): Promise<void> {
   // reciben de forma lazy vía ensureSalesItemCurrency() (sin bumpear versión).
   await safeAddColumn(env, "sale_items", "currency", "TEXT DEFAULT 'ARS'");
 
+  // 011 — USD-nativo: el dólar pasa a ser la fuente de verdad. Guardamos total,
+  // cobrado y saldo en USD + el blue congelado al momento de la venta (para la
+  // referencia ≈ en pesos). Las columnas ARS quedan como referencia. Aditivo:
+  // ventas viejas tienen estos campos NULL hasta el backfill (/admin/backfill-usd).
+  await safeAddColumn(env, "sales", "total_usd", "REAL");
+  await safeAddColumn(env, "sales", "total_paid_usd", "REAL");
+  await safeAddColumn(env, "sales", "balance_usd", "REAL");
+  await safeAddColumn(env, "sales", "fx_rate", "REAL");
+  // Cada pago guarda su valor en USD, congelado al blue del día del cobro, para
+  // calcular el saldo en USD sumando una sola moneda.
+  await safeAddColumn(env, "sale_payments", "amount_usd", "REAL");
+  await safeAddColumn(env, "sale_payments", "fx_rate", "REAL");
+
   // 009 — precios por tipo de cliente. Cada producto del catálogo puede tener
   // un precio sugerido distinto por tipo de cliente (final/revendedor/
   // mayorista/empresa). En ARS (la web es ARS-only). Sin fila = sin precio
@@ -1151,6 +1164,25 @@ export async function ensureSalesItemCurrency(env: Env): Promise<void> {
   if (salesItemCurrencyReady) return;
   await safeAddColumn(env, "sale_items", "currency", "TEXT DEFAULT 'ARS'");
   salesItemCurrencyReady = true;
+}
+
+let salesUsdReady = false;
+
+/**
+ * Fase USD-nativo: total/cobrado/saldo en USD + el blue congelado, a nivel venta
+ * y pago. El dólar pasa a ser la fuente de verdad; las columnas ARS quedan de
+ * referencia. Aditivo: ventas viejas quedan con estos campos NULL hasta el
+ * backfill (/admin/backfill-usd). Lazy/auto-curativo, sin bumpear SCHEMA_VERSION.
+ */
+export async function ensureSalesUsd(env: Env): Promise<void> {
+  if (salesUsdReady) return;
+  await safeAddColumn(env, "sales", "total_usd", "REAL");
+  await safeAddColumn(env, "sales", "total_paid_usd", "REAL");
+  await safeAddColumn(env, "sales", "balance_usd", "REAL");
+  await safeAddColumn(env, "sales", "fx_rate", "REAL");
+  await safeAddColumn(env, "sale_payments", "amount_usd", "REAL");
+  await safeAddColumn(env, "sale_payments", "fx_rate", "REAL");
+  salesUsdReady = true;
 }
 
 let originsReady = false;

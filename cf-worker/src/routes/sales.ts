@@ -168,6 +168,11 @@ export async function handleListSales(workspaceId: string, req: Request, env: En
 // cruzando catalog_item_id → cost del catálogo client-side.
 export async function handleListSaleItems(workspaceId: string, req: Request, env: Env): Promise<Response> {
   await ensureSchema(env);
+  // Reportes US$ (Fase 4): necesitamos la moneda de la línea (sale_items.currency)
+  // y el blue congelado de la venta (sales.fx_rate) para pasar cada línea a US$
+  // sin licuar. Aseguramos las columnas en DBs viejas antes de SELECTearlas.
+  await ensureSalesItemCurrency(env);
+  await ensureSalesUsd(env);
   const auth = await requireAuth(req, env);
   if (!auth) return json({ error: "unauthorized" }, 401);
   // GET /sale-items alimenta Reportes → requiere reports.view (managers).
@@ -178,7 +183,8 @@ export async function handleListSaleItems(workspaceId: string, req: Request, env
 
   const [rows] = await tursoQuery(env, {
     sql: `SELECT si.id, si.sale_id, si.catalog_item_id, si.description,
-                 si.quantity, si.unit_price, si.subtotal, si.unit_cost,
+                 si.quantity, si.unit_price, si.subtotal, si.unit_cost, si.currency,
+                 s.fx_rate,
                  s.sale_date, s.created_at AS sale_created_at,
                  s.seller_name, s.customer_name
             FROM sale_items si
